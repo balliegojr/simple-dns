@@ -2,7 +2,10 @@ use std::{convert::TryFrom, fmt::Display };
 
 use byteorder::{ByteOrder, BigEndian};
 
-use super::{MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
+use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
+
+const POINTER_MASK: u8 = 0b1100_0000;
+const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
@@ -19,14 +22,33 @@ impl <'a> Name<'a> {
         let mut out = Vec::new();
         let mut pos = 0usize;
 
-        for element in name.split('.') {
-            if element.len() > MAX_LABEL_LENGTH {
-                return Err(crate::SimpleMdnsError::InvalidServiceLabel);
-            }
+
+        let last_pos = name.match_indices('.').fold(0, |acc, (pos, _)| {
+            // println!("{} {} {}", acc, pos, &name[acc..pos]);
+            out.push((acc, pos - acc));
+            pos + 1
+        });
+
+        out.push((last_pos, name.len() - last_pos));
+
+        // if last_pos != name.len() {
+        //     println!("{} {} {}", last_pos, name.len(), &name[last_pos..]);
+        // } else {
+        //     println!("{} {} {}", last_pos, name.len(), &name[last_pos..]);
+        // }
+
+        
+
+        // for element in name.split('.') {
+        //     if element.len() > MAX_LABEL_LENGTH {
+        //         return Err(crate::SimpleMdnsError::InvalidServiceLabel);
+        //     }
             
-            out.push((pos, element.len()));
-            pos += element.len() + 1;
-        }
+        //     out.push((pos, element.len()));
+        //     println!("{} {}", pos, element.len());
+
+        //     pos += element.len() + 1;
+        // }
         
 
         Ok(
@@ -38,7 +60,18 @@ impl <'a> Name<'a> {
         )
     }
 
-    pub fn parse(data: &'a[u8], initial_position: usize) -> crate::Result<Self> {
+    pub fn is_link_local(self) -> bool {
+        if self.labels.len() < 2 {
+            return false
+        }
+
+        let (start, end) = &self.labels[self.labels.len() - 2];
+        b"local.".eq_ignore_ascii_case(&self.data[*start..*start + *end + 1])
+    }
+}
+
+impl <'a> DnsPacketContent<'a> for Name<'a> {
+    fn parse(data: &'a [u8], initial_position: usize) -> crate::Result<Self> where Self: Sized {
         let mut labels = Vec::new();
 
         let mut position = initial_position;
@@ -46,13 +79,13 @@ impl <'a> Name<'a> {
 
         while data[position] != 0 {
             match data[position] {
-                len if len & 0b1100_0000 == 0b1100_0000 => { //compression
+                len if len & POINTER_MASK == POINTER_MASK => { //compression
                     if end == initial_position {
                         end = position + 1;
                     }
 
                     position = (BigEndian::read_u16(
-                        &data[position..position + 2]) & !0b1100_0000_0000_0000) as usize;
+                        &data[position..position + 2]) & !POINTER_MASK_U16) as usize;
                 }
                 len => {
                     labels.push((position + 1, len as usize));
@@ -76,20 +109,19 @@ impl <'a> Name<'a> {
             length_in_bytes: end - initial_position
         })
     }
-
-    pub fn len(&self) -> usize {
-        self.length_in_bytes
-    }
-
-    pub fn to_bytes_vec(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(255);
-        for (pos, length) in &self.labels {
+    
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        for (pos, length) in self.labels.iter().filter(|(p, l)| *l > 0) {
             out.push(*length as u8);
             
             out.extend(&self.data[*pos..(pos+length)])
         }
         out.push(0);
-        out
+        Ok(())
+    }
+    
+    fn len(&self) -> usize {
+        self.length_in_bytes
     }
 }
 
@@ -129,6 +161,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn construct_valid_names() {
+        assert!(Name::new("some").is_ok());
+        assert!(Name::new("some.local").is_ok());
+        assert!(Name::new("some.local.").is_ok());
+        assert!(Name::new("\u{1F600}.local.").is_err());
+    }
+
+    #[test]
+    fn is_link_local() {
+        assert!(!Name::new("some.example.com").unwrap().is_link_local());
+        assert!(!Name::new("some.example.local").unwrap().is_link_local());
+        assert!(Name::new("some.example.local.").unwrap().is_link_local());
+    }
+
+    #[test]
     fn parse_without_compression() {
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00";
         let mut offset = 3usize;
@@ -161,8 +208,14 @@ mod tests {
 
     #[test]
     fn convert_to_bytes_vec() {
-        let name = Name::new("_srv._udp.local").unwrap();
-        let bytes = name.to_bytes_vec();
+        
+        let mut bytes = Vec::with_capacity(30);
+        Name::new("_srv._udp.local").unwrap().append_to_vec(&mut bytes).unwrap();
+
+        assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
+
+        let mut bytes = Vec::with_capacity(30);
+        Name::new("_srv._udp.local.").unwrap().append_to_vec(&mut bytes).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
     }

@@ -2,14 +2,17 @@ mod packet_header;
 mod packet;
 mod question;
 mod name;
+mod resource_record;
+mod rdata;
 
-use std::{borrow::Cow, cmp, convert::TryFrom, error, fmt, io::Cursor, io::Write, str, time::Duration};
-use byteorder::{BigEndian, ByteOrder};
+use std::{convert::TryFrom };
 
 pub use packet_header::PacketHeader;
 pub use packet::Packet;
 pub use question::Question;
 pub use name::Name;
+pub use resource_record::ResourceRecord;
+pub use rdata::{RData, RawRData};
 
 const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;
@@ -33,27 +36,82 @@ const MAX_PACKET_SIZE: usize = 9000 - 68;
 /// header data to be added by [`query_response_packet()`].
 const MAX_RECORDS_PER_PACKET: usize = (MAX_PACKET_SIZE - 100) / MAX_TXT_RECORD_SIZE;
 
-/// An encoded MDNS packet.
-pub type MdnsPacket = Vec<u8>;
+pub trait DnsPacketContent<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;
+    
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
+    fn len(&self) -> usize;
+}
 
-
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TYPE {
-    A = 1, // a host address
-    NS =  2, // an authoritative name server
-    MD =  3, // a mail destination (Obsolete - use MX)
-    MF =  4, // a mail forwarder (Obsolete - use MX)
-    CNAME =  5, // the canonical name for an alias
-    SOA =  6, // marks the start of a zone of authority
-    MB =  7, // a mailbox domain name (EXPERIMENTAL)
-    MG =  8, // a mail group member (EXPERIMENTAL)
-    MR =  9, // a mail rename domain name (EXPERIMENTAL)
-    NULL = 10, // a null RR (EXPERIMENTAL)
-    WKS = 11, // a well known service description
-    PTR = 12, // a domain name pointer
-    HINFO = 13, // host information
-    MINFO = 14, // mailbox or mail list information
-    MX = 15, // mail exchange
-    TXT = 16, // text strings
+    A, // a host address
+    NS, // an authoritative name server
+    MD, // a mail destination (Obsolete - use MX)
+    MF, // a mail forwarder (Obsolete - use MX)
+    CNAME, // the canonical name for an alias
+    SOA, // marks the start of a zone of authority
+    MB, // a mailbox domain name (EXPERIMENTAL)
+    MG, // a mail group member (EXPERIMENTAL)
+    MR, // a mail rename domain name (EXPERIMENTAL)
+    NULL, // a null RR (EXPERIMENTAL)
+    WKS, // a well known service description
+    PTR, // a domain name pointer
+    HINFO, // host information
+    MINFO, // mailbox or mail list information
+    MX, // mail exchange
+    TXT, // text strings
+    Unknown(u16)
+}
+
+impl From<TYPE> for u16 {
+    fn from(value: TYPE) -> Self {
+        match value {
+            TYPE::A => 1,
+            TYPE::NS => 2,
+            TYPE::MD => 3,
+            TYPE::MF => 4,
+            TYPE::CNAME => 5,
+            TYPE::SOA => 6,
+            TYPE::MB => 7,
+            TYPE::MG => 8,
+            TYPE::MR => 9,
+            TYPE::NULL => 10,
+            TYPE::WKS => 11,
+            TYPE::PTR => 12,
+            TYPE::HINFO => 13,
+            TYPE::MINFO => 14,
+            TYPE::MX => 15,
+            TYPE::TXT => 16,
+            TYPE::Unknown(x) => x
+        }
+    }
+}
+
+impl From<u16> for TYPE {
+    fn from(value: u16) -> Self {
+        use self::TYPE::*;
+
+        match value {
+            1 => A,
+            2 => NS,
+            3 => MD,
+            4 => MF,
+            5 => CNAME,
+            6 => SOA,
+            7 => MB,
+            8 => MG,
+            9 => MR,
+            10 => NULL,
+            11 => WKS,
+            12 => PTR,
+            13 => HINFO,
+            14 => MINFO,
+            15 => MX,
+            16 => TXT,
+            v => TYPE::Unknown(v)
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -113,11 +171,27 @@ impl TryFrom<u16> for QTYPE {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum  CLASS {
     IN = 1, // the Internet
     CS = 2, // the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
     CH = 3, // the CHAOS class
     HS = 4, // Hesiod [Dyer 87]
+}
+
+impl TryFrom<u16> for CLASS {
+    type Error = crate::SimpleMdnsError;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        use self::CLASS::*;
+        match value {
+            1 => Ok(IN),
+            2 => Ok(CS),
+            3 => Ok(CH),
+            4 => Ok(HS),
+            v => Err(Self::Error::InvalidClass(v))
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

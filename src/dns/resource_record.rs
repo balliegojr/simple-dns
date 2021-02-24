@@ -1,0 +1,91 @@
+use byteorder::{ ByteOrder, BigEndian };
+
+use super::{CLASS, DnsPacketContent, Name, RData, TYPE, rdata::parse_rdata, RawRData};
+use core::fmt::Debug;
+use std::{convert::{ TryInto }};
+#[derive(Debug)]
+pub struct ResourceRecord<'a> {
+    name: Name<'a>,
+    ttl: u32,
+    class: CLASS,
+    rdatatype: TYPE,
+    rdata: Box<dyn RData<'a> + 'a>
+}
+
+impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
+    fn len(&self) -> usize {
+        self.name.len() + self.rdata.len() + 8
+    }
+    
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
+        let name = Name::parse(data, position)?;
+        let offset = position + name.len() + 1;
+
+        let rdatatype = BigEndian::read_u16(&data[offset..offset+2]).into();
+        let class = BigEndian::read_u16(&data[offset+2..offset+4]).try_into()?;
+        let ttl = BigEndian::read_u32(&data[offset+4..offset+8]);
+
+        let position = offset + 8;
+        let rdata = parse_rdata(data, position, rdatatype)?;
+
+        Ok(Self{
+            name,
+            rdatatype,
+            class,
+            ttl,
+            rdata: rdata
+        })
+    }
+
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        self.name.append_to_vec(out)?;
+
+        let mut buf = [0u8; 8];
+        BigEndian::write_u16(&mut buf[..2], self.rdatatype.into());
+        BigEndian::write_u16(&mut buf[2..4], self.class as u16);
+        BigEndian::write_u32(&mut buf[4..8], self.ttl);
+
+        out.extend(&buf);
+        self.rdata.append_to_vec(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_parse() {
+        let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
+        let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
+        
+        assert_eq!("_srv._udp.local", rr.name.to_string());
+        assert_eq!(TYPE::Unknown(0), rr.rdatatype);
+        assert_eq!(CLASS::IN, rr.class);
+        assert_eq!(10, rr.ttl);
+        assert_eq!(4, rr.rdata.len());
+    }
+
+    #[test]
+    fn test_append_to_vec() {
+        let mut out = Vec::new();
+        let rdata = [255u8; 4];
+
+        let rr = ResourceRecord {
+            class: CLASS::IN,
+            name: "_srv._udp.local".try_into().unwrap(),
+            rdatatype: TYPE::Unknown(0),
+            ttl: 10,
+            rdata: Box::new(RawRData::new(&rdata))
+        };
+
+        assert!(rr.append_to_vec(&mut out).is_ok());
+        assert_eq!(
+            b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
+            &out[..]
+        )
+
+
+    }
+
+}
