@@ -6,7 +6,6 @@ use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
-
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
     data: &'a [u8],
@@ -19,41 +18,22 @@ impl <'a> Name<'a> {
             return Err(crate::SimpleMdnsError::InvalidServiceName);
         }
 
-        let mut out = Vec::new();
-        let mut pos = 0usize;
-
-
+        let mut labels = Vec::new();
         let last_pos = name.match_indices('.').fold(0, |acc, (pos, _)| {
-            // println!("{} {} {}", acc, pos, &name[acc..pos]);
-            out.push((acc, pos - acc));
+            labels.push((acc, pos - acc));
             pos + 1
         });
 
-        out.push((last_pos, name.len() - last_pos));
+        labels.push((last_pos, name.len() - last_pos));
 
-        // if last_pos != name.len() {
-        //     println!("{} {} {}", last_pos, name.len(), &name[last_pos..]);
-        // } else {
-        //     println!("{} {} {}", last_pos, name.len(), &name[last_pos..]);
-        // }
-
-        
-
-        // for element in name.split('.') {
-        //     if element.len() > MAX_LABEL_LENGTH {
-        //         return Err(crate::SimpleMdnsError::InvalidServiceLabel);
-        //     }
-            
-        //     out.push((pos, element.len()));
-        //     println!("{} {}", pos, element.len());
-
-        //     pos += element.len() + 1;
-        // }
+        if labels.iter().any(|(_, len)| *len > MAX_LABEL_LENGTH) {
+            return Err(crate::SimpleMdnsError::InvalidServiceLabel)
+        }
         
 
         Ok(
             Self {
-                labels: out,
+                labels,
                 data: name.as_bytes(),
                 length_in_bytes: name.len()
             }
@@ -111,9 +91,8 @@ impl <'a> DnsPacketContent<'a> for Name<'a> {
     }
     
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        for (pos, length) in self.labels.iter().filter(|(p, l)| *l > 0) {
+        for (pos, length) in self.labels.iter().filter(|(_, l)| *l > 0) {
             out.push(*length as u8);
-            
             out.extend(&self.data[*pos..(pos+length)])
         }
         out.push(0);
@@ -156,8 +135,29 @@ impl<'a> std::fmt::Debug for Name<'a> {
     }
 }
 
+impl<'a> PartialEq for Name<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        if self.labels.len() != other.labels.len() {
+            return false;
+        }
+
+        for (&(l_pos, l_len), &(r_pos, r_len) ) in self.labels.iter().zip(other.labels.iter()) {
+            if l_len != r_len {
+                return false;
+            }
+
+            if self.data[l_pos..l_pos + l_len] != other.data[r_pos..r_pos+r_len] {
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
 #[cfg(test)] 
 mod tests {
+    use crate::SimpleMdnsError;
     use super::*;
 
     #[test]
@@ -218,5 +218,15 @@ mod tests {
         Name::new("_srv._udp.local.").unwrap().append_to_vec(&mut bytes).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
+    }
+
+    #[test]
+    fn eq_other_name() -> Result<(), SimpleMdnsError> {
+        assert_eq!(Name::new("example.com")?, Name::new("example.com")?);
+        assert_ne!(Name::new("some.example.com")?, Name::new("example.com")?);
+        assert_ne!(Name::new("example.co")?, Name::new("example.com")?);
+        assert_ne!(Name::new("example.com.org")?, Name::new("example.com")?);
+
+        Ok(())
     }
 }

@@ -12,13 +12,13 @@ pub struct Question<'a> {
 }
 
 impl <'a> Question<'a> {
-    pub fn new(qname: Name<'a>, qtype: QTYPE, qclass: QCLASS, unicast_response: bool) -> crate::Result<Self> {
-        Ok(Self {
+    pub fn new(qname: Name<'a>, qtype: QTYPE, qclass: QCLASS, unicast_response: bool) -> Self {
+        Self {
             qname,
             qtype,
             qclass,
             unicast_response
-        })
+        }
     }
 }
 
@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn convert_to_bytes_vec() {
-        let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false).unwrap();
+        let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
         let mut bytes = Vec::new();
         question.append_to_vec(&mut bytes).unwrap();
 
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn unicast_response() {
         let mut bytes = Vec::new();
-        Question::new("x.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, true).unwrap().append_to_vec(&mut bytes).unwrap();
+        Question::new("x.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, true).append_to_vec(&mut bytes).unwrap();
         let parsed = Question::parse(&bytes, 0).unwrap();
 
         assert!(parsed.unicast_response);

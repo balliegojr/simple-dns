@@ -1,15 +1,15 @@
 use byteorder::{ ByteOrder, BigEndian };
 
-use super::{CLASS, DnsPacketContent, Name, RData, TYPE, rdata::parse_rdata, RawRData};
+use super::{CLASS, DnsPacketContent, Name, RData, TYPE, rdata::parse_rdata};
 use core::fmt::Debug;
 use std::{convert::{ TryInto }};
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
-    name: Name<'a>,
-    ttl: u32,
-    class: CLASS,
-    rdatatype: TYPE,
-    rdata: Box<dyn RData<'a> + 'a>
+    pub name: Name<'a>,
+    pub ttl: u32,
+    pub class: CLASS,
+    pub rdatatype: TYPE,
+    pub rdata: RData<'a>
 }
 
 impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
@@ -52,18 +52,23 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::dns::RawRData;
     use super::*;
     
     #[test]
     fn test_parse() {
-        let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
+        let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
         let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
         
         assert_eq!("_srv._udp.local", rr.name.to_string());
-        assert_eq!(TYPE::Unknown(0), rr.rdatatype);
+        assert_eq!(TYPE::A, rr.rdatatype);
         assert_eq!(CLASS::IN, rr.class);
         assert_eq!(10, rr.ttl);
         assert_eq!(4, rr.rdata.len());
+        match rr.rdata {
+            RData::A(a) => assert_eq!(4294967295, a.address),
+            _ => panic!("invalid rdata")
+        }
     }
 
     #[test]
@@ -76,7 +81,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::Unknown(0),
             ttl: 10,
-            rdata: Box::new(RawRData::new(&rdata))
+            rdata: RData::Raw(RawRData::new(&rdata))
         };
 
         assert!(rr.append_to_vec(&mut out).is_ok());

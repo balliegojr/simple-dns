@@ -1,12 +1,11 @@
 use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
-
 #[derive(Debug)]
 pub struct Packet<'a> {
     header: PacketHeader,
-    questions: Vec<Question<'a>>,
-    answers: Vec<ResourceRecord<'a>>,
-    name_servers: Vec<ResourceRecord<'a>>,
-    additional_records: Vec<ResourceRecord<'a>>
+    pub questions: Vec<Question<'a>>,
+    pub answers: Vec<ResourceRecord<'a>>,
+    pub name_servers: Vec<ResourceRecord<'a>>,
+    pub additional_records: Vec<ResourceRecord<'a>>
 }
 
 impl <'a> Packet<'a> {
@@ -52,12 +51,31 @@ impl <'a> Packet<'a> {
 
     pub fn with_question(mut self, question: Question<'a>) -> Self {
         self.questions.push(question);
-        self.header.questions_count = self.questions.len() as u16;
+        self
+    }
+    
+    pub fn with_answer(mut self, answer: ResourceRecord<'a>) -> Self {
+        self.answers.push(answer);
+        self
+    }
+    
+    pub fn with_name_server(mut self, name_server: ResourceRecord<'a>) -> Self {
+        self.name_servers.push(name_server);
         self
     }
 
+    pub fn with_additional_record(mut self, additional_record: ResourceRecord<'a>) -> Self {
+        self.additional_records.push(additional_record);
+        self
+    }
+    
     pub fn to_bytes_vec(&mut self, truncate: bool) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
+        
+        self.header.questions_count = self.questions.len() as u16;
+        self.header.answers_count = self.answers.len() as u16;
+        self.header.name_servers_count = self.name_servers.len() as u16;
+        self.header.additional_records_count = self.additional_records.len() as u16;
         
         self.header.truncated = Self::add_section(&mut out, truncate, &self.questions)?;
         if !self.header.truncated {
@@ -97,8 +115,8 @@ mod tests {
     #[test]
     fn build_query_correct() {
         let query = Packet::new_query(1, false)
-            .with_question(Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false).unwrap())
-            .with_question(Question::new("_srv2._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false).unwrap())
+            .with_question(Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
+            .with_question(Question::new("_srv2._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
             .to_bytes_vec(true).unwrap();
 
         let parsed = Packet::parse(&query);

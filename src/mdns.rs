@@ -2,7 +2,9 @@
 // use std::{convert::TryInto, error::Error, net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket}};
 // use std::str::FromStr;
 
-// use dns::Name;
+// use dns::{Name};
+// use socket2::Socket;
+// use futures::select;
 
 // use crate::dns;
 
@@ -21,20 +23,32 @@
 // }
 
 
+
 // impl MdnsService {
 //     pub fn oneshot_query(service_name: &str, timeout: Duration) -> crate::Result<std::net::IpAddr> {
-//         let name = Name::new(service_name)?;
-//         if !name.is_link_local() {
-//             todo!() //raise error
-//         }
+//         let service_name = format_to_link_local(service_name);
+//         let socket = create_socket();
 
-
-
-//         todo!()
-//         // dispatch a question
-//         // wait for a response till timeout
-//         // reply the first address received
+//         send_link_local_question(&socket, service_name)?;
+//         get_first_address(&socket, service_name, timeout)
 //     }
+// }
+
+// fn format_to_link_local(name: &str) -> &str {
+//     // TODO: format incomplete names to .local. ?
+//     name
+// }
+
+// fn send_link_local_question(socket: &Socket, name: &str) -> crate::Result<()>{
+//     let question = dns::Question::new(Name::new(name)?, dns::QTYPE::ANY, dns::QCLASS::IN, false);
+//     let packet = dns::Packet::new_query(0, false)
+//         .with_question(question)
+//         .to_bytes_vec(false)?;
+
+//     // TODO: also send to ipv6
+//     // TODO: fix error response
+//     socket.send_to(&packet, &std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT).into()).unwrap();
+//     Ok(())
 // }
 
 // fn create_socket() -> socket2::Socket {
@@ -58,17 +72,32 @@
 //     socket
 // }
 
-// fn query(socket: &socket2::Socket) {
-//     // let mut builder = dns_parser::Builder::new_query(0, false);
-//     // builder.add_question("srv._udp.local.", false, dns_parser::QueryType::All, dns_parser::QueryClass::IN);
-//     // let buf = builder.build().unwrap();
+// fn get_first_address<'a>(socket: &'a Socket, name: &str, timeout: Duration) -> crate::Result<IpAddr> {
+//     let name = Name::new(name)?;
+    
+//     let mut recv_buffer = vec![0; 4096];
+//     loop {
+//         let (count, _) = socket.recv_from(&mut recv_buffer).unwrap();
+//             match dns::Packet::parse(&recv_buffer[..count]) {
+//                 Ok(packet) => {
+//                     for answer in packet.answers.iter().filter(|a| a.name == name) {
+//                         if let dns::RData::A(ref a) = answer.rdata {
+//                             return Ok(IpAddr::V4(Ipv4Addr::from(a.address)))
+//                         }
+//                     }
+//                 }
+//                 Err(err) => {
+//                     //TODO: log invalid package
+//                     continue;
+//                 }
+//             }
+//     }
+    
+//     // select! {
+        
+//     // }
 
-//     let mut packet = dns::Packet::new_query(0, false)
-//         .with_question(dns::Question::new("_srv._udp.local".try_into().unwrap(), dns::QTYPE::ANY, dns::QCLASS::IN, false).unwrap());
 
-//     // let buf = dns::build_query(b"_srv._udp.local", dns::QTYPE::ANY, dns::QCLASS::ANY);
-//     let buf = packet.to_bytes_vec(false).unwrap();
-//     socket.send_to(&buf, &std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT).into()).unwrap();
 // }
 
 // fn wait_reply(socket: &socket2::Socket) {
@@ -106,7 +135,7 @@
 
 //         let socket = create_socket();
 //         println!("{:?}", socket.local_addr().unwrap());
-//         query(&socket);
+//         // query(&socket);
 //         // wait_reply(&socket);
 
 //         handle.join();

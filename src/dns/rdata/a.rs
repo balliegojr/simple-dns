@@ -2,16 +2,11 @@ use byteorder::{ByteOrder, BigEndian};
 
 use crate::dns::DnsPacketContent;
 
-use super::RData;
-
-
 #[derive(Debug)]
 pub struct A {
-    address: u32,
+    pub address: u32,
 }
 
-
-impl <'a> RData<'a> for A {}
 impl <'a> DnsPacketContent<'a> for A {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let address = BigEndian::read_u32(&data[position+2..position+6]);
@@ -54,9 +49,5 @@ mod tests {
         let a = a.unwrap();
 
         assert_eq!(2130706433, a.address)
-        
-
-        
     }
-
 }

@@ -8,27 +8,73 @@ mod a;
 
 pub use a::A;
 
-pub trait RData<'a> : DnsPacketContent<'a> + Debug {}
+#[derive(Debug)]
+pub enum RData<'a> {
+    A(A),
+    NS(Name<'a>),
+    MD(Name<'a>),
+    CNAME(Name<'a>),
+    MB(Name<'a>),
+    MG(Name<'a>),
+    MR(Name<'a>),
+    PTR(Name<'a>),
+    MF(Name<'a>),
+    Raw(RawRData<'a>)
+}
 
-pub fn parse_rdata<'a>(data: &'a [u8], position: usize, rdatatype: TYPE) -> crate::Result<Box<dyn RData<'a> + 'a>> {
+impl <'a> RData<'a> {
+    pub fn len(&self) -> usize {
+        match &self {
+            RData::A(data) => data.len(),
+            RData::NS(data) | 
+            RData::CNAME(data) |
+            RData::MB(data) |
+            RData::MG(data) |
+            RData::MR(data) |
+            RData::PTR(data) |
+            RData::MF(data) |
+            RData::MD(data) => data.len(),
+            RData::Raw(data) => data.len()
+        }
+    }
+
+    pub fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        match &self {
+            RData::A(data) => data.append_to_vec(out),
+            RData::NS(data) |
+            RData::CNAME(data) |
+            RData::MB(data) |
+            RData::MG(data) |
+            RData::MR(data) |
+            RData::PTR(data) |
+            RData::MF(data) |
+            RData::MD(data) => data.append_to_vec(out),
+            RData::Raw(data) => data.append_to_vec(out)
+        }
+    }
+}
+
+// pub trait RData<'a> : DnsPacketContent<'a> + Debug {}
+
+pub fn parse_rdata<'a>(data: &'a [u8], position: usize, rdatatype: TYPE) -> crate::Result<RData<'a>> {
     let rdata = match rdatatype {
-        TYPE::A => Box::new(A::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::NS => Box::new(NS::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::MD => Box::new(MD::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::MF => Box::new(MF::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::CNAME => Box::new(CNAME::parse(data, position)?) as Box<dyn RData<'a>>,
+        TYPE::A => RData::A(A::parse(data, position)?),
+        TYPE::NS => RData::NS(Name::parse(data, position)?),
+        TYPE::MD => RData::MD(Name::parse(data, position)?),
+        TYPE::CNAME => RData::CNAME(Name::parse(data, position)?),
+        TYPE::MB => RData::MB(Name::parse(data, position)?),
+        TYPE::MG => RData::MG(Name::parse(data, position)?),
+        TYPE::MR => RData::MR(Name::parse(data, position)?),
+        TYPE::PTR => RData::PTR(Name::parse(data, position)?),
+        TYPE::MF => RData::NS(Name::parse(data, position)?),
         // TYPE::SOA => {}
-        TYPE::MB => Box::new(MB::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::MG => Box::new(MG::parse(data, position)?) as Box<dyn RData<'a>>,
-        TYPE::MR => Box::new(MR::parse(data, position)?) as Box<dyn RData<'a>>,
         // TYPE::NULL => {}
         // TYPE::WKS => {}
-        TYPE::PTR => Box::new(PTR::parse(data, position)?) as Box<dyn RData<'a>>,
         // TYPE::HINFO => {}
         // TYPE::MINFO => {}
         // TYPE::MX => {}
         // TYPE::TXT => {}
-        _ => Box::new(RawRData::parse(data, position)?) as Box<dyn RData<'a>>
+        _ => RData::Raw(RawRData::parse(data, position)?)
     };
 
     Ok(rdata)
@@ -50,7 +96,7 @@ impl <'a> RawRData<'a> {
     }
 }
 
-impl <'a>  RData<'a> for RawRData<'a> {}
+
 impl <'a> DnsPacketContent<'a> for RawRData<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let length = BigEndian::read_u16(&data[position..position+2]);
@@ -71,15 +117,3 @@ impl <'a> DnsPacketContent<'a> for RawRData<'a> {
         self.length as usize
     }
 }
-
-
-impl <'a> RData<'a> for Name<'a> {}
-
-pub type CNAME<'a> = Name<'a>;
-pub type PTR<'a> = Name<'a>;
-pub type MB<'a> = Name<'a>;
-pub type MD<'a> = Name<'a>;
-pub type MF<'a> = Name<'a>;
-pub type MG<'a> = Name<'a>;
-pub type MR<'a> = Name<'a>;
-pub type NS<'a> = Name<'a>;
