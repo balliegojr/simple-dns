@@ -62,12 +62,12 @@ impl PacketHeader {
 
     pub fn parse(data: &[u8]) -> crate::Result<Self> {
         if data.len() < 12 {
-            return Err(crate::SimpleMdnsError::InvalidHeaderData);
+            return Err(crate::SimpleDnsError::InvalidHeaderData);
         }
 
         let flags = BigEndian::read_u16(&data[2..4]);
         if flags & flag::RESERVED_MASK != 0 {
-            return Err(crate::SimpleMdnsError::InvalidHeaderData);
+            return Err(crate::SimpleDnsError::InvalidHeaderData);
         }
 
         let header = Self {

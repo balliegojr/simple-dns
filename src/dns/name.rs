@@ -15,7 +15,7 @@ pub struct Name<'a> {
 impl <'a> Name<'a> {
     pub fn new(name: &'a str) -> crate::Result<Self> {
         if !name.is_ascii() || name.len() > MAX_NAME_LENGTH {
-            return Err(crate::SimpleMdnsError::InvalidServiceName);
+            return Err(crate::SimpleDnsError::InvalidServiceName);
         }
 
         let mut labels = Vec::new();
@@ -27,7 +27,7 @@ impl <'a> Name<'a> {
         labels.push((last_pos, name.len() - last_pos));
 
         if labels.iter().any(|(_, len)| *len > MAX_LABEL_LENGTH) {
-            return Err(crate::SimpleMdnsError::InvalidServiceLabel)
+            return Err(crate::SimpleDnsError::InvalidServiceLabel)
         }
         
 
@@ -75,7 +75,7 @@ impl <'a> DnsPacketContent<'a> for Name<'a> {
             }
 
             if position > data.len() {
-                return Err(crate::SimpleMdnsError::InvalidDnsPacket)
+                return Err(crate::SimpleDnsError::InvalidDnsPacket)
             }
         }
 
@@ -105,7 +105,7 @@ impl <'a> DnsPacketContent<'a> for Name<'a> {
 }
 
 impl <'a> TryFrom<&'a str> for Name<'a> {
-    type Error = crate::SimpleMdnsError;
+    type Error = crate::SimpleDnsError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         Name::new(value)
@@ -157,7 +157,7 @@ impl<'a> PartialEq for Name<'a> {
 
 #[cfg(test)] 
 mod tests {
-    use crate::SimpleMdnsError;
+    use crate::SimpleDnsError;
     use super::*;
 
     #[test]
@@ -221,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn eq_other_name() -> Result<(), SimpleMdnsError> {
+    fn eq_other_name() -> Result<(), SimpleDnsError> {
         assert_eq!(Name::new("example.com")?, Name::new("example.com")?);
         assert_ne!(Name::new("some.example.com")?, Name::new("example.com")?);
         assert_ne!(Name::new("example.co")?, Name::new("example.com")?);

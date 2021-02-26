@@ -1,5 +1,5 @@
 [package]
-name = "simple-mdns"
+name = "simple-dns"
 version = "0.1.0"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2018"

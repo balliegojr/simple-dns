@@ -139,7 +139,7 @@ pub enum QTYPE {
 }
 
 impl TryFrom<u16> for QTYPE {
-    type Error = crate::SimpleMdnsError;
+    type Error = crate::SimpleDnsError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         use self::QTYPE::*;
@@ -180,7 +180,7 @@ pub enum  CLASS {
 }
 
 impl TryFrom<u16> for CLASS {
-    type Error = crate::SimpleMdnsError;
+    type Error = crate::SimpleDnsError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         use self::CLASS::*;
@@ -204,7 +204,7 @@ pub enum QCLASS {
 }
 
 impl TryFrom<u16> for QCLASS {
-    type Error = crate::SimpleMdnsError;
+    type Error = crate::SimpleDnsError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         use self::QCLASS::*;
