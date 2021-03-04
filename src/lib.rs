@@ -1,4 +1,5 @@
 pub mod dns;
+#[cfg(feature="mdns")]
 pub mod mdns;
 
 type Result<T> = std::result::Result<T, SimpleDnsError>;
@@ -10,7 +11,11 @@ pub enum SimpleDnsError {
     InvalidQType(u16),
     InvalidServiceName,
     InvalidServiceLabel,
+    InvalidCharacterString,
     InvalidHeaderData,
-    InvalidDnsPacket
+    InvalidDnsPacket,
+    ErrorSendingDNSPacket,
+    ErrorReadingFromUDPSocket,
+    ErrorCreatingUDPSocket
 
 }

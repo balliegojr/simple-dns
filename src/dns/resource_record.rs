@@ -14,7 +14,7 @@ pub struct ResourceRecord<'a> {
 
 impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
     fn len(&self) -> usize {
-        self.name.len() + self.rdata.len() + 8
+        self.name.len() + self.rdata.len() + 10
     }
     
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
@@ -24,9 +24,10 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let rdatatype = BigEndian::read_u16(&data[offset..offset+2]).into();
         let class = BigEndian::read_u16(&data[offset+2..offset+4]).try_into()?;
         let ttl = BigEndian::read_u32(&data[offset+4..offset+8]);
+        let rdatalen = BigEndian::read_u16(&data[offset+8..offset+10]) as usize;
 
-        let position = offset + 8;
-        let rdata = parse_rdata(data, position, rdatatype)?;
+        let position = offset + 10;
+        let rdata = parse_rdata(&data[..position+rdatalen], position, rdatatype)?;
 
         Ok(Self{
             name,
@@ -40,10 +41,11 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         self.name.append_to_vec(out)?;
 
-        let mut buf = [0u8; 8];
+        let mut buf = [0u8; 10];
         BigEndian::write_u16(&mut buf[..2], self.rdatatype.into());
         BigEndian::write_u16(&mut buf[2..4], self.class as u16);
         BigEndian::write_u32(&mut buf[4..8], self.ttl);
+        BigEndian::write_u16(&mut buf[8..10], self.rdata.len() as u16);
 
         out.extend(&buf);
         self.rdata.append_to_vec(out)
@@ -52,7 +54,7 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::dns::RawRData;
+    use crate::dns::rdata::NULL;
     use super::*;
     
     #[test]
@@ -81,7 +83,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::Unknown(0),
             ttl: 10,
-            rdata: RData::Raw(RawRData::new(&rdata))
+            rdata: RData::NULL(NULL::new(&rdata).unwrap())
         };
 
         assert!(rr.append_to_vec(&mut out).is_ok());

@@ -4,6 +4,7 @@ mod question;
 mod name;
 mod resource_record;
 mod rdata;
+mod character_string;
 
 use std::{convert::TryFrom };
 
@@ -12,29 +13,18 @@ pub use packet::Packet;
 pub use question::Question;
 pub use name::Name;
 pub use resource_record::ResourceRecord;
-pub use rdata::{RData, RawRData};
+pub use rdata::{RData};
+pub use character_string::CharacterString;
 
 const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;
-
-/// DNS TXT records can have up to 255 characters as a single string value.
-///
-/// Current values are usually around 170-190 bytes long, varying primarily
-/// with the length of the contained `Multiaddr`.
-const MAX_TXT_VALUE_LENGTH: usize = 255;
-
-/// A conservative maximum size (in bytes) of a complete TXT record,
-/// as encoded by [`append_txt_record`].
-const MAX_TXT_RECORD_SIZE: usize = MAX_TXT_VALUE_LENGTH + 45;
+const MAX_CHARACTER_STRING_LENGTH: usize = 255;
+const MAX_NULL_LENGTH: usize = 65535;
 
 /// The maximum DNS packet size is 9000 bytes less the maximum
 /// sizes of the IP (60) and UDP (8) headers.
 const MAX_PACKET_SIZE: usize = 9000 - 68;
 
-/// A conservative maximum number of records that can be packed into
-/// a single DNS UDP packet, allowing up to 100 bytes of MDNS packet
-/// header data to be added by [`query_response_packet()`].
-const MAX_RECORDS_PER_PACKET: usize = (MAX_PACKET_SIZE - 100) / MAX_TXT_RECORD_SIZE;
 
 pub trait DnsPacketContent<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;

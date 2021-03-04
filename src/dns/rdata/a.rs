@@ -9,16 +9,15 @@ pub struct A {
 
 impl <'a> DnsPacketContent<'a> for A {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let address = BigEndian::read_u32(&data[position+2..position+6]);
+        let address = BigEndian::read_u32(&data[position..position+4]);
         Ok(Self{
             address
         })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 6];
-        BigEndian::write_u16(&mut buf[..2], 4);
-        BigEndian::write_u32(&mut buf[2..], self.address);
+        let mut buf = [0u8; 4];
+        BigEndian::write_u32(&mut buf[..], self.address);
 
         out.extend(&buf);
 
