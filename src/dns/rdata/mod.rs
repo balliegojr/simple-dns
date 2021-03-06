@@ -7,12 +7,14 @@ mod hinfo;
 mod minfo;
 mod mx;
 mod null;
+mod soa;
 
 pub use a::A;
 pub use hinfo::HINFO;
 pub use minfo::MINFO;
 pub use mx::MX;
 pub use null::NULL;
+pub use soa::SOA;
 
 #[derive(Debug)]
 pub enum RData<'a> {
@@ -29,7 +31,8 @@ pub enum RData<'a> {
     MINFO(MINFO<'a>),
     MX(MX<'a>),
     NULL(NULL<'a>),
-    TXT(CharacterString<'a>)
+    TXT(CharacterString<'a>),
+    SOA(Box<SOA<'a>>)
 }
 
 impl <'a> RData<'a> {
@@ -48,7 +51,8 @@ impl <'a> RData<'a> {
             RData::MINFO(data) => data.len(),
             RData::MX(data) => data.len(),
             RData::NULL(data) => data.len(),
-            RData::TXT(data) => data.len()
+            RData::TXT(data) => data.len(),
+            RData::SOA(data) => data.len()
         }
     }
 
@@ -67,7 +71,8 @@ impl <'a> RData<'a> {
             RData::MINFO(data) => data.append_to_vec(out),
             RData::MX(data) => data.append_to_vec(out),
             RData::NULL(data) => data.append_to_vec(out),
-            RData::TXT(data) => data.append_to_vec(out)
+            RData::TXT(data) => data.append_to_vec(out),
+            RData::SOA(data) => data.append_to_vec(out)
         }
     }
 }
@@ -83,7 +88,7 @@ pub fn parse_rdata<'a>(data: &'a [u8], position: usize, rdatatype: TYPE) -> crat
         TYPE::MR => RData::MR(Name::parse(data, position)?),
         TYPE::PTR => RData::PTR(Name::parse(data, position)?),
         TYPE::MF => RData::NS(Name::parse(data, position)?),
-        // TYPE::SOA => {}
+        TYPE::SOA => RData::SOA(Box::new(SOA::parse(data, position)?)),
         // TYPE::WKS => {}
         TYPE::HINFO => RData::HINFO(HINFO::parse(data, position)?),
         TYPE::MINFO => RData::MINFO(MINFO::parse(data, position)?),

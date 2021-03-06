@@ -42,7 +42,7 @@ impl <'a> DnsPacketContent<'a> for Question<'a> {
 
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
-        let offset = position + qname.len() + 1;
+        let offset = position + qname.len();
 
         let qclass = BigEndian::read_u16(&data[offset+2..offset+4]);
         
@@ -78,12 +78,13 @@ mod tests {
     }
 
     #[test]
-    fn convert_to_bytes_vec() {
+    fn append_to_vec() {
         let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
         let mut bytes = Vec::new();
         question.append_to_vec(&mut bytes).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01", &bytes[..]);
+        assert_eq!(bytes.len(), question.len());
     }
 
     #[test]

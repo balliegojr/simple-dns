@@ -42,7 +42,7 @@ impl <'a> Packet<'a> {
         
         for _ in 0..items_count {
             let item = T::parse(data, *offset)?;
-            *offset += item.len() + 1;
+            *offset += item.len();
             section_items.push(item);
         }
 
@@ -162,7 +162,6 @@ mod tests {
             }
             _ => panic!("invalid RDATA")
         }
-
 
         Ok(())
     }

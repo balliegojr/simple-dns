@@ -35,7 +35,7 @@ impl <'a> Name<'a> {
             Self {
                 labels,
                 data: name.as_bytes(),
-                length_in_bytes: name.len()
+                length_in_bytes: name.len() + if last_pos == name.len() { 1 } else { 2 }
             }
         )
     }
@@ -86,7 +86,7 @@ impl <'a> DnsPacketContent<'a> for Name<'a> {
         Ok(Self {
             data,
             labels,
-            length_in_bytes: end - initial_position
+            length_in_bytes: end - initial_position + 1
         })
     }
     
@@ -178,13 +178,10 @@ mod tests {
     #[test]
     fn parse_without_compression() {
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00";
-        let mut offset = 3usize;
-        
-        let name = Name::parse(data, offset).unwrap();
+        let name = Name::parse(data, 3).unwrap();
         assert_eq!("F.ISI.ARPA", name.to_string());
-
-        offset += name.len() + 1;
-        let name = Name::parse(data, offset ).unwrap();
+        
+        let name = Name::parse(data, 3 + name.len() ).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", name.to_string());
     }
 
@@ -196,11 +193,11 @@ mod tests {
         let name = Name::parse(data, offset).unwrap();
         assert_eq!("F.ISI.ARPA", name.to_string());
 
-        offset += name.len() + 1;
+        offset += name.len();
         let name = Name::parse(data, offset).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", name.to_string());
 
-        offset += name.len() + 1;
+        offset += name.len();
         let name = Name::parse(data, offset).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", name.to_string());
     }
@@ -228,5 +225,20 @@ mod tests {
         assert_ne!(Name::new("example.com.org")?, Name::new("example.com")?);
 
         Ok(())
+    }
+
+    #[test]
+    fn len() {
+        let mut bytes = Vec::new();
+
+        let name_one = Name::new("ex.com.").unwrap();
+        name_one.append_to_vec(&mut bytes).unwrap();
+
+        let name_two = Name::parse(&bytes, 0).unwrap();
+
+        assert_eq!(8, bytes.len());
+        assert_eq!(8, name_one.len());
+        assert_eq!(8, name_two.len());
+        assert_eq!(8, Name::new("ex.com").unwrap().len());
     }
 }

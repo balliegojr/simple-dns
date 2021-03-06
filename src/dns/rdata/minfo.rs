@@ -9,7 +9,7 @@ pub struct MINFO<'a> {
 impl <'a> DnsPacketContent<'a> for MINFO<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let rmailbox = Name::parse(data, position)?;
-        let emailbox = Name::parse(data, position + rmailbox.len() + 1)?;
+        let emailbox = Name::parse(data, position + rmailbox.len())?;
 
         Ok(
             Self {
@@ -47,7 +47,7 @@ mod tests {
         assert!(minfo.is_ok());
         let minfo = minfo.unwrap();
 
-        assert_eq!(28, minfo.len());
+        assert_eq!(data.len(), minfo.len());
         assert_eq!("r.mailbox.com", minfo.rmailbox.to_string());
         assert_eq!("e.mailbox.com", minfo.emailbox.to_string());
 

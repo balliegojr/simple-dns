@@ -51,7 +51,7 @@ mod tests {
         assert!(mx.is_ok());
         let mx = mx.unwrap();
 
-        assert_eq!(17, mx.len());
+        assert_eq!(data.len(), mx.len());
         assert_eq!(10, mx.preference);
         assert_eq!("e.exchange.com", mx.exchange.to_string());
 

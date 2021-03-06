@@ -19,7 +19,7 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
     
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let name = Name::parse(data, position)?;
-        let offset = position + name.len() + 1;
+        let offset = position + name.len();
 
         let rdatatype = BigEndian::read_u16(&data[offset..offset+2]).into();
         let class = BigEndian::read_u16(&data[offset+2..offset+4]).try_into()?;
@@ -90,9 +90,8 @@ mod tests {
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]
-        )
-
-
+        );
+        assert_eq!(out.len(), rr.len());
     }
 
 }

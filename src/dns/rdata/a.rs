@@ -47,6 +47,7 @@ mod tests {
         assert!(a.is_ok());
         let a = a.unwrap();
 
-        assert_eq!(2130706433, a.address)
+        assert_eq!(2130706433, a.address);
+        assert_eq!(bytes.len(), a.len());
     }
 }
