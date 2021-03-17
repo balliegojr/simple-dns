@@ -6,6 +6,9 @@ use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
+
+/// Name (<domain-name>s) make up a large share of the data in the master file.  
+/// The labels in the domain name are expressed as character strings and separated by dots.  
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
     data: &'a [u8],
@@ -13,6 +16,7 @@ pub struct Name<'a> {
 }
 
 impl <'a> Name<'a> {
+    /// Creates a new validated Name
     pub fn new(name: &'a str) -> crate::Result<Self> {
         if !name.is_ascii() || name.len() > MAX_NAME_LENGTH {
             return Err(crate::SimpleDnsError::InvalidServiceName);
@@ -40,7 +44,8 @@ impl <'a> Name<'a> {
         )
     }
 
-    pub fn is_link_local(self) -> bool {
+    /// Verify if name ends with .local.
+    pub fn is_link_local(&self) -> bool {
         if self.labels.len() < 2 {
             return false
         }
@@ -151,7 +156,7 @@ impl<'a> PartialEq for Name<'a> {
             }
         }
 
-        return true;
+        true
     }
 }
 

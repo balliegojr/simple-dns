@@ -49,7 +49,7 @@
 //     let question = dns::Question::new(Name::new(name)?, dns::QTYPE::ANY, dns::QCLASS::IN, false);
 //     let packet = dns::Packet::new_query(0, false)
 //         .with_question(question)
-//         .to_bytes_vec(false)?;
+//         .build_bytes_vec(false)?;
 
 //     // TODO: also send to ipv6
 //     let target_addr = std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT);

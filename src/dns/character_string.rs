@@ -4,20 +4,45 @@ use crate::SimpleDnsError;
 
 use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 
+/// CharacterString is expressed in one or two ways: 
+/// - as a contiguous set of characters without interior spaces, 
+/// - or as a string beginning with a " and ending with a ".  
+///
+/// Inside a " delimited string any character can occur, except for a " itself,  
+/// which must be quoted using \ (back slash).
 #[derive(Debug)]
 pub struct CharacterString<'a> {
     data: &'a [u8]
 }
 
 impl <'a> CharacterString<'a> {
+    /// Creates a new validated CharacterString
     pub fn new(data: &'a [u8]) -> crate::Result<Self> {
-        if data.len() > MAX_CHARACTER_STRING_LENGTH {
+        if data.len() > MAX_CHARACTER_STRING_LENGTH || !CharacterString::is_valid(data) {
             return Err(SimpleDnsError::InvalidCharacterString)
         }
 
-        Ok(Self {
-            data
+        Ok(Self { 
+            data 
         })
+    }
+
+    fn is_valid(data: &'a [u8]) -> bool {
+        if data[0] == b'"' {
+            if data[data.len() - 1] != b'"' {
+                return false;
+            }
+
+            for (p, c) in data[1..data.len()-1].iter().enumerate() {
+                if *c == b'"' && data[p] != b'\\' {
+                    return false
+                }
+            }
+
+            return true
+        }
+
+        return data.iter().all(|c| *c != b' ') 
     }
 }
 
@@ -25,7 +50,7 @@ impl <'a> DnsPacketContent<'a> for CharacterString<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let length = data[position] as usize;
 
-        return Ok(Self{
+        Ok(Self{
             data: &data[position + 1..position + 1 + length]
         })
     }
@@ -64,11 +89,15 @@ mod tests {
 
     #[test]
     fn construct_valid_character_string() {
-        assert!(CharacterString::new(b"I am valid").is_ok());
+        assert!(CharacterString::new(b"Iamvalid").is_ok());
+        assert!(CharacterString::new(br#""I am valid""#).is_ok());
+        assert!(CharacterString::new(br#""I am \" also valid""#).is_ok());
+        assert!(CharacterString::new(b"I am invalid").is_err());
 
         let long_string= [0u8; 300];
         assert!(CharacterString::new(&long_string).is_err());
     }
+
 
     #[test]
     fn parse() {

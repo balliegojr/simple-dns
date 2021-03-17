@@ -1,3 +1,7 @@
+#![warn(missing_docs)]
+
+//! Pure Rust implementation to work with DNS packets
+
 pub mod dns;
 #[cfg(feature="mdns")]
 pub mod mdns;

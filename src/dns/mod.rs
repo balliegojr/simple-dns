@@ -1,9 +1,11 @@
+//! Provides parsing and manipulation for DNS packets
+
 mod packet_header;
 mod packet;
 mod question;
 mod name;
 mod resource_record;
-mod rdata;
+pub mod rdata;
 mod character_string;
 
 use std::{convert::TryFrom };
@@ -13,7 +15,7 @@ pub use packet::Packet;
 pub use question::Question;
 pub use name::Name;
 pub use resource_record::ResourceRecord;
-pub use rdata::{RData};
+// pub use rdata::RData;
 pub use character_string::CharacterString;
 
 const MAX_LABEL_LENGTH: usize = 63;
@@ -23,34 +25,53 @@ const MAX_NULL_LENGTH: usize = 65535;
 
 /// The maximum DNS packet size is 9000 bytes less the maximum
 /// sizes of the IP (60) and UDP (8) headers.
-const MAX_PACKET_SIZE: usize = 9000 - 68;
+// const MAX_PACKET_SIZE: usize = 9000 - 68; 
 
 
-pub trait DnsPacketContent<'a> {
+pub(crate) trait DnsPacketContent<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;
     
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
     fn len(&self) -> usize;
 }
 
+/// Possible TYPE values in DNS Resource Records  
+/// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TYPE {
-    A, // a host address
-    NS, // an authoritative name server
-    MD, // a mail destination (Obsolete - use MX)
-    MF, // a mail forwarder (Obsolete - use MX)
-    CNAME, // the canonical name for an alias
-    SOA, // marks the start of a zone of authority
-    MB, // a mailbox domain name (EXPERIMENTAL)
-    MG, // a mail group member (EXPERIMENTAL)
-    MR, // a mail rename domain name (EXPERIMENTAL)
-    NULL, // a null RR (EXPERIMENTAL)
-    WKS, // a well known service description
-    PTR, // a domain name pointer
-    HINFO, // host information
-    MINFO, // mailbox or mail list information
-    MX, // mail exchange
-    TXT, // text strings
+    /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    A,
+    /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    NS,
+    /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MD,
+    /// Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MF, 
+    /// Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CNAME, 
+    /// Marks the start of a zone of authority, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    SOA, 
+    /// Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MB, 
+    /// Mail group member (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MG, 
+    /// Mail rename domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MR, 
+    /// Null RR (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    NULL, 
+    /// Well known service description, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    WKS, 
+    /// Domain name pointer, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    PTR, 
+    /// Host information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    HINFO, 
+    /// Mailbox or mail list information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MINFO, 
+    /// Mail exchange, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MX, 
+    /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    TXT, 
+    /// Unknown value, for future (or unimplemented RFC) compatibility
     Unknown(u16)
 }
 
@@ -104,28 +125,50 @@ impl From<u16> for TYPE {
     }
 }
 
+/// Possible QTYPE values for a Question in a DNS packet  
+/// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum QTYPE {
-    A = 1, // a host address
-    NS =  2, // an authoritative name server
-    MD =  3, // a mail destination (Obsolete - use MX)
-    MF =  4, // a mail forwarder (Obsolete - use MX)
-    CNAME =  5, // the canonical name for an alias
-    SOA =  6, // marks the start of a zone of authority
-    MB =  7, // a mailbox domain name (EXPERIMENTAL)
-    MG =  8, // a mail group member (EXPERIMENTAL)
-    MR =  9, // a mail rename domain name (EXPERIMENTAL)
-    NULL = 10, // a null RR (EXPERIMENTAL)
-    WKS = 11, // a well known service description
-    PTR = 12, // a domain name pointer
-    HINFO = 13, // host information
-    MINFO = 14, // mailbox or mail list information
-    MX = 15, // mail exchange
-    TXT = 16, // text strings
-    AXFR = 252, // A request for a transfer of an entire zone
-    MAILB = 253, // A request for mailbox-related records (MB, MG or MR)
-    MAILA = 254, // A request for mail agent RRs (Obsolete - see MX)
-    ANY = 255, // A request for all records
+    /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    A = 1,
+    /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    NS =  2,
+    /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MD =  3,
+    /// Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MF =  4,
+    /// Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CNAME =  5,
+    /// Marks the start of a zone of authority, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    SOA =  6,
+    /// Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MB =  7,
+    /// Mail group member (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MG =  8,
+    /// Mail rename domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MR =  9,
+    /// Null RR (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    NULL = 10,
+    /// Well known service description, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    WKS = 11,
+    /// Domain name pointer, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    PTR = 12,
+    /// Host Information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    HINFO = 13,
+    /// Mailbox or mail list information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MINFO = 14,
+    /// Mail exchange, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MX = 15,
+    /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    TXT = 16,
+    /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    AXFR = 252,
+    /// A request for mailbox-related records (MB, MG or MR), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MAILB = 253,
+    /// A request for mail agent RRs (Obsolete - see MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    MAILA = 254,
+    /// A request for all records, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    ANY = 255,
 }
 
 impl TryFrom<u16> for QTYPE {
@@ -161,12 +204,18 @@ impl TryFrom<u16> for QTYPE {
     }
 }
 
+/// Possible CLASS values for a Resource in a DNS packet  
+/// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum  CLASS {
-    IN = 1, // the Internet
-    CS = 2, // the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
-    CH = 3, // the CHAOS class
-    HS = 4, // Hesiod [Dyer 87]
+    /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    IN = 1, 
+    /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CS = 2, 
+    /// The CHAOS class, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CH = 3, 
+    /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    HS = 4, 
 }
 
 impl TryFrom<u16> for CLASS {
@@ -184,12 +233,19 @@ impl TryFrom<u16> for CLASS {
     }
 }
 
+/// Possible QCLASS values for a Question in a DNS packet  
+/// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum QCLASS {
-    IN = 1, // the Internet
-    CS = 2, // the CSNET class (Obsolete - used only for examples in some obsolete RFCs)
-    CH = 3, // the CHAOS class
-    HS = 4, // Hesiod [Dyer 87],
+    /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    IN = 1, 
+    /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs), [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CS = 2, 
+    /// The CHAOS class, [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    CH = 3, 
+    /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
+    HS = 4, 
+    /// [RFC 1035](https://tools.ietf.org/html/rfc1035)
     ANY = 255
 }
 
@@ -209,6 +265,10 @@ impl TryFrom<u16> for QCLASS {
     }
 }
 
+
+/// Possible OPCODE values for a DNS packet, use to specify the type of operation.  
+/// [RFC 1035](https://tools.ietf.org/html/rfc1035): A four bit field that specifies kind of query in this message.  
+/// This value is set by the originator of a query and copied into the response.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum OPCODE {
     /// Normal query
@@ -232,14 +292,27 @@ impl From<u16> for OPCODE {
     }
 }
 
+/// Possible RCODE values for a DNS packet   
+/// [RFC 1035](https://tools.ietf.org/html/rfc1035) Response code - this 4 bit field is set as part of responses.  
+/// The values have the following interpretation
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum RCODE {
+    /// No error condition
     NoError = 0,
+    /// Format error - The name server was unable to interpret the query.
     FormatError = 1,
+    /// Server failure - The name server was unable to process this query due to a problem with the name server.
     ServerFailure = 2,
+    /// Name Error - Meaningful only for responses from an authoritative name server,  
+    /// this code signifies that the domain name referenced in the query does not exist.
     NameError = 3,
+    /// Not Implemented - The name server does not support the requested kind of query.
     NotImplemented = 4,
+    /// Refused - The name server refuses to perform the specified operation for policy reasons.  
+    /// For example, a name server may not wish to provide the information to the particular requester,   
+    /// or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data. 
     Refused = 5,
+    /// Reserved for future use.
     Reserved
 }
 

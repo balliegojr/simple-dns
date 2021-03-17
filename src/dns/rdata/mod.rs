@@ -39,7 +39,7 @@ pub enum RData<'a> {
 }
 
 impl <'a> RData<'a> {
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         match &self {
             RData::A(data) => data.len(),
             RData::NS(data) | 
@@ -60,7 +60,7 @@ impl <'a> RData<'a> {
         }
     }
 
-    pub fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    pub(crate) fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         match &self {
             RData::A(data) => data.append_to_vec(out),
             RData::NS(data) |
@@ -82,7 +82,7 @@ impl <'a> RData<'a> {
     }
 }
 
-pub fn parse_rdata<'a>(data: &'a [u8], position: usize, rdatatype: TYPE) -> crate::Result<RData<'a>> {
+pub(crate) fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
     let rdata = match rdatatype {
         TYPE::A => RData::A(A::parse(data, position)?),
         TYPE::NS => RData::NS(Name::parse(data, position)?),

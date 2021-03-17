@@ -1,14 +1,22 @@
 use byteorder::{ ByteOrder, BigEndian };
 
-use super::{CLASS, DnsPacketContent, Name, RData, TYPE, rdata::parse_rdata};
+use super::{CLASS, DnsPacketContent, Name, rdata::RData, TYPE, rdata::parse_rdata};
 use core::fmt::Debug;
 use std::{convert::{ TryInto }};
+
+/// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
+    /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
-    pub ttl: u32,
-    pub class: CLASS,
+    /// A [`TYPE`] that defines the contents of the rdata field
     pub rdatatype: TYPE,
+    /// A [`CLASS`] that defines the class of the rdata field
+    pub class: CLASS,
+    /// The time interval (in seconds) that the resource record may becached before it should be discarded.  
+    /// Zero values are interpreted to mean that the RR can only be used for the transaction in progress, and should not be cached.
+    pub ttl: u32,
+    /// A [`RData`] with the contents of this resource record
     pub rdata: RData<'a>
 }
 
@@ -34,7 +42,7 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
             rdatatype,
             class,
             ttl,
-            rdata: rdata
+            rdata
         })
     }
 

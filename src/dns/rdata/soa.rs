@@ -1,13 +1,23 @@
 use crate::dns::{ DnsPacketContent, Name };
 use byteorder::{ ByteOrder, BigEndian };
+
+/// SOA records are used to mark the start of a zone of authority
 #[derive(Debug)]
 pub struct SOA<'a> {
+    /// The [Name](`Name`) of the name server that was the original or primary source of data for this zone.
     pub mname: Name<'a>,
+    /// A [Name](`Name`) which specifies the mailbox of the person responsible for this zone.
     pub rname: Name<'a>,
+    /// The unsigned 32 bit version number of the original copy of the zone.  Zone transfers preserve this value.  
+    /// This value wraps and should be compared using sequence space arithmetic.
     pub serial: u32,
+    /// A 32 bit time interval before the zone should be refreshed.
     pub refresh: i32,
+    /// A 32 bit time interval that should elapse before a failed refresh should be retried.
     pub retry: i32,
+    /// A 32 bit time value that specifies the upper limit on the time interval that can elapse before the zone is no longer authoritative.
     pub expire: i32,
+    /// The unsigned 32 bit minimum TTL field that should be exported with any RR from this zone.
     pub minimum: u32
 }
 

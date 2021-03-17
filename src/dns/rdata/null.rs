@@ -1,5 +1,6 @@
 use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
 
+/// NULL resources are used to represent any kind of information.
 #[derive(Debug)]
 pub struct NULL<'a> {
     length: u16,
@@ -7,6 +8,7 @@ pub struct NULL<'a> {
 }
 
 impl <'a> NULL<'a> {
+    /// Creates a new NULL rdata
     pub fn new(data: &'a [u8]) -> crate::Result<Self> {
         if data.len() > MAX_NULL_LENGTH {
             return Err(crate::SimpleDnsError::InvalidDnsPacket);
@@ -18,6 +20,11 @@ impl <'a> NULL<'a> {
                 data
            }
         )
+    }
+
+    /// get a read only reference to internal data
+    pub fn get_data(&self) -> &'a [u8] {
+        self.data
     }
 }
 

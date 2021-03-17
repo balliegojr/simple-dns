@@ -10,39 +10,48 @@ mod flag {
     pub const TRUNCATED:           u16 = 0b0000_0010_0000_0000;
     pub const RECURSION_DESIRED:   u16 = 0b0000_0001_0000_0000;
     pub const RECURSION_AVAILABLE: u16 = 0b0000_0000_1000_0000;
-    pub const AUTHENTICATED_DATA:  u16 = 0b0000_0000_0010_0000;
-    pub const CHECKING_DISABLED:   u16 = 0b0000_0000_0001_0000;
+    // pub const AUTHENTICATED_DATA:  u16 = 0b0000_0000_0010_0000;
+    // pub const CHECKING_DISABLED:   u16 = 0b0000_0000_0001_0000;
     pub const RESERVED_MASK:       u16 = 0b0000_0000_0100_0000;
     pub const RESPONSE_CODE_MASK:  u16 = 0b0000_0000_0000_1111;
 }
 
+/// Contains general information about the packet
 #[derive(Debug)]
 pub struct PacketHeader {
+    /// The identification of the packet, must be defined when querying
     pub id: u16,
-    /// qc field
+    /// Indicates if this packet is a query or a response.
     pub query: bool,
+    /// Indicates the type of query in this packet
     pub opcode: OPCODE,
-    /// aa field
+    /// Authoritative Answer - this bit is valid in responses,  
+    /// and specifies that the responding name server is an authority for the domain name in question section.
     pub authoritative_answer: bool,
-    /// tc field
+    /// TrunCation - specifies that this message was truncated due to  
+    /// length greater than that permitted on the transmission channel.
     pub truncated: bool,
-    /// rd field
+    /// Recursion Desired may be set in a query andis copied into the response.  
+    /// If RD is set, it directs the name server to pursue the query recursively.  
+    /// Recursive query support is optional.
     pub recursion_desired: bool,
-    /// ra field
+    /// Recursion Available is set or cleared in a response.  
+    /// It denotes whether recursive query support is available in the name server.
     pub recursion_available: bool,
-    /// rcode field
+    /// [RCODE](`RCODE`) indicates the response code for this packet
     pub response_code: RCODE,
-    /// qscount field
+    /// Indicate the number of questions in the packet
     pub questions_count: u16,
-    /// ancount field
+    /// Indicate the number of answers in the packet
     pub answers_count: u16,
-    /// nscount
+    /// Indicate the number of name servers resource records in the packet
     pub name_servers_count: u16,
-    /// arcount
+    /// Indicate the number of additional records in the packet
     pub additional_records_count: u16
 }
 
 impl PacketHeader {
+    /// Creates a new header for querying
     pub fn new_query(id: u16, recursion_desired: bool) -> Self {
         Self {
             id,
@@ -60,6 +69,7 @@ impl PacketHeader {
         }
     }
 
+    /// Parse a slice of 12 bytes into a Packet header
     pub fn parse(data: &[u8]) -> crate::Result<Self> {
         if data.len() < 12 {
             return Err(crate::SimpleDnsError::InvalidHeaderData);
@@ -90,6 +100,7 @@ impl PacketHeader {
         Ok(header)
     }
 
+    /// Writes this header to a buffer of 12 bytes
     pub fn write_to(&self, buffer: &mut [u8]) {
         assert_eq!(12, buffer.len(), "Header buffer must have length of 12");
 

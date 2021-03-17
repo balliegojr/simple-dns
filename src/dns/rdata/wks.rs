@@ -1,10 +1,14 @@
 use crate::dns::DnsPacketContent;
 use byteorder::{BigEndian, ByteOrder};
 
+/// The WKS record is used to describe the well known services supported by a particular protocol on a particular internet address.
 #[derive(Debug)]
 pub struct WKS<'a> {
+    /// An 32 bit Internet address
     pub address: u32,
+    /// An 8 bit IP protocol number
     pub protocol: u8,
+    /// A variable length bit map.  The bit map must be a multiple of 8 bits long.
     pub bit_map: &'a [u8]
 }
 

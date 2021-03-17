@@ -1,14 +1,20 @@
 use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
+/// Represents a DNS message packet
 #[derive(Debug)]
 pub struct Packet<'a> {
     header: PacketHeader,
+    /// Questions section
     pub questions: Vec<Question<'a>>,
+    /// Answers section
     pub answers: Vec<ResourceRecord<'a>>,
+    /// Name servers section
     pub name_servers: Vec<ResourceRecord<'a>>,
+    /// Aditional records section
     pub additional_records: Vec<ResourceRecord<'a>>
 }
 
 impl <'a> Packet<'a> {
+    /// Creates a new empty packet with a query header
     pub fn new_query(id: u16, recursion_desired: bool) -> Self {
         Self {
             header: PacketHeader::new_query(id, recursion_desired),
@@ -19,6 +25,7 @@ impl <'a> Packet<'a> {
         }
     }
 
+    /// Parses a packet from a slice of bytes
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
         let header = PacketHeader::parse(&data[..12])?;
         
@@ -49,27 +56,32 @@ impl <'a> Packet<'a> {
         Ok(section_items)
     }
 
+    /// Helper method to build a packet with questions
     pub fn with_question(mut self, question: Question<'a>) -> Self {
         self.questions.push(question);
         self
     }
     
+    /// Helper method to build a packet with answers
     pub fn with_answer(mut self, answer: ResourceRecord<'a>) -> Self {
         self.answers.push(answer);
         self
     }
     
+    /// Helper method to build a packet with name servers
     pub fn with_name_server(mut self, name_server: ResourceRecord<'a>) -> Self {
         self.name_servers.push(name_server);
         self
     }
 
+    /// Helper method to build a packet with additional records
     pub fn with_additional_record(mut self, additional_record: ResourceRecord<'a>) -> Self {
         self.additional_records.push(additional_record);
         self
     }
     
-    pub fn to_bytes_vec(&mut self, truncate: bool) -> crate::Result<Vec<u8>> {
+    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package, ready to be sent
+    pub fn build_bytes_vec(&mut self, truncate: bool) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
         
         self.header.questions_count = self.questions.len() as u16;
@@ -119,7 +131,7 @@ mod tests {
         let query = Packet::new_query(1, false)
             .with_question(Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
             .with_question(Question::new("_srv2._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
-            .to_bytes_vec(true).unwrap();
+            .build_bytes_vec(true).unwrap();
 
         let parsed = Packet::parse(&query);
         assert!(parsed.is_ok());
@@ -143,7 +155,13 @@ mod tests {
 
     #[test]
     fn reply_google_com() -> Result<(), SimpleDnsError> {
-        let bytes = b"\x00\x03\x81\x80\x00\x01\x00\x0b\x00\x00\x00\x00\x06\x67\x6f\x6f\x67\x6c\x65\x03\x63\x6f\x6d\x00\x00\x01\x00\x01\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x23\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x25\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x27\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x20\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x28\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x21\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x29\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x22\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x24\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x2e\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x26";
+        let bytes = b"\x00\x03\x81\x80\x00\x01\x00\x0b\x00\x00\x00\x00\x06\x67\x6f\x6f\x67\x6c\x65\x03\x63\x6f\x6d\x00\
+        \x00\x01\x00\x01\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x23\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\
+        \x00\x04\x4a\x7d\xec\x25\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x27\xc0\x0c\x00\x01\x00\x01\x00\x00\
+        \x00\x04\x00\x04\x4a\x7d\xec\x20\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x28\xc0\x0c\x00\x01\x00\x01\
+        \x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x21\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x29\xc0\x0c\x00\x01\
+        \x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x22\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x24\xc0\x0c\
+        \x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x2e\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x04\x00\x04\x4a\x7d\xec\x26";
 
         let packet = Packet::parse(bytes)?;
 
@@ -157,7 +175,7 @@ mod tests {
         assert_eq!(4, packet.answers[0].rdata.len());
         
         match &packet.answers[0].rdata {
-            crate::dns::RData::A(a) => {
+            crate::dns::rdata::RData::A(a) => {
                 assert_eq!(1249766435, a.address)
             }
             _ => panic!("invalid RDATA")

@@ -3,15 +3,22 @@ use byteorder::{ ByteOrder, BigEndian };
 
 use super::{DnsPacketContent, Name, QCLASS, QTYPE};
 
+/// Question represents a query in the DNS Packet
 #[derive(Debug)]
 pub struct Question<'a> {
+    /// a [Name](`Name`)  to query for
     pub qname: Name<'a>,
+    /// a [QTYPE](`QTYPE`) which specifies the type of the query.
     pub qtype: QTYPE,
+    /// a [QCLASS](`QCLASS`) whire specifics the class of the query, For Example: IN
     pub qclass: QCLASS,
+    /// indicates if the queries prefers a unicast response.  
+    /// MDNS related, See [RFC 6762](https://tools.ietf.org/html/rfc6762#section-5.4)
     pub unicast_response: bool
 }
 
 impl <'a> Question<'a> {
+    /// Creates a new question
     pub fn new(qname: Name<'a>, qtype: QTYPE, qclass: QCLASS, unicast_response: bool) -> Self {
         Self {
             qname,

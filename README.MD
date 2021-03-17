@@ -1,5 +1,5 @@
 # Simple DNS
-This project provides DNS capabilities
+Pure Rust implementation to work with DNS packets
 
 ## DNS Packet Parser/Builder
 The *Packet* structure provides parsing e building of a DNS packet, it aims to be fully compliant with the RFCs bellow:

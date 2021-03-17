@@ -2,8 +2,10 @@ use byteorder::{ByteOrder, BigEndian};
 
 use crate::dns::DnsPacketContent;
 
+/// Represents a Resource Address (IPv4)
 #[derive(Debug)]
 pub struct A {
+    /// a 32 bit ip address
     pub address: u32,
 }
 

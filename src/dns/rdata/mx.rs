@@ -1,9 +1,14 @@
 use byteorder::{ByteOrder, BigEndian};
 use crate::dns::{DnsPacketContent, Name};
 
+/// MX is used to acquire mail exchange information
 #[derive(Debug)]
 pub struct MX<'a> {
+    /// A 16 bit integer which specifies the preference given to this RR among others at the same owner.  
+    /// Lower values are preferred.
     pub preference: u16,
+
+    /// A [Name](`Name`) which specifies a host willing to act as a mail exchange for the owner name.
     pub exchange: Name<'a>
 }
 
