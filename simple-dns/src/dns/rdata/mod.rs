@@ -1,4 +1,3 @@
-
 use super::{CharacterString, DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
 

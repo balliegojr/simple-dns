@@ -50,9 +50,13 @@ impl <'a> DnsPacketContent<'a> for CharacterString<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
         let length = data[position] as usize;
 
-        Ok(Self{
-            data: &data[position + 1..position + 1 + length]
-        })
+        if Self::is_valid(&data[position + 1..position + 1 + length]) {
+            Ok(Self {
+                data: &data[position + 1..position + 1 + length]
+            })
+        } else {
+            Err(SimpleDnsError::InvalidCharacterString)
+        }
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -101,19 +105,19 @@ mod tests {
 
     #[test]
     fn parse() {
-        let c_string= CharacterString::parse(b"\x0esome long text", 0);
+        let c_string= CharacterString::parse(b"\x0esome_long_text", 0);
         assert!(c_string.is_ok());
         let c_string = c_string.unwrap();
         assert_eq!(15, c_string.len());
-        assert_eq!("some long text", c_string.to_string());
+        assert_eq!("some_long_text", c_string.to_string());
     }
 
     #[test]
     fn append_to_vec() {
         let mut out = Vec::new();
-        let c_string= CharacterString::new("some long text".as_bytes()).unwrap();
+        let c_string= CharacterString::new("some_long_text".as_bytes()).unwrap();
         c_string.append_to_vec(&mut out).unwrap();
 
-        assert_eq!(b"\x0esome long text", &out[..]);
+        assert_eq!(b"\x0esome_long_text", &out[..]);
     }
 }

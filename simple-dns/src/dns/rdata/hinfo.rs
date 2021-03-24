@@ -41,8 +41,8 @@ mod tests {
     #[test]
     fn parse_and_write_hinfo() {
         let hinfo = HINFO {
-            cpu: CharacterString::new(b"some cpu").unwrap(),
-            os: CharacterString::new(b"some os").unwrap()
+            cpu: CharacterString::new(b"\"some cpu\"").unwrap(),
+            os: CharacterString::new(b"\"some os\"").unwrap()
         };
 
         let mut data = Vec::new();
@@ -53,8 +53,8 @@ mod tests {
         let hinfo = hinfo.unwrap();
 
         assert_eq!(data.len(), hinfo.len());
-        assert_eq!("some cpu", hinfo.cpu.to_string());
-        assert_eq!("some os", hinfo.os.to_string());
+        assert_eq!("\"some cpu\"", hinfo.cpu.to_string());
+        assert_eq!("\"some os\"", hinfo.os.to_string());
 
     }
 }

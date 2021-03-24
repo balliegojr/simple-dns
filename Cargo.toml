@@ -1,16 +1,6 @@
-[package]
-name = "simple-dns"
-version = "0.1.0"
-authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-futures = "0.3.12"
-byteorder = "1.4.2"
-socket2 = { version="0.3.19", features=["reuseport"] }
-tokio = { version="^1.0", optional=true, features=["full"] }
-
-[features]
-mdns = ["tokio"]
+members = [
+    "simple-dns",
+    "simple-mdns"
+]

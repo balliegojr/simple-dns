@@ -1,16 +1,20 @@
-// use std::time::Duration;
+// use std::{time::Duration};
 // use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, SocketAddr}};
 
-// use dns::Name;
 // use tokio::{time, net::UdpSocket};
-// use crate::{SimpleDnsError, dns};
+// use simple_dns::{Name, Packet, QCLASS, QTYPE, Question, SimpleDnsError, rdata::RData};
 
 
 // const MULTICAST_ADDR_IPV4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
 // //const MULTICAST_ADDR_IPV6: Ipv6Addr = "FF02::FB"
 // const MULTICAST_PORT: u16 = 5353;
 
-
+// enum SimpleMdnsError {
+//     ErrorCreatingUDPSocket,
+//     ErrorSendingDNSPacket,
+//     ErrorReadingFromUDPSocket,
+//     DnsParsing(SimpleDnsError)
+// }
 
 // pub struct MdnsResolver { 
 //     // service_name: String,
@@ -28,9 +32,9 @@
 //         }   
 //     }
 
-//     pub async fn oneshot_query(&self, service_name: &str, timeout: Duration) -> crate::Result<Option<std::net::IpAddr>> {
+//     pub async fn oneshot_query(&self, service_name: &str, timeout: Duration) -> Result<Option<std::net::IpAddr>, SimpleMdnsError> {
 //         let service_name = format_to_link_local(service_name);
-//         let socket = create_udp_socket(self.enable_loopback).map_err(|_| SimpleDnsError::ErrorCreatingUDPSocket)?;
+//         let socket = create_udp_socket(self.enable_loopback).map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
 //         send_link_local_question(&socket, service_name).await?;
         
 //         match time::timeout(timeout, get_first_address(&socket, service_name.try_into()?)).await {
@@ -45,9 +49,9 @@
 //     name
 // }
 
-// async fn send_link_local_question(socket: &UdpSocket, name: &str) -> crate::Result<()>{
-//     let question = dns::Question::new(Name::new(name)?, dns::QTYPE::ANY, dns::QCLASS::IN, false);
-//     let packet = dns::Packet::new_query(0, false)
+// async fn send_link_local_question(socket: &UdpSocket, name: &str) -> Result<(), SimpleMdnsError>{
+//     let question = Question::new(Name::new(name)?, QTYPE::ANY, QCLASS::IN, false);
+//     let packet = Packet::new_query(0, false)
 //         .with_question(question)
 //         .build_bytes_vec(false)?;
 
@@ -55,7 +59,7 @@
 //     let target_addr = std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT);
 //     socket.send_to(&packet, target_addr)
 //         .await
-//         .map_err(|_| crate::SimpleDnsError::ErrorSendingDNSPacket)?;
+//         .map_err(|_| SimpleMdnsError::ErrorSendingDNSPacket)?;
 //     Ok(())
 // }
 
@@ -78,18 +82,18 @@
 //     Ok(socket)
 // }
 
-// async fn get_first_address<'a>(socket: &'a tokio::net::UdpSocket, name: Name<'a>) -> crate::Result<IpAddr> {
+// async fn get_first_address<'a>(socket: &'a tokio::net::UdpSocket, name: Name<'a>) -> Result<IpAddr, SimpleMdnsError> {
 //     let mut recv_buffer = vec![0; 4096];
 //     loop {
 //         let (count, _) = socket.recv_from(&mut recv_buffer)
 //             .await
-//             .map_err(|_| crate::SimpleDnsError::ErrorReadingFromUDPSocket)?;
+//             .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
 
-//         match dns::Packet::parse(&recv_buffer[..count]) {
+//         match Packet::parse(&recv_buffer[..count]) {
 //             Ok(packet) => {
 //                 println!("{:?}", packet);
 //                 for answer in packet.answers.iter().filter(|a| a.name == name) {
-//                     if let dns::RData::A(ref a) = answer.rdata {
+//                     if let RData::A(ref a) = answer.rdata {
 //                         return Ok(IpAddr::V4(Ipv4Addr::from(a.address)))
 //                     }
 //                 }
@@ -122,19 +126,19 @@
 //         });
 //     }
 
-//     async fn wait_packages(enable_loopback: bool) -> crate::Result<()> {
+//     async fn wait_packages(enable_loopback: bool) -> Result<(), SimpleMdnsError> {
 //         let mut recv_buffer = vec![0; 4096];
         
 //         let socket = create_udp_socket(enable_loopback)
-//             .map_err(|_| SimpleDnsError::ErrorCreatingUDPSocket)?;
+//             .map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
         
         
 //         loop {
 //             let (count, _) = socket.recv_from(&mut recv_buffer)
 //                 .await
-//                 .map_err(|_| crate::SimpleDnsError::ErrorReadingFromUDPSocket)?;
+//                 .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
     
-//             match dns::Packet::parse(&recv_buffer[..count]) {
+//             match Packet::parse(&recv_buffer[..count]) {
 //                 Ok(packet) => {
 //                     for question in packet.questions {
                         

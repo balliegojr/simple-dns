@@ -7,8 +7,9 @@ use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 
-/// Name (<domain-name>s) make up a large share of the data in the master file.  
-/// The labels in the domain name are expressed as character strings and separated by dots.  
+/// A Name represents a domain-name, which consists of character strings separated by dots.  
+/// Each section of a name is called label  
+/// ex: `google.com` consists of two labels `google` and `com`
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
     data: &'a [u8],
