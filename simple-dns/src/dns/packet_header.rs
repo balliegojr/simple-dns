@@ -10,8 +10,8 @@ mod flag {
     pub const TRUNCATED:           u16 = 0b0000_0010_0000_0000;
     pub const RECURSION_DESIRED:   u16 = 0b0000_0001_0000_0000;
     pub const RECURSION_AVAILABLE: u16 = 0b0000_0000_1000_0000;
-    // pub const AUTHENTICATED_DATA:  u16 = 0b0000_0000_0010_0000;
-    // pub const CHECKING_DISABLED:   u16 = 0b0000_0000_0001_0000;
+    pub const AUTHENTIC_DATA:      u16 = 0b0000_0000_0010_0000;
+    pub const CHECKING_DISABLED:   u16 = 0b0000_0000_0001_0000;
     pub const RESERVED_MASK:       u16 = 0b0000_0000_0100_0000;
     pub const RESPONSE_CODE_MASK:  u16 = 0b0000_0000_0000_1111;
 }
@@ -47,11 +47,14 @@ pub struct PacketHeader {
     /// Indicate the number of name servers resource records in the packet
     pub name_servers_count: u16,
     /// Indicate the number of additional records in the packet
-    pub additional_records_count: u16
+    pub additional_records_count: u16,
+    pub authentic_data: bool,
+    pub checking_disabled: bool
+
 }
 
 impl PacketHeader {
-    /// Creates a new header for querying
+    /// Creates a new header for a query packet
     pub fn new_query(id: u16, recursion_desired: bool) -> Self {
         Self {
             id,
@@ -65,7 +68,30 @@ impl PacketHeader {
             additional_records_count: 0,
             answers_count: 0,
             name_servers_count: 0,
-            questions_count: 0
+            questions_count: 0,
+            authentic_data: false,
+            checking_disabled: false
+        }
+    }
+
+    /// Creates a new header for a reply packet
+    pub fn new_reply(id: u16, opcode: OPCODE) -> Self {
+        Self {
+            id,
+            query: false,
+            opcode,
+            authoritative_answer: false,
+            truncated: false,
+            recursion_desired: false,
+            recursion_available: false,
+            response_code: RCODE::NoError,
+            questions_count: 0,
+            answers_count: 0,
+            name_servers_count: 0,
+            additional_records_count: 0,
+            authentic_data: false,
+            checking_disabled: false,
+            
         }
     }
 
@@ -89,8 +115,8 @@ impl PacketHeader {
             truncated: flags & flag::TRUNCATED != 0,
             recursion_desired: flags & flag::RECURSION_DESIRED != 0,
             recursion_available: flags & flag::RECURSION_AVAILABLE != 0,
-            // authenticated_data: flags & flag::AUTHENTICATED_DATA != 0,
-            // checking_disabled: flags & flag::CHECKING_DISABLED != 0,
+            authentic_data: flags & flag::AUTHENTIC_DATA != 0,
+            checking_disabled: flags & flag::CHECKING_DISABLED != 0,
             response_code: (flags&flag::RESPONSE_CODE_MASK).into(),
             questions_count: BigEndian::read_u16(&data[4..6]),
             answers_count: BigEndian::read_u16(&data[6..8]),
@@ -126,6 +152,52 @@ impl PacketHeader {
 
         flags
     }
+
+    /// Returns the packet id from the header buffer
+    pub fn id(buffer: &[u8]) -> u16 {
+        BigEndian::read_u16(&buffer[..2])
+    }
+
+    /// Returns the questions count from the header buffer
+    pub fn read_questions(buffer: &[u8]) -> u16 {
+        BigEndian::read_u16(&buffer[4..6])
+    }
+
+    /// Writes the questions count in the header buffer
+    pub fn write_questions(buffer: &mut [u8], question_count: u16) {
+        BigEndian::write_u16(&mut buffer[4..6], question_count);
+    }
+
+    /// Returns the answers count from the header buffer
+    pub fn read_answers(buffer: &[u8]) -> u16 {
+        BigEndian::read_u16(&buffer[6..8])
+    }
+
+    /// Writes the answers count in the header buffer
+    pub fn write_answers(buffer: &mut [u8], answers_count: u16) {
+        BigEndian::write_u16(&mut buffer[6..8], answers_count);
+    }
+
+    /// Returns the name servers count from the header buffer
+    pub fn read_name_servers(buffer: &[u8]) -> u16 {
+        BigEndian::read_u16(&buffer[8..10])
+    }
+
+    /// Writes the name servers count in the header buffer
+    pub fn write_name_servers(buffer: &mut [u8], name_servers_count: u16) {
+        BigEndian::write_u16(&mut buffer[8..10], name_servers_count);
+    }
+
+    /// Returns the additional records from the header buffer
+    pub fn read_additional_records(buffer: &[u8]) -> u16 {
+        BigEndian::read_u16(&buffer[10..12])
+    }
+
+    /// Writes the additional records count in the header buffer
+    pub fn write_additional_records(buffer: &mut [u8], additional_records_count: u16) {
+        BigEndian::write_u16(&mut buffer[10..12], additional_records_count);
+    }
+
 }
 
 #[cfg(test)]
@@ -146,7 +218,9 @@ mod tests {
             additional_records_count: 2,
             answers_count: 2,
             name_servers_count: 2,
-            questions_count: 2
+            questions_count: 2,
+            authentic_data: false,
+            checking_disabled: false 
         };
 
         let mut buf = [0u8; 12];
@@ -159,17 +233,45 @@ mod tests {
     fn parse_example_query() {
         let header = PacketHeader::parse(b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02").unwrap();
 
-            assert_eq!(core::u16::MAX, header.id);
-            assert_eq!(true, header.query);
-            assert_eq!(OPCODE::StandardQuery, header.opcode);
-            assert_eq!(false, header.authoritative_answer);
-            assert_eq!(true, header.truncated);
-            assert_eq!(true, header.recursion_desired);
-            assert_eq!(false, header.recursion_available);
-            assert_eq!(RCODE::NoError, header.response_code);
-            assert_eq!(2, header.additional_records_count);
-            assert_eq!(2, header.answers_count);
-            assert_eq!(2, header.name_servers_count);
-            assert_eq!(2, header.questions_count);
+        assert_eq!(core::u16::MAX, header.id);
+        assert_eq!(true, header.query);
+        assert_eq!(OPCODE::StandardQuery, header.opcode);
+        assert_eq!(false, header.authoritative_answer);
+        assert_eq!(true, header.truncated);
+        assert_eq!(true, header.recursion_desired);
+        assert_eq!(false, header.recursion_available);
+        assert_eq!(RCODE::NoError, header.response_code);
+        assert_eq!(2, header.additional_records_count);
+        assert_eq!(2, header.answers_count);
+        assert_eq!(2, header.name_servers_count);
+        assert_eq!(2, header.questions_count);
+    }
+
+    #[test]
+    fn read_write_questions_count() {
+        let mut buffer = [0u8; 12];
+        PacketHeader::write_questions(&mut buffer, 1);
+        assert_eq!(1, PacketHeader::read_questions(&buffer));
+    }
+
+    #[test]
+    fn read_write_answers_count() {
+        let mut buffer = [0u8; 12];
+        PacketHeader::write_answers(&mut buffer, 1);
+        assert_eq!(1, PacketHeader::read_answers(&buffer));
+    }
+
+    #[test]
+    fn read_write_name_servers_count() {
+        let mut buffer = [0u8; 12];
+        PacketHeader::write_name_servers(&mut buffer, 1);
+        assert_eq!(1, PacketHeader::read_name_servers(&buffer));
+    }
+
+    #[test]
+    fn read_write_additional_records_count() {
+        let mut buffer = [0u8; 12];
+        PacketHeader::write_additional_records(&mut buffer, 1);
+        assert_eq!(1, PacketHeader::read_additional_records(&buffer));
     }
 }

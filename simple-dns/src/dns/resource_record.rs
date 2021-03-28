@@ -1,5 +1,7 @@
 use byteorder::{ ByteOrder, BigEndian };
 
+use crate::{QCLASS, QTYPE};
+
 use super::{CLASS, DnsPacketContent, Name, rdata::RData, TYPE, rdata::parse_rdata};
 use core::fmt::Debug;
 use std::{convert::{ TryInto }};
@@ -18,6 +20,32 @@ pub struct ResourceRecord<'a> {
     pub ttl: u32,
     /// A [`RData`] with the contents of this resource record
     pub rdata: RData<'a>
+}
+
+impl <'a> ResourceRecord<'a> {
+    /// Creates a new ResourceRecord
+    pub fn new(name: &'a str, rdatatype: TYPE, class: CLASS, ttl: u32, rdata: RData<'a>) -> crate::Result<Self> {
+        Ok(Self {
+            name: name.try_into()?,
+            class,
+            ttl,
+            rdata,
+            rdatatype
+        })
+    }
+
+
+    /// Return true if current resource match given query class
+    pub fn match_qclass(&self, qclass: QCLASS) -> bool {
+        qclass == QCLASS::ANY || self.class as u16 == qclass as u16
+    }
+
+    /// Return true if current resource match given query type
+    pub fn match_qtype(&self, qtype: QTYPE) -> bool {
+        let rtype: u16 = self.rdatatype.into();
+        qtype == QTYPE::ANY || rtype == qtype as u16
+    }
+    
 }
 
 impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
@@ -102,4 +130,33 @@ mod tests {
         assert_eq!(out.len(), rr.len());
     }
 
+    #[test]
+    fn test_match_qclass() {
+        let rr = ResourceRecord {
+            class: CLASS::IN,
+            name: "_srv._udp.local".try_into().unwrap(),
+            rdatatype: TYPE::Unknown(0),
+            ttl: 10,
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+        };
+
+        assert!(rr.match_qclass(QCLASS::ANY));
+        assert!(rr.match_qclass(QCLASS::IN));
+        assert!(!rr.match_qclass(QCLASS::CS));
+    }
+
+    #[test]
+    fn test_match_qtype() {
+        let rr = ResourceRecord {
+            class: CLASS::IN,
+            name: "_srv._udp.local".try_into().unwrap(),
+            rdatatype: TYPE::A,
+            ttl: 10,
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+        };
+
+        assert!(rr.match_qtype(QTYPE::ANY));
+        assert!(rr.match_qtype(QTYPE::A));
+        assert!(!rr.match_qtype(QTYPE::WKS));
+    }
 }

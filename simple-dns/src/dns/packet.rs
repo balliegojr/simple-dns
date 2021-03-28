@@ -1,8 +1,125 @@
+use std::{ops::Deref};
+
+use crate::{OPCODE, SimpleDnsError};
+
 use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
+
+/// Owned version of [`Packet`] that contains a internal buffer.  
+/// This struct fills the internal buffer on the fly, because of this, it imposes some constraints.  
+/// You have to build the packet in order.  
+/// ex: It is not possible to add a question after an answer
+pub struct BufPacket {
+    inner: Vec<u8>
+}
+
+impl BufPacket {
+    /// Creates a new empty BufPacket
+    pub fn new(header: PacketHeader) -> Self {
+        let mut inner = vec![0; 12];
+        header.write_to(&mut inner);
+        Self {
+            inner
+        }
+    }
+
+    /// Add a [`Question`] to this packet.  
+    /// This function will fail if the packet already has any answer, name server or additional records
+    pub fn add_question(&mut self, question: &Question) -> crate::Result<()> {
+        if self.has_answers() || self.has_name_servers() || self.has_additional_records() {
+            return Err(SimpleDnsError::InvalidDnsPacket)
+        }
+
+        question.append_to_vec(&mut self.inner)?;
+        let questions_count = PacketHeader::read_questions(&self.inner);
+        PacketHeader::write_questions(&mut self.inner, questions_count + 1);
+        Ok(())
+    }
+
+    /// Add a [Answer](`ResourceRecord`) to this packet.  
+    /// This function will fail if the packet already has any name server or additional records
+    pub fn add_answer(&mut self, answer: &ResourceRecord) -> crate::Result<()> {
+        if self.has_name_servers() || self.has_additional_records() {
+            return Err(SimpleDnsError::InvalidDnsPacket)
+        }
+
+        answer.append_to_vec(&mut self.inner)?;
+        let answers_count = PacketHeader::read_answers(&self.inner);
+        PacketHeader::write_answers(&mut self.inner, answers_count + 1);
+        Ok(())
+    }
+
+    /// Add a [Name Server](`ResourceRecord`) to this packet.  
+    /// This function will fail if the packet already has any additional records
+    pub fn add_name_server(&mut self, name_server: &ResourceRecord) -> crate::Result<()> {
+        if self.has_additional_records() {
+            return Err(SimpleDnsError::InvalidDnsPacket)
+        }
+
+        name_server.append_to_vec(&mut self.inner)?;
+        let ns_count = PacketHeader::read_name_servers(&self.inner);
+        PacketHeader::write_name_servers(&mut self.inner, ns_count + 1);
+        Ok(())
+    }
+
+    /// Add an [Additional Record](`ResourceRecord`) to this packet
+    pub fn add_additional_record(&mut self, additional_record: &ResourceRecord) -> crate::Result<()> {
+        additional_record.append_to_vec(&mut self.inner)?;
+        let additional_records_count = PacketHeader::read_additional_records(&self.inner);
+        PacketHeader::write_additional_records(&mut self.inner, additional_records_count + 1);
+        Ok(())
+    }
+
+    /// Return the packet id from this packet header
+    pub fn packet_id(&self) -> u16 {
+        PacketHeader::id(&self.inner)
+    }
+
+    /// Creates a [`Packet`] by calling the [`Packet::parse`] function
+    pub fn to_packet(&self) -> crate::Result<Packet> {
+        Packet::parse(&self.inner)
+    }
+
+    /// Return true if this packet has any answers
+    pub fn has_answers(&self) -> bool {
+        PacketHeader::read_answers(&self.inner) > 0
+    }
+
+    /// Return true if this packet has questions
+    pub fn has_questions(&self) -> bool {
+        PacketHeader::read_questions(&self.inner) > 0
+    }
+
+    /// Return true if this packet has any name servers
+    pub fn has_name_servers(&self) -> bool {
+        PacketHeader::read_name_servers(&self.inner) > 0
+    }
+
+    /// Return true if this packet has any additional records
+    pub fn has_additional_records(&self) -> bool {
+        PacketHeader::read_additional_records(&self.inner) > 0
+    }
+}
+
+impl From<&[u8]> for BufPacket {
+    fn from(buffer: &[u8]) -> Self {
+        Self {
+            inner: buffer.to_vec()
+        }
+    }
+}
+
+impl Deref for BufPacket {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
 /// Represents a DNS message packet
 #[derive(Debug)]
 pub struct Packet<'a> {
-    header: PacketHeader,
+    /// Packet header
+    pub header: PacketHeader,
     /// Questions section
     pub questions: Vec<Question<'a>>,
     /// Answers section
@@ -23,6 +140,23 @@ impl <'a> Packet<'a> {
             name_servers: Vec::new(),
             additional_records: Vec::new(),
         }
+    }
+
+    /// Creates a new empty packet with a reply header
+    pub fn new_reply(id: u16) -> Self {
+        Self {
+            header: PacketHeader::new_reply(id, OPCODE::StandardQuery),
+            questions: Vec::new(),
+            answers: Vec::new(),
+            name_servers: Vec::new(),
+            additional_records: Vec::new(),
+        }
+    }
+
+    /// Changes this packet into a reply packet by replacing its header
+    pub fn into_reply(mut self) -> Self {
+        self.header = PacketHeader::new_reply(self.header.id, self.header.opcode);
+        self
     }
 
     /// Parses a packet from a slice of bytes
@@ -55,72 +189,49 @@ impl <'a> Packet<'a> {
 
         Ok(section_items)
     }
-
-    /// Helper method to build a packet with questions
-    pub fn with_question(mut self, question: Question<'a>) -> Self {
-        self.questions.push(question);
-        self
-    }
-    
-    /// Helper method to build a packet with answers
-    pub fn with_answer(mut self, answer: ResourceRecord<'a>) -> Self {
-        self.answers.push(answer);
-        self
-    }
-    
-    /// Helper method to build a packet with name servers
-    pub fn with_name_server(mut self, name_server: ResourceRecord<'a>) -> Self {
-        self.name_servers.push(name_server);
-        self
-    }
-
-    /// Helper method to build a packet with additional records
-    pub fn with_additional_record(mut self, additional_record: ResourceRecord<'a>) -> Self {
-        self.additional_records.push(additional_record);
-        self
-    }
     
     /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package, ready to be sent
-    pub fn build_bytes_vec(&mut self, truncate: bool) -> crate::Result<Vec<u8>> {
+    pub fn build_bytes_vec(&self) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
         
-        self.header.questions_count = self.questions.len() as u16;
-        self.header.answers_count = self.answers.len() as u16;
-        self.header.name_servers_count = self.name_servers.len() as u16;
-        self.header.additional_records_count = self.additional_records.len() as u16;
-        
-        self.header.truncated = Self::add_section(&mut out, truncate, &self.questions)?;
-        if !self.header.truncated {
-            self.header.truncated = Self::add_section(&mut out, truncate, &self.answers)?;
-        }
-        if !self.header.truncated {
-            self.header.truncated = Self::add_section(&mut out, truncate, &self.name_servers)?;
-        }
-        if !self.header.truncated {
-            self.header.truncated = Self::add_section(&mut out, truncate, &self.additional_records)?;
-        }
+        Self::add_section(&mut out, &self.questions)?;
+        Self::add_section(&mut out, &self.answers)?;
+        Self::add_section(&mut out, &self.name_servers)?;
+        Self::add_section(&mut out, &self.additional_records)?;
         
         self.header.write_to(&mut out[0..12]);
+        if !self.questions.is_empty() { 
+            PacketHeader::write_questions(&mut out, self.questions.len() as u16) 
+        }
+
+        if !self.answers.is_empty() { 
+            PacketHeader::write_answers(&mut out, self.answers.len() as u16) 
+        }
+
+        if !self.name_servers.is_empty() { 
+            PacketHeader::write_name_servers(&mut out, self.name_servers.len() as u16) 
+        }
+        
+        if !self.additional_records.is_empty() { 
+            PacketHeader::write_additional_records(&mut out, self.additional_records.len() as u16) 
+        }
+
+
         Ok(out)
     }
 
-    fn add_section<'b, T : DnsPacketContent<'b>>(out: &mut Vec<u8>, truncate: bool, section: &[T]) -> crate::Result<bool> {
+    fn add_section<'b, T : DnsPacketContent<'b>>(out: &mut Vec<u8>, section: &[T]) -> crate::Result<()> {
         for item in section {
             item.append_to_vec(out)?;
-
-            if truncate && out.len() > 243 {
-                return Ok(true);
-            }
         }
 
-        Ok(false)
+        Ok(())
     }
-
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{SimpleDnsError, dns::CLASS, dns::TYPE};
+    use crate::{SimpleDnsError, dns::CLASS, dns::TYPE, rdata::RData, rdata::A};
 
     use super::*;
     use super::super::{QTYPE, QCLASS};
@@ -128,10 +239,11 @@ mod tests {
 
     #[test]
     fn build_query_correct() {
-        let query = Packet::new_query(1, false)
-            .with_question(Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
-            .with_question(Question::new("_srv2._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false))
-            .build_bytes_vec(true).unwrap();
+        let mut query = Packet::new_query(1, false);
+        query.questions.push(Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false));
+        query.questions.push(Question::new("_srv2._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false));
+
+        let query = query.build_bytes_vec().unwrap();
 
         let parsed = Packet::parse(&query);
         assert!(parsed.is_ok());
@@ -182,5 +294,73 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn bufpacket_add_question() {
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
+        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        
+        assert!(buf_packet.add_question(&question).is_ok());
+        assert!(buf_packet.has_questions());
+
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_answer(&resource).unwrap();
+        assert!(buf_packet.add_question(&question).is_err());
+        assert!(!buf_packet.has_questions());
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_name_server(&resource).unwrap();
+        assert!(buf_packet.add_question(&question).is_err());
+        assert!(!buf_packet.has_questions());
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_additional_record(&resource).unwrap();
+        assert!(buf_packet.add_question(&question).is_err());
+        assert!(!buf_packet.has_questions());
+    }
+
+    #[test]
+    fn bufpacket_add_answers() {
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        
+        assert!(buf_packet.add_answer(&resource).is_ok());
+        assert!(buf_packet.has_answers());
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_name_server(&resource).unwrap();
+        assert!(buf_packet.add_answer(&resource).is_err());
+        assert!(!buf_packet.has_answers());
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_additional_record(&resource).unwrap();
+        assert!(buf_packet.add_answer(&resource).is_err());
+        assert!(!buf_packet.has_answers());
+    }
+
+    #[test]
+    fn bufpacket_add_name_servers() {
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        
+        assert!(buf_packet.add_name_server(&resource).is_ok());
+        assert!(buf_packet.has_name_servers());
+
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        buf_packet.add_additional_record(&resource).unwrap();
+        assert!(buf_packet.add_name_server(&resource).is_err());
+        assert!(!buf_packet.has_name_servers());
+    }
+
+    #[test]
+    fn bufpacket_add_additional_records() {
+        let mut buf_packet = BufPacket::new(PacketHeader::new_query(0, false));
+        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        
+        assert!(buf_packet.add_additional_record(&resource).is_ok());
+        assert!(buf_packet.has_additional_records());
     }
 }

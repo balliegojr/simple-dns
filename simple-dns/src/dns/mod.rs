@@ -11,7 +11,7 @@ mod character_string;
 use std::{convert::TryFrom };
 
 pub use packet_header::PacketHeader;
-pub use packet::Packet;
+pub use packet::{Packet, BufPacket};
 pub use question::Question;
 pub use name::Name;
 pub use resource_record::ResourceRecord;
@@ -71,6 +71,8 @@ pub enum TYPE {
     MX, 
     /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     TXT, 
+    /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
+    SRV,
     /// Unknown value, for future (or unimplemented RFC) compatibility
     Unknown(u16)
 }
@@ -94,6 +96,7 @@ impl From<TYPE> for u16 {
             TYPE::MINFO => 14,
             TYPE::MX => 15,
             TYPE::TXT => 16,
+            TYPE::SRV => 33,
             TYPE::Unknown(x) => x
         }
     }
@@ -120,6 +123,7 @@ impl From<u16> for TYPE {
             14 => MINFO,
             15 => MX,
             16 => TXT,
+            33 => SRV,
             v => TYPE::Unknown(v)
         }
     }
@@ -161,6 +165,8 @@ pub enum QTYPE {
     MX = 15,
     /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     TXT = 16,
+    /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
+    SRV = 33,
     /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR), [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -194,6 +200,7 @@ impl TryFrom<u16> for QTYPE {
             14 => Ok(MINFO),
             15 => Ok(MX),
             16 => Ok(TXT),
+            33 => Ok(SRV),
             252 => Ok(AXFR),
             253 => Ok(MAILB),
             254 => Ok(MAILA),

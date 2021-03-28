@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![allow(upper_case_acronyms)]
 
 //! Pure Rust implementation to work with DNS packets
 //!

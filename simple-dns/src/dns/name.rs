@@ -19,7 +19,7 @@ pub struct Name<'a> {
 impl <'a> Name<'a> {
     /// Creates a new validated Name
     pub fn new(name: &'a str) -> crate::Result<Self> {
-        if !name.is_ascii() || name.len() > MAX_NAME_LENGTH {
+        if name.len() > MAX_NAME_LENGTH {
             return Err(crate::SimpleDnsError::InvalidServiceName);
         }
 
@@ -171,7 +171,7 @@ mod tests {
         assert!(Name::new("some").is_ok());
         assert!(Name::new("some.local").is_ok());
         assert!(Name::new("some.local.").is_ok());
-        assert!(Name::new("\u{1F600}.local.").is_err());
+        assert!(Name::new("\u{1F600}.local.").is_ok());
     }
 
     #[test]
