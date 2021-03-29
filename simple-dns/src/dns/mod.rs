@@ -11,7 +11,7 @@ mod character_string;
 use std::{convert::TryFrom };
 
 pub use packet_header::PacketHeader;
-pub use packet::{Packet, BufPacket};
+pub use packet::{Packet, PacketBuf, PacketSectionIter};
 pub use question::Question;
 pub use name::Name;
 pub use resource_record::ResourceRecord;
@@ -28,7 +28,7 @@ const MAX_NULL_LENGTH: usize = 65535;
 // const MAX_PACKET_SIZE: usize = 9000 - 68; 
 
 
-pub(crate) trait DnsPacketContent<'a> {
+pub trait DnsPacketContent<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;
     
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;

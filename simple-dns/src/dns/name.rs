@@ -161,6 +161,17 @@ impl<'a> PartialEq for Name<'a> {
     }
 }
 
+impl<'a> Clone for Name<'a> {
+    fn clone(&self) -> Self {
+        
+        Self {
+            data: self.data,
+            length_in_bytes: self.length_in_bytes,
+            labels: self.labels.clone()
+        }
+    }
+}
+
 #[cfg(test)] 
 mod tests {
     use crate::SimpleDnsError;
