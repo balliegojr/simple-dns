@@ -4,13 +4,15 @@ use simple_dns::{PacketBuf, PacketHeader, ResourceRecord, rdata::RData};
 
 use crate::{ENABLE_LOOPBACK, MULTICAST_ADDR_IPV4, MULTICAST_PORT, SimpleMdnsError, create_udp_socket};
 
-
+/// A simple mDNS responder aimed for service discovery.  
+/// This struct is provided as an alternative for external mDNS resource configuration
 pub struct SimpleMdnsResponder {
     enable_loopback: bool,
     resources: Arc<RwLock<HashMap<String, Vec<ResourceRecord<'static>>>>>
 }
 
 impl SimpleMdnsResponder {
+    /// Creates a new SimpleMdnsResponder
     pub fn new() -> Self {
         Self {
             resources: Arc::new(RwLock::new(HashMap::new())),
@@ -18,10 +20,7 @@ impl SimpleMdnsResponder {
         }
     }
 
-    pub fn set_loopback(&mut self, enable_loopback: bool) {
-        self.enable_loopback = enable_loopback
-    }
-
+    /// Register a Resource Record
     pub fn add_resouce(&mut self, resource: ResourceRecord<'static>) {
         let mut resources = self.resources.write().unwrap();
         match resources.get_mut(&resource.name.to_string()) {
@@ -30,6 +29,7 @@ impl SimpleMdnsResponder {
         }
     }
 
+    /// Start listening to requests
     pub fn listen(&self) {
         let enable_loopback = self.enable_loopback;
         let resources = self.resources.clone();
@@ -66,6 +66,11 @@ impl SimpleMdnsResponder {
                     .map_err(|_| SimpleMdnsError::ErrorSendingDNSPacket)?;
             }
         }
+    }
+
+    /// Set the simple mdns responder's enable loopback.
+    pub fn set_enable_loopback(&mut self, enable_loopback: bool) {
+        self.enable_loopback = enable_loopback;
     }
 }
 

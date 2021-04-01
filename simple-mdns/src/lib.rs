@@ -1,3 +1,11 @@
+/*!
+Pure Rust implementation for mDNS and DNS-SD protocols  
+
+For IpAddress and/or Port querying just one single time, see [`OneShotMdnsResolver`]  
+For Dns Responder, see [`SimpleMdnsResponder`]
+*/
+#![warn(missing_docs)]
+
 use std::{net::{Ipv4Addr, SocketAddr}};
 
 use tokio::{net::UdpSocket};

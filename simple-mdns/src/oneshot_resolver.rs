@@ -5,6 +5,9 @@ use tokio::time;
 
 use crate::{ENABLE_LOOPBACK, SimpleMdnsError, UNICAST_RESPONSE, create_udp_socket, send_packet_to_multicast_socket};
 
+/// Provides One Shot queries (legacy mDNS)
+/// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
+/// One Shot queries returns only the first valid response to arrive
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     enable_loopback: bool,
@@ -12,6 +15,7 @@ pub struct OneShotMdnsResolver {
 }
 
 impl OneShotMdnsResolver {
+    /// Creates a new OneShotMdnsResolver
     pub fn new() -> Self {
         Self { 
             enable_loopback: ENABLE_LOOPBACK,
@@ -20,6 +24,7 @@ impl OneShotMdnsResolver {
         }
     }
 
+    /// Send a query packet and returns the first response
     pub async fn query_packet<'a>(&self, packet: PacketBuf) -> Result<Option<PacketBuf>, SimpleMdnsError> {
         let socket = create_udp_socket(self.enable_loopback).map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
         send_packet_to_multicast_socket(&socket, &packet).await?;
@@ -30,6 +35,7 @@ impl OneShotMdnsResolver {
         }
     }
 
+    /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
     pub async fn query_service_address(&self, service_name: &str) -> Result<Option<std::net::IpAddr>, SimpleMdnsError> {
         let mut packet = PacketBuf::new( PacketHeader::new_query(rand::random(), false));
         let service_name = Name::new(service_name)?;
@@ -54,6 +60,7 @@ impl OneShotMdnsResolver {
         Ok(None)
     }
 
+    /// Send a query for SRV resources and return the first address and port
     pub async fn query_service_address_and_port(&self, service_name: &str) -> Result<Option<std::net::SocketAddr>, SimpleMdnsError> {
         let mut packet = PacketBuf::new( PacketHeader::new_query(rand::random(), false));
         let parsed_name_service = Name::new(service_name)?;
