@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::{Arc, RwLock}};
 
-use simple_dns::{PacketBuf, PacketHeader, ResourceRecord, TYPE, rdata::RData};
+use simple_dns::{PacketBuf, PacketHeader, ResourceRecord, rdata::RData};
 
 use crate::{ENABLE_LOOPBACK, MULTICAST_ADDR_IPV4, MULTICAST_PORT, SimpleMdnsError, create_udp_socket};
 
@@ -23,11 +23,11 @@ impl SimpleMdnsResponder {
     }
 
     pub fn add_resouce(&mut self, resource: ResourceRecord<'static>) {
-        self.resources.write()
-            .unwrap()
-            .entry(resource.name.to_string())
-            .or_default()
-            .push(resource);
+        let mut resources = self.resources.write().unwrap();
+        match resources.get_mut(&resource.name.to_string()) {
+            Some(rec) => { rec.push(resource) },
+            None => { resources.insert(resource.name.to_string(), vec![resource]); }
+        }
     }
 
     pub fn listen(&self) {
@@ -75,7 +75,7 @@ impl Default for SimpleMdnsResponder {
     }
 }
 
-fn build_reply(packet: PacketBuf, resources: &HashMap<String, Vec<ResourceRecord<'static>>>) -> Option<(bool, PacketBuf)> {
+fn build_reply(packet: PacketBuf, resources: &HashMap<String, Vec<ResourceRecord>>) -> Option<(bool, PacketBuf)> {
     let header = PacketHeader::parse(&packet).ok()?;
     let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode));
 
@@ -92,10 +92,10 @@ fn build_reply(packet: PacketBuf, resources: &HashMap<String, Vec<ResourceRecord
 
                 if let RData::SRV(srv) = &answer.rdata {
                     if srv.target == question.qname {
-                        additional_records.extend(resource.iter().filter(|r| r.rdatatype == TYPE::A));
+                        additional_records.extend(resource.iter().filter(|r| r.match_qtype(simple_dns::QTYPE::A)));
                     } else {
                         let target = resources.get(&srv.target.to_string())
-                            .map(|f| f.iter().filter(|r| r.match_qclass(question.qclass) && r.match_qtype(question.qtype) && r.rdatatype == TYPE::A));
+                            .map(|f| f.iter().filter(|r| r.match_qclass(question.qclass) && r.match_qtype(simple_dns::QTYPE::A)));
                         if let Some(target) = target {
                             additional_records.extend(target);
                         }
@@ -116,3 +116,139 @@ fn build_reply(packet: PacketBuf, resources: &HashMap<String, Vec<ResourceRecord
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use std::{convert::TryInto, net::{Ipv4Addr, Ipv6Addr}};
+
+    use simple_dns::{CLASS, Question, rdata::{A, AAAA, SRV}};
+
+    use super::*;
+
+    fn get_resources() -> HashMap<String, Vec<ResourceRecord<'static>>> {
+        let mut resources = HashMap::new();
+        resources.insert(
+            "_res1._tcp.com".to_string(), 
+            vec![
+                ResourceRecord { 
+                    class: CLASS::IN, 
+                    name: "_res1._tcp.com".try_into().unwrap(),
+                    rdatatype: simple_dns::TYPE::A,
+                    ttl: 10,
+                    rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
+                },
+                ResourceRecord { 
+                    class: CLASS::IN, 
+                    name: "_res1._tcp.com".try_into().unwrap(),
+                    rdatatype: simple_dns::TYPE::AAAA,
+                    ttl: 10,
+                    rdata: RData::AAAA(AAAA { address: Ipv6Addr::LOCALHOST.into() }), 
+                },
+                ResourceRecord { 
+                    class: CLASS::IN, 
+                    name: "_res1._tcp.com".try_into().unwrap(),
+                    rdatatype: simple_dns::TYPE::SRV,
+                    ttl: 10,
+                    rdata: RData::SRV(Box::new(SRV { port: 8080, priority: 0, weight: 0, target: "_res1._tcp.com".try_into().unwrap() })), 
+                }
+            ]
+        );
+
+        resources.insert(
+            "_res2._tcp.com".to_string(),
+            vec![
+                ResourceRecord { 
+                    class: CLASS::IN, 
+                    name: "_res2._tcp.com".try_into().unwrap(),
+                    rdatatype: simple_dns::TYPE::A,
+                    ttl: 10,
+                    rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
+                }
+            ]
+        );
+
+        resources
+    }
+
+    #[test]
+    fn test_add_resource() {
+        let mut responder = SimpleMdnsResponder::new();
+        responder.add_resouce(ResourceRecord { 
+            class: CLASS::IN, 
+            name: "_res1._tcp.com".try_into().unwrap(),
+            rdatatype: simple_dns::TYPE::A,
+            ttl: 10,
+            rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
+        });
+
+        responder.add_resouce(ResourceRecord { 
+            class: CLASS::IN, 
+            name: "_res1._tcp.com".try_into().unwrap(),
+            rdatatype: simple_dns::TYPE::AAAA,
+            ttl: 10,
+            rdata: RData::AAAA(AAAA { address: Ipv6Addr::LOCALHOST.into() }), 
+        });
+
+        responder.add_resouce(ResourceRecord { 
+            class: CLASS::IN, 
+            name: "_res2._tcp.com".try_into().unwrap(),
+            rdatatype: simple_dns::TYPE::A,
+            ttl: 10,
+            rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
+        });
+
+        let resources = responder.resources.read().unwrap();
+
+        assert_eq!(2, resources.len());
+        assert_eq!(2, resources.get("_res1._tcp.com").unwrap().len());
+        assert_eq!(1, resources.get("_res2._tcp.com").unwrap().len());
+    }
+
+    #[test]
+    fn test_build_reply_with_no_questions() {
+        let resources = get_resources();
+
+        let packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        assert!(build_reply(packet, &resources).is_none());
+    }
+
+    #[test]
+    fn test_build_reply_without_valid_answers() {
+        let resources = get_resources();
+
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        packet.add_question(&Question::new("_res3._tcp.com".try_into().unwrap(), simple_dns::QTYPE::ANY, simple_dns::QCLASS::ANY, false)).unwrap();
+        
+        assert!(build_reply(packet, &resources).is_none());
+    }
+
+    #[test]
+    fn test_build_reply_with_valid_answer() {
+        let resources = get_resources();
+
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        packet.add_question(&Question::new("_res1._tcp.com".try_into().unwrap(), simple_dns::QTYPE::A, simple_dns::QCLASS::ANY, false)).unwrap();
+        
+        let (unicast_response, reply) = build_reply(packet, &resources).unwrap();
+        let reply = reply.to_packet().unwrap();
+
+        assert!(!unicast_response);
+        assert_eq!(2, reply.answers.len());
+        assert_eq!(0, reply.additional_records.len());
+    }
+
+
+    #[test]
+    fn test_build_reply_for_srv() {
+        let resources = get_resources();
+
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        packet.add_question(&Question::new("_res1._tcp.com".try_into().unwrap(), simple_dns::QTYPE::SRV, simple_dns::QCLASS::ANY, false)).unwrap();
+        
+        let (unicast_response, reply) = build_reply(packet, &resources).unwrap();
+        let reply = reply.to_packet().unwrap();
+
+        assert!(!unicast_response);
+        assert_eq!(1, reply.answers.len());
+        assert_eq!(2, reply.additional_records.len());
+    }
+}

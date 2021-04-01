@@ -40,10 +40,14 @@ impl <'a> ResourceRecord<'a> {
         qclass == QCLASS::ANY || self.class as u16 == qclass as u16
     }
 
-    /// Return true if current resource match given query type
+    /// Return true if current resource match given query type 
+    /// The types `A` and `AAAA` will match each other
     pub fn match_qtype(&self, qtype: QTYPE) -> bool {
-        let rtype: u16 = self.rdatatype.into();
-        qtype == QTYPE::ANY || rtype == qtype as u16
+        match qtype {
+            QTYPE::A | QTYPE::AAAA => self.rdatatype == TYPE::A || self.rdatatype == TYPE::AAAA,
+            QTYPE::ANY => true,
+            qtype => Into::<u16>::into(self.rdatatype) == qtype as u16
+        }
     }
     
 }
@@ -158,5 +162,24 @@ mod tests {
         assert!(rr.match_qtype(QTYPE::ANY));
         assert!(rr.match_qtype(QTYPE::A));
         assert!(!rr.match_qtype(QTYPE::WKS));
+    }
+
+    #[test]
+    fn test_match_qtype_for_aaaa() {
+        let mut rr = ResourceRecord {
+            class: CLASS::IN,
+            name: "_srv._udp.local".try_into().unwrap(),
+            rdatatype: TYPE::A,
+            ttl: 10,
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+        };
+
+        assert!(rr.match_qtype(QTYPE::A));
+        assert!(rr.match_qtype(QTYPE::AAAA));
+
+        rr.rdatatype = TYPE::AAAA;
+
+        assert!(rr.match_qtype(QTYPE::A));
+        assert!(rr.match_qtype(QTYPE::AAAA));
     }
 }

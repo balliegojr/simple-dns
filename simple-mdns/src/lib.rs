@@ -1,7 +1,7 @@
-use std::{net::{Ipv4Addr, Ipv6Addr, SocketAddr}};
+use std::{net::{Ipv4Addr, SocketAddr}};
 
 use tokio::{net::UdpSocket};
-use simple_dns::{PacketBuf, PacketHeader, SimpleDnsError};
+use simple_dns::{PacketBuf, SimpleDnsError};
 
 mod oneshot_resolver;
 mod simple_responder;
@@ -44,19 +44,6 @@ async fn send_packet_to_multicast_socket(socket: &UdpSocket, packet: &PacketBuf)
 }
 
 
-async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> Result<PacketBuf, SimpleMdnsError> {
-    let mut buf = [0u8; 9000];
-    
-    loop {
-        let (count, _) = socket.recv_from(&mut buf[..])
-            .await
-            .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
-
-        if PacketHeader::id(&buf) == packet_id && PacketHeader::read_answers(&buf) > 0 {
-            return Ok(buf[..count].into())
-        }
-    }
-}
 
 fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, Box<dyn std::error::Error>> {
     // let addrs = [
@@ -68,6 +55,8 @@ fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, Box<
     socket.set_multicast_loop_v4(multicast_loop)?;
     socket.join_multicast_v4(&MULTICAST_ADDR_IPV4, &Ipv4Addr::new(0, 0, 0, 0))?;
     socket.set_reuse_address(true)?;
+
+    #[cfg(not(windows))]
     socket.set_reuse_port(true)?;
     socket.set_nonblocking(true)?;
     

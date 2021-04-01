@@ -27,11 +27,16 @@ const MAX_NULL_LENGTH: usize = 65535;
 /// sizes of the IP (60) and UDP (8) headers.
 // const MAX_PACKET_SIZE: usize = 9000 - 68; 
 
-
+/// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub trait DnsPacketContent<'a> {
+    /// Parse the contents of the data buffer begining in the given position
+    /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;
     
+    /// Append the bytes of this content to a given vector
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
+
+    /// Returns the length in bytes of this content
     fn len(&self) -> usize;
 }
 
@@ -41,6 +46,8 @@ pub trait DnsPacketContent<'a> {
 pub enum TYPE {
     /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     A,
+    /// Host address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
+    AAAA,
     /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     NS,
     /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -81,6 +88,7 @@ impl From<TYPE> for u16 {
     fn from(value: TYPE) -> Self {
         match value {
             TYPE::A => 1,
+            TYPE::AAAA => 28,
             TYPE::NS => 2,
             TYPE::MD => 3,
             TYPE::MF => 4,
@@ -123,6 +131,7 @@ impl From<u16> for TYPE {
             14 => MINFO,
             15 => MX,
             16 => TXT,
+            28 => AAAA,
             33 => SRV,
             v => TYPE::Unknown(v)
         }
@@ -135,6 +144,8 @@ impl From<u16> for TYPE {
 pub enum QTYPE {
     /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     A = 1,
+    /// Host address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
+    AAAA = 28,
     /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     NS =  2,
     /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -200,6 +211,7 @@ impl TryFrom<u16> for QTYPE {
             14 => Ok(MINFO),
             15 => Ok(MX),
             16 => Ok(TXT),
+            28 => Ok(AAAA),
             33 => Ok(SRV),
             252 => Ok(AXFR),
             253 => Ok(MAILB),

@@ -9,8 +9,10 @@ mod null;
 mod soa;
 mod wks;
 mod srv;
+mod aaaa;
 
 pub use a::A;
+pub use aaaa::AAAA;
 pub use hinfo::HINFO;
 pub use minfo::MINFO;
 pub use mx::MX;
@@ -22,6 +24,7 @@ pub use srv::SRV;
 #[derive(Debug)]
 pub enum RData<'a> {
     A(A),
+    AAAA(AAAA),
     NS(Name<'a>),
     MD(Name<'a>),
     CNAME(Name<'a>),
@@ -45,6 +48,7 @@ impl <'a> RData<'a> {
     pub(crate) fn len(&self) -> usize {
         match &self {
             RData::A(data) => data.len(),
+            RData::AAAA(data) => data.len(),
             RData::NS(data) | 
             RData::CNAME(data) |
             RData::MB(data) |
@@ -67,6 +71,7 @@ impl <'a> RData<'a> {
     pub(crate) fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         match &self {
             RData::A(data) => data.append_to_vec(out),
+            RData::AAAA(data) => data.append_to_vec(out),
             RData::NS(data) |
             RData::CNAME(data) |
             RData::MB(data) |
@@ -90,6 +95,7 @@ impl <'a> RData<'a> {
 pub(crate) fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
     let rdata = match rdatatype {
         TYPE::A => RData::A(A::parse(data, position)?),
+        TYPE::AAAA => RData::AAAA(AAAA::parse(data, position)?),
         TYPE::NS => RData::NS(Name::parse(data, position)?),
         TYPE::MD => RData::MD(Name::parse(data, position)?),
         TYPE::CNAME => RData::CNAME(Name::parse(data, position)?),

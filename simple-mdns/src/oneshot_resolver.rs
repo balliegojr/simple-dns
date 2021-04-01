@@ -1,9 +1,9 @@
-use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, time::Duration};
+use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr}, time::Duration};
 
 use simple_dns::{Name, PacketBuf, PacketHeader, QCLASS, QTYPE, Question, TYPE, rdata::RData};
 use tokio::time;
 
-use crate::{ENABLE_LOOPBACK, SimpleMdnsError, UNICAST_RESPONSE, create_udp_socket, get_first_response, send_packet_to_multicast_socket};
+use crate::{ENABLE_LOOPBACK, SimpleMdnsError, UNICAST_RESPONSE, create_udp_socket, send_packet_to_multicast_socket};
 
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
@@ -43,8 +43,10 @@ impl OneShotMdnsResolver {
                     continue;
                 }
 
-                if let RData::A(a) = anwser.rdata {
-                    return Ok(Some(IpAddr::V4(Ipv4Addr::from(a.address))))
+                return match anwser.rdata {
+                    RData::A(a) => Ok(Some(IpAddr::V4(Ipv4Addr::from(a.address)))),
+                    RData::AAAA(aaaa) => Ok(Some(IpAddr::V6(Ipv6Addr::from(aaaa.address)))),
+                    _ => Ok(None)
                 }
             }
         }
@@ -68,9 +70,10 @@ impl OneShotMdnsResolver {
                 });
 
             let mut address = response.additional_records.iter()
-                .filter(|a| a.name == parsed_name_service && a.rdatatype == TYPE::A)
+                .filter(|a| a.name == parsed_name_service &&  a.match_qtype(QTYPE::A))
                 .find_map(|a| match &a.rdata { 
                     RData::A(a) => Some(IpAddr::V4(Ipv4Addr::from( a.address))),
+                    RData::AAAA(aaaa) => Some(IpAddr::V6(Ipv6Addr::from(aaaa.address))),
                     _ => None
                 });
 
@@ -108,6 +111,21 @@ impl Default for OneShotMdnsResolver {
         Self::new()
     }
 }
+
+async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> Result<PacketBuf, SimpleMdnsError> {
+    let mut buf = [0u8; 9000];
+    
+    loop {
+        let (count, _) = socket.recv_from(&mut buf[..])
+            .await
+            .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
+
+        if PacketHeader::id(&buf) == packet_id && PacketHeader::read_answers(&buf) > 0 {
+            return Ok(buf[..count].into())
+        }
+    }
+}
+
 
 
 #[cfg(test)]

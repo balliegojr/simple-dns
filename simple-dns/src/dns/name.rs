@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt::Display };
+use std::{convert::TryFrom, fmt::Display};
 
 use byteorder::{ByteOrder, BigEndian};
 
