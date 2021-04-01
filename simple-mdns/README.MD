@@ -1,0 +1,62 @@
+# Simple mDNS
+
+Pure Rust implementation for mDNS and DNS-SD protocols
+
+## OneShotMdnsResolver (Legacy mDNS)
+One shot resolvers are considered legacy and not fully compliant with the mDNS protocol, but they are handy for service discovery if you have (or need) only one service instance
+
+### How it works
+One shot resolvers or queries send a multicast DNS question to discover available services in the network.  
+- Only the IP address is necessary (port is fixed or already known), a A or AAAA question is sent.
+- IP address and port are necessary, a SRV question is sent.
+
+Since mDNS is a well known protocol, you can register your service in any mDNS responder inside your network, and they should be able to reply the requested information about your service.
+
+Query example:
+```rust
+    let resolver = OneShotMdnsResolver::new();
+    // querying for IP Address
+    let answer = resolver.query_service_address("_myservice._tcp.local").await.unwrap();
+    println!("{:?}", answer);
+    // IpV4Addr or IpV6Addr, depending on what was returned
+    
+    let answer = resolver.query_service_address_and_port("_myservice._tcp.local").await.unwrap();
+    println!("{:?}", answer);
+    // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
+```
+
+## SimpleMdnsResponder
+In case you don't have a mDNS responder in your network, or for some reason don't want to use the ones available.
+
+This responder will list for any mDNS query in the network via Multicast and will reply only to the resources that were added.
+
+```rust
+    let mut responder = SimpleMdnsResponder::new();
+    responder.add_resouce(ResourceRecord { 
+        class: CLASS::IN, 
+        name: srv_name.try_into().unwrap(),
+        rdatatype: simple_dns::TYPE::A,
+        ttl: 10,
+        rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
+    });
+
+    responder.add_resouce(ResourceRecord { 
+        class: CLASS::IN, 
+        name: srv_name.try_into().unwrap(),
+        rdatatype: simple_dns::TYPE::SRV,
+        ttl: 10,
+        rdata: RData::SRV(Box::new(SRV {  
+            port: 8080,
+            priority: 0,
+            weight: 0,
+            target: srv_name.try_into().unwrap()
+        })), 
+    });
+
+    responder.listen();
+```
+
+# TODOs
+- A full compliant mDNS resolver and advertiser
+- IPv6 queries
+- Support to other runtimes besides Tokio
