@@ -1,8 +1,5 @@
 use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr}, time::Duration};
-
 use simple_dns::{Name, PacketBuf, PacketHeader, QCLASS, QTYPE, Question, TYPE, rdata::RData};
-use tokio::time;
-
 use crate::{ENABLE_LOOPBACK, SimpleMdnsError, UNICAST_RESPONSE, create_udp_socket, send_packet_to_multicast_socket};
 
 /// Provides One Shot queries (legacy mDNS)
@@ -29,7 +26,7 @@ impl OneShotMdnsResolver {
         let socket = create_udp_socket(self.enable_loopback).map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
         send_packet_to_multicast_socket(&socket, &packet).await?;
 
-        match time::timeout(self.query_timeout, get_first_response(&socket, packet.packet_id())).await {
+        match super::timeout(self.query_timeout, get_first_response(&socket, packet.packet_id())).await {
             Ok(packet) => Ok(Some(packet?)),
             Err(_) => Ok(None)
         }
@@ -137,36 +134,15 @@ async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> R
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryInto, str::FromStr};
-
-    use simple_dns::{CLASS, ResourceRecord, rdata::{A, SRV}};
-
+    use std::str::FromStr;
+    
     use crate::SimpleMdnsResponder;
 
     use super::*;
 
     fn get_oneshot_responder(srv_name: &'static str) -> SimpleMdnsResponder { 
         let mut responder = SimpleMdnsResponder::new();
-        responder.add_resouce(ResourceRecord { 
-            class: CLASS::IN, 
-            name: srv_name.try_into().unwrap(),
-            rdatatype: simple_dns::TYPE::A,
-            ttl: 10,
-            rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
-        });
-
-        responder.add_resouce(ResourceRecord { 
-            class: CLASS::IN, 
-            name: srv_name.try_into().unwrap(),
-            rdatatype: simple_dns::TYPE::SRV,
-            ttl: 10,
-            rdata: RData::SRV(Box::new(SRV {  
-                port: 8080,
-                priority: 0,
-                weight: 0,
-                target: srv_name.try_into().unwrap()
-            })), 
-        });
+        responder.add_service_address(srv_name, IpAddr::V4(Ipv4Addr::LOCALHOST), 8080).unwrap();
 
         responder
     }

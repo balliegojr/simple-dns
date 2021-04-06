@@ -1,6 +1,6 @@
-use std::{collections::HashMap, sync::{Arc, RwLock}};
+use std::{collections::HashMap, convert::TryInto, net::IpAddr, sync::{Arc, RwLock}};
 
-use simple_dns::{PacketBuf, PacketHeader, ResourceRecord, rdata::RData};
+use simple_dns::{CLASS, PacketBuf, PacketHeader, ResourceRecord, TYPE, rdata::{A, AAAA, RData, SRV}};
 
 use crate::{ENABLE_LOOPBACK, MULTICAST_ADDR_IPV4, MULTICAST_PORT, SimpleMdnsError, create_udp_socket};
 
@@ -8,7 +8,8 @@ use crate::{ENABLE_LOOPBACK, MULTICAST_ADDR_IPV4, MULTICAST_PORT, SimpleMdnsErro
 /// This struct is provided as an alternative for external mDNS resource configuration
 pub struct SimpleMdnsResponder {
     enable_loopback: bool,
-    resources: Arc<RwLock<HashMap<String, Vec<ResourceRecord<'static>>>>>
+    resources: Arc<RwLock<HashMap<String, Vec<ResourceRecord<'static>>>>>,
+    rr_default_ttl: u32
 }
 
 impl SimpleMdnsResponder {
@@ -16,7 +17,8 @@ impl SimpleMdnsResponder {
     pub fn new() -> Self {
         Self {
             resources: Arc::new(RwLock::new(HashMap::new())),
-            enable_loopback: ENABLE_LOOPBACK
+            enable_loopback: ENABLE_LOOPBACK,
+            rr_default_ttl: 60*5
         }
     }
 
@@ -27,6 +29,23 @@ impl SimpleMdnsResponder {
             Some(rec) => { rec.push(resource) },
             None => { resources.insert(resource.name.to_string(), vec![resource]); }
         }
+    }
+
+    /// Register the service address as a Resource Record
+    pub fn add_service_address(&mut self, name: &'static str, addr: IpAddr, port: u16) -> Result<(), crate::SimpleMdnsError> {
+        let addr_resource = match addr {
+            IpAddr::V4(ip) => ResourceRecord::new(name, TYPE::A, CLASS::IN, self.rr_default_ttl, RData::A(A { address: ip.into() })),
+            IpAddr::V6(ip) => ResourceRecord::new(name, TYPE::AAAA, CLASS::IN, self.rr_default_ttl, RData::AAAA(AAAA { address: ip.into() }))
+        }?;
+
+        self.add_resouce(addr_resource);
+
+        let exists_srv = self.resources.read().unwrap().get(name).map_or(false, |r| r.iter().any(|r| r.rdatatype == TYPE::SRV));
+        if !exists_srv {
+            self.add_resouce(ResourceRecord::new(name, TYPE::SRV, CLASS::IN, self.rr_default_ttl, RData::SRV(Box::new(SRV { port, priority: 0, target: name.try_into()?, weight: 0 })))?);
+        }
+
+        Ok(())
     }
 
     /// Start listening to requests
@@ -60,7 +79,6 @@ impl SimpleMdnsResponder {
                     std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT)
                 };
     
-                // reply_packet.questions.clear();
                 socket.send_to(&reply_packet, target_addr)
                     .await
                     .map_err(|_| SimpleMdnsError::ErrorSendingDNSPacket)?;
@@ -71,6 +89,11 @@ impl SimpleMdnsResponder {
     /// Set the simple mdns responder's enable loopback.
     pub fn set_enable_loopback(&mut self, enable_loopback: bool) {
         self.enable_loopback = enable_loopback;
+    }
+
+    /// Set the simple mdns responder's rr default ttl in seconds (defaults to 300).
+    pub fn set_rr_default_ttl(&mut self, rr_default_ttl: u32) {
+        self.rr_default_ttl = rr_default_ttl;
     }
 }
 
@@ -177,35 +200,15 @@ mod tests {
     #[test]
     fn test_add_resource() {
         let mut responder = SimpleMdnsResponder::new();
-        responder.add_resouce(ResourceRecord { 
-            class: CLASS::IN, 
-            name: "_res1._tcp.com".try_into().unwrap(),
-            rdatatype: simple_dns::TYPE::A,
-            ttl: 10,
-            rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
-        });
-
-        responder.add_resouce(ResourceRecord { 
-            class: CLASS::IN, 
-            name: "_res1._tcp.com".try_into().unwrap(),
-            rdatatype: simple_dns::TYPE::AAAA,
-            ttl: 10,
-            rdata: RData::AAAA(AAAA { address: Ipv6Addr::LOCALHOST.into() }), 
-        });
-
-        responder.add_resouce(ResourceRecord { 
-            class: CLASS::IN, 
-            name: "_res2._tcp.com".try_into().unwrap(),
-            rdatatype: simple_dns::TYPE::A,
-            ttl: 10,
-            rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
-        });
+        responder.add_service_address("_res1._tcp.com", IpAddr::V4(Ipv4Addr::LOCALHOST), 8080).unwrap();
+        responder.add_service_address("_res1._tcp.com", IpAddr::V6(Ipv6Addr::LOCALHOST), 8080).unwrap();
+        responder.add_service_address("_res2._tcp.com", IpAddr::V4(Ipv4Addr::LOCALHOST), 8080).unwrap();
 
         let resources = responder.resources.read().unwrap();
-
+        
         assert_eq!(2, resources.len());
-        assert_eq!(2, resources.get("_res1._tcp.com").unwrap().len());
-        assert_eq!(1, resources.get("_res2._tcp.com").unwrap().len());
+        assert_eq!(3, resources.get("_res1._tcp.com").unwrap().len());
+        assert_eq!(2, resources.get("_res2._tcp.com").unwrap().len());
     }
 
     #[test]

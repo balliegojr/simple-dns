@@ -6,7 +6,7 @@ For Dns Responder, see [`SimpleMdnsResponder`]
 */
 #![warn(missing_docs)]
 
-use std::{net::{Ipv4Addr, SocketAddr}};
+use std::{net::{Ipv4Addr, SocketAddr}, time::Duration};
 
 use tokio::{net::UdpSocket};
 use simple_dns::{PacketBuf, SimpleDnsError};
@@ -72,4 +72,11 @@ fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, Box<
     
     let socket = tokio::net::UdpSocket::from_std(socket.into_udp_socket())?;
     Ok(socket)
+}
+
+async fn timeout<T:futures::Future>(duration: Duration, future: T) -> Result<T::Output, Box<dyn std::error::Error>> {
+    match tokio::time::timeout(duration, future).await {
+        Ok(result) => Ok(result),
+        Err(err) => Err(Box::new(err))
+    }
 }
