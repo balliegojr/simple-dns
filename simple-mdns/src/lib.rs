@@ -8,14 +8,17 @@ For Dns Responder, see [`SimpleMdnsResponder`]
 
 use std::{net::{Ipv4Addr, SocketAddr}, time::Duration};
 
-use tokio::{net::UdpSocket};
+use tokio::net::UdpSocket;
 use simple_dns::{PacketBuf, SimpleDnsError};
 
 mod oneshot_resolver;
 mod simple_responder;
+mod service_discovery;
+mod resource_record_manager;
 
 pub use oneshot_resolver::OneShotMdnsResolver;
 pub use simple_responder::SimpleMdnsResponder;
+pub use service_discovery::ServiceDiscovery;
 
 const ENABLE_LOOPBACK: bool = cfg!(test);
 const UNICAST_RESPONSE: bool = cfg!(not(test));

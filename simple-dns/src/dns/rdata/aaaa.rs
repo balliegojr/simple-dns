@@ -1,3 +1,5 @@
+use std::net::Ipv6Addr;
+
 use byteorder::{ByteOrder, BigEndian};
 
 use crate::dns::DnsPacketContent;
@@ -31,6 +33,11 @@ impl <'a> DnsPacketContent<'a> for AAAA {
     }
 }
 
+impl From<Ipv6Addr> for AAAA {
+    fn from(ip: Ipv6Addr) -> Self {
+        Self { address: ip.into() }
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -141,7 +141,7 @@ mod tests {
     use super::*;
 
     fn get_oneshot_responder(srv_name: &'static str) -> SimpleMdnsResponder { 
-        let mut responder = SimpleMdnsResponder::new();
+        let mut responder = SimpleMdnsResponder::default();
         responder.add_service_address(srv_name, IpAddr::V4(Ipv4Addr::LOCALHOST), 8080).unwrap();
 
         responder
