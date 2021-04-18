@@ -12,9 +12,8 @@
 //! ```rust
 //! # use simple_dns::*;
 //! # use simple_dns::rdata::*;
-//! # use std::convert::TryInto;
-//! let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
-//! let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+//! let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
+//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
 //! 
 //! let mut packet = Packet::new_query(1, false);
 //! packet.questions.push(question);
@@ -41,9 +40,8 @@
 //! ```rust
 //! # use simple_dns::*;
 //! # use simple_dns::rdata::*;
-//! # use std::convert::TryInto;
-//! let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
-//! let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+//! let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
+//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
 //!
 //! let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
 //! assert!(packet.add_answer(&resource).is_ok());

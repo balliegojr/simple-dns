@@ -4,7 +4,7 @@ use crate::{QCLASS, QTYPE};
 
 use super::{CLASS, DnsPacketContent, Name, rdata::RData, TYPE, rdata::parse_rdata};
 use core::fmt::Debug;
-use std::{convert::{ TryInto }};
+use std::convert::TryInto;
 
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
 #[derive(Debug)]
@@ -24,14 +24,14 @@ pub struct ResourceRecord<'a> {
 
 impl <'a> ResourceRecord<'a> {
     /// Creates a new ResourceRecord
-    pub fn new(name: &'a str, rdatatype: TYPE, class: CLASS, ttl: u32, rdata: RData<'a>) -> crate::Result<Self> {
-        Ok(Self {
-            name: name.try_into()?,
+    pub fn new(name: Name<'a>, rdatatype: TYPE, class: CLASS, ttl: u32, rdata: RData<'a>) -> Self {
+        Self {
+            name,
             class,
             ttl,
             rdata,
             rdatatype
-        })
+        }
     }
 
 

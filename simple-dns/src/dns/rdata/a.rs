@@ -33,9 +33,9 @@ impl <'a> DnsPacketContent<'a> for A {
     }
 }
 
-impl From<Ipv4Addr> for A {
-    fn from(ip: Ipv4Addr) -> Self {
-        Self { address: ip.into() }
+impl From<&Ipv4Addr> for A {
+    fn from(addr: &Ipv4Addr) -> Self {
+        Self {  address: (*addr).into() }
     }
 }
 

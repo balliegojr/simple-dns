@@ -23,6 +23,16 @@ impl <'a> Name<'a> {
             return Err(crate::SimpleDnsError::InvalidServiceName);
         }
 
+        let name = Self::new_unchecked(name);
+        if name.labels.iter().any(|(_, len)| *len > MAX_LABEL_LENGTH) {
+            return Err(crate::SimpleDnsError::InvalidServiceLabel)
+        }
+        
+        Ok(name)
+    }
+
+    /// Create a new Name without checking for size limits
+    pub fn new_unchecked(name: &'a str) -> Self {
         let mut labels = Vec::new();
         let last_pos = name.match_indices('.').fold(0, |acc, (pos, _)| {
             labels.push((acc, pos - acc));
@@ -31,18 +41,11 @@ impl <'a> Name<'a> {
 
         labels.push((last_pos, name.len() - last_pos));
 
-        if labels.iter().any(|(_, len)| *len > MAX_LABEL_LENGTH) {
-            return Err(crate::SimpleDnsError::InvalidServiceLabel)
+        Self {
+            labels,
+            data: name.as_bytes(),
+            length_in_bytes: name.len() + if last_pos == name.len() { 1 } else { 2 }
         }
-        
-
-        Ok(
-            Self {
-                labels,
-                data: name.as_bytes(),
-                length_in_bytes: name.len() + if last_pos == name.len() { 1 } else { 2 }
-            }
-        )
     }
 
     /// Verify if name ends with .local.

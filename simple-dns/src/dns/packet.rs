@@ -275,7 +275,7 @@ impl <'a> Packet<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{SimpleDnsError, dns::CLASS, dns::TYPE, rdata::RData, rdata::A};
+    use crate::{SimpleDnsError, dns::CLASS, dns::TYPE, rdata::RData, rdata::A, Name};
 
     use super::*;
     use super::super::{QTYPE, QCLASS};
@@ -343,8 +343,8 @@ mod tests {
     #[test]
     fn bufpacket_add_question() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-        let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
-        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
+        let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
         
         assert!(buf_packet.add_question(&question).is_ok());
         assert!(buf_packet.has_questions());
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn bufpacket_add_answers() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        let resource = ResourceRecord::new(Name::new_unchecked("srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
         
         assert!(buf_packet.add_answer(&resource).is_ok());
         assert!(buf_packet.has_answers());
@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn bufpacket_add_name_servers() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
         
         assert!(buf_packet.add_name_server(&resource).is_ok());
         assert!(buf_packet.has_name_servers());
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn bufpacket_add_additional_records() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-        let resource = ResourceRecord::new("_srv._udp.local", TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 })).unwrap();
+        let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
         
         assert!(buf_packet.add_additional_record(&resource).is_ok());
         assert!(buf_packet.has_additional_records());
@@ -411,12 +411,11 @@ mod tests {
     #[test] 
     fn bufpacket_questions_iter() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-        let question = Question::new("_srv._udp.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, false);
+        let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
 
         buf_packet.add_question(&question).unwrap();
         buf_packet.add_question(&question).unwrap();
 
-        
         let questions: Vec<Question> =  buf_packet.questions_iter().collect();
         assert_eq!(2, questions.len());
     }
