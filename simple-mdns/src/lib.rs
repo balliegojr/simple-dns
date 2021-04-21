@@ -62,7 +62,7 @@ fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, Box<
     //     // SocketAddr::from(([0, 0, 0, 0], 0)),
     // ];
 
-    let socket = socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::dgram(), None).unwrap();
+    let socket = socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::dgram(), None)?;
     socket.set_multicast_loop_v4(multicast_loop)?;
     socket.join_multicast_v4(&MULTICAST_ADDR_IPV4, &Ipv4Addr::new(0, 0, 0, 0))?;
     socket.set_reuse_address(true)?;

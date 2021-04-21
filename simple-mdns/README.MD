@@ -51,9 +51,6 @@ This responder will list for any mDNS query in the network via Multicast and wil
             weight: 0,
             target: srv_name.try_into().unwrap()
         })), 
-    });
-
-    responder.listen();
 ```
 
 # TODOs

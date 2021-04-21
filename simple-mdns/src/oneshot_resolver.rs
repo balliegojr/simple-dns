@@ -117,15 +117,17 @@ impl Default for OneShotMdnsResolver {
 }
 
 async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> Result<PacketBuf, SimpleMdnsError> {
-    let mut buf = [0u8; 9000];
+    let mut buf = [0u8; 4096];
     
     loop {
         let (count, _) = socket.recv_from(&mut buf[..])
             .await
             .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
 
-        if PacketHeader::id(&buf) == packet_id && PacketHeader::read_answers(&buf) > 0 {
-            return Ok(buf[..count].into())
+        if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
+            if !header.query && header.id == packet_id && header.answers_count > 0 {
+                return Ok(buf[..count].into())
+            }
         }
     }
 }
@@ -140,17 +142,16 @@ mod tests {
 
     use super::*;
 
-    fn get_oneshot_responder(srv_name: &'static str) -> SimpleMdnsResponder { 
+    fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
         let mut responder = SimpleMdnsResponder::default();
-        responder.add_service_address(srv_name, IpAddr::V4(Ipv4Addr::LOCALHOST), 8080).unwrap();
+        responder.add_service_address(srv_name, &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080));
 
         responder
     }
 
     #[tokio::test] 
     async fn one_shot_resolver_address_query() {
-        let responder = get_oneshot_responder("_srv._tcp.local");
-        responder.listen();
+        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address("_srv._tcp.local").await;
@@ -162,8 +163,7 @@ mod tests {
 
     #[tokio::test] 
     async fn one_shot_resolver_address_port_query() {
-        let responder =get_oneshot_responder("_srv._tcp.local");
-        responder.listen();
+        let _responder =get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address_and_port("_srv._tcp.local").await;
