@@ -1,7 +1,7 @@
 use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
 
 /// NULL resources are used to represent any kind of information.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct NULL<'a> {
     length: u16,
     data: &'a [u8]

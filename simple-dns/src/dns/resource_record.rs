@@ -7,7 +7,7 @@ use core::fmt::Debug;
 use std::convert::TryInto;
 
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub struct ResourceRecord<'a> {
     /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
@@ -94,7 +94,11 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+
     use crate::dns::rdata::NULL;
+    use crate::dns::CharacterString;
+
     use super::*;
     
     #[test]
@@ -181,5 +185,20 @@ mod tests {
 
         assert!(rr.match_qtype(QTYPE::A));
         assert!(rr.match_qtype(QTYPE::AAAA));
+    }
+
+    #[test]
+    fn test_eq() {
+        let a = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+        let b = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+
+        assert_eq!(a, b);
+        assert_eq!(get_hash(a), get_hash(b));
+    }
+
+    fn get_hash(rr: ResourceRecord) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        rr.hash(&mut hasher);
+        hasher.finish()
     }
 }

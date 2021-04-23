@@ -1,7 +1,7 @@
 use crate::dns::{Name, DnsPacketContent};
 
 /// MINFO recors are used to acquire mailbox or mail list information
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct MINFO<'a> {
     /// A [Name](`Name`) which specifies a mailbox which is responsible for the mailing list or mailbox.  
     pub rmailbox: Name<'a>,

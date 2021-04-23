@@ -37,13 +37,13 @@ impl SimpleMdnsResponder {
     }
 
     /// Remove a resource record by service name and resource type
-    pub fn remove_resource_record(&mut self, service_name: &str, resource_type: TYPE) {
+    pub fn remove_resource_record(&mut self, service_name: &'static Name, resource_type: TYPE) {
         let mut resources = self.resources.write().unwrap();
-        resources.remove_resource_record(service_name, &resource_type);
+        resources.remove_resource_records_of_type(service_name, &resource_type);
     }
 
     /// Remove all resource records for a service name
-    pub fn remove_all_resource_records(&mut self, service_name: &str) {
+    pub fn remove_all_resource_records(&mut self, service_name: &'static Name) {
         let mut resources = self.resources.write().unwrap();
         resources.remove_all_resource_records(service_name);
     }
@@ -59,7 +59,7 @@ impl SimpleMdnsResponder {
     }
 
     /// Remove the service address from the resource records
-    pub fn remove_service_address(&mut self, name: &'static str, addr: &SocketAddr) {
+    pub fn remove_service_address(&mut self, name: &'static Name, addr: &SocketAddr) {
         let mut resources = self.resources.write().unwrap();
         resources.remove_service_address(name, addr);
     }
@@ -73,9 +73,9 @@ impl SimpleMdnsResponder {
         });
     }
 
-    async fn create_socket_and_wait_messages(
+    async fn create_socket_and_wait_messages<'b>(
         enable_loopback: bool,
-        resources: Arc<RwLock<ResourceRecordManager<'static>>>,
+        resources: Arc<RwLock<ResourceRecordManager<'b>>>,
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = vec![0; 4096];
 
@@ -128,7 +128,7 @@ impl Default for SimpleMdnsResponder {
     }
 }
 
-pub(crate) fn build_reply(packet: PacketBuf, resources: &ResourceRecordManager) -> Option<(bool, PacketBuf)> {
+pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordManager<'b>) -> Option<(bool, PacketBuf)> {
     let header = PacketHeader::parse(&packet).ok()?;
     let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode));
 
@@ -143,7 +143,7 @@ pub(crate) fn build_reply(packet: PacketBuf, resources: &ResourceRecordManager) 
         }
 
         for answer in resources.find_matching_resources(
-            &question.qname.to_string(),
+            &question.qname,
             question.qtype,
             question.qclass,
         ) {
@@ -151,7 +151,7 @@ pub(crate) fn build_reply(packet: PacketBuf, resources: &ResourceRecordManager) 
 
             if let RData::SRV(srv) = &answer.rdata {
                 additional_records.extend(resources.find_matching_resources(
-                    &srv.target.to_string(),
+                    &srv.target,
                     QTYPE::A,
                     question.qclass,
                 ));

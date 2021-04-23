@@ -12,7 +12,7 @@ use tokio::net::UdpSocket;
 
 use crate::{
     create_udp_socket, resource_record_manager::ResourceRecordManager,
-    simple_responder::build_reply,  MULTICAST_ADDR_IPV4, MULTICAST_PORT,
+    simple_responder::build_reply, MULTICAST_ADDR_IPV4, MULTICAST_PORT,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -45,12 +45,11 @@ pub struct ServiceDiscovery {
     resource_ttl: u32,
     udp_socket: Arc<UdpSocket>,
     multicast_addr: SocketAddr,
-    instance_id: u16,
-    enable_loopback: bool
+    enable_loopback: bool,
 }
 
 impl ServiceDiscovery {
-    pub fn new(service_name: Name<'static>, resource_ttl: u32, enable_loopback: bool, instance_id: u16) -> Self {
+    pub fn new(service_name: Name<'static>, resource_ttl: u32, enable_loopback: bool) -> Self {
         let service_discory = Self {
             service_name,
             multicast_addr: std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT),
@@ -58,8 +57,7 @@ impl ServiceDiscovery {
             known_instances: Arc::new(RwLock::new(HashMap::new())),
             resource_ttl,
             udp_socket: Arc::new(create_udp_socket(enable_loopback).unwrap()),
-            instance_id,
-            enable_loopback
+            enable_loopback,
         };
 
         service_discory.wait_replies();
@@ -78,7 +76,7 @@ impl ServiceDiscovery {
 
         self.advertise_service();
     }
-    pub fn remove_service_from_discovery(&mut self, service_name: &str) {
+    pub fn remove_service_from_discovery(&mut self, service_name: &'static Name) {
         self.resource_manager
             .write()
             .unwrap()
@@ -94,9 +92,9 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
         let addr = self.multicast_addr;
-        let instance_id = self.instance_id;
 
         tokio::spawn(async move {
+            let service_name = service_name;
             loop {
                 let now = Instant::now();
 
@@ -115,7 +113,7 @@ impl ServiceDiscovery {
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
-                            send_question(service_name.clone(), &socket, addr, instance_id).await;
+                            send_question(service_name.clone(), &socket, addr).await;
                         } else {
                             tokio::time::sleep_until(expiration.refresh_at.into()).await;
                         }
@@ -129,19 +127,18 @@ impl ServiceDiscovery {
     }
 
     fn advertise_service(&self) {
-        let mut packet = PacketBuf::new(PacketHeader::new_reply(self.instance_id, OPCODE::StandardQuery));
+        let mut packet = PacketBuf::new(PacketHeader::new_reply(0, OPCODE::StandardQuery));
         {
-            let service_name = self.service_name.to_string();
             let resource_manager = self.resource_manager.read().unwrap();
             if let Some(srv) = resource_manager
-                .find_matching_resources(&service_name, QTYPE::SRV, QCLASS::IN)
+                .find_matching_resources(&self.service_name, QTYPE::SRV, QCLASS::IN)
                 .next()
             {
                 packet.add_answer(srv);
             }
 
             for additional_record in
-                resource_manager.find_matching_resources(&service_name, QTYPE::A, QCLASS::IN)
+                resource_manager.find_matching_resources(&self.service_name, QTYPE::A, QCLASS::IN)
             {
                 packet.add_additional_record(additional_record);
             }
@@ -158,10 +155,9 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
         let dest = self.multicast_addr;
-        let instance_id = self.instance_id;
 
         tokio::spawn(async move {
-            send_question(service_name, &socket, dest, instance_id).await;
+            send_question(service_name, &socket, dest).await;
         });
     }
 
@@ -170,27 +166,24 @@ impl ServiceDiscovery {
         let known_instances = self.known_instances.clone();
         let resources = self.resource_manager.clone();
         let multicast_addr = self.multicast_addr;
-        let instance_id = self.instance_id;
         let enable_loopback = self.enable_loopback;
 
         tokio::spawn(async move {
             let mut recv_buffer = vec![0; 4096];
             let socket = create_udp_socket(enable_loopback).unwrap();
+            let service_name = service_name;
 
             loop {
                 let (count, addr) = socket.recv_from(&mut recv_buffer).await.unwrap();
 
                 if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
-                    if enable_loopback && header.id == instance_id {
-                        continue;
-                    }
-
                     if header.query {
                         let packet = PacketBuf::from(&recv_buffer[..count]);
                         let reply = {
                             let resources = resources.read().unwrap();
                             build_reply(packet, &resources)
                         };
+
                         if let Some((unicast_reply, packet)) = reply {
                             let addr_reply = if unicast_reply { addr } else { multicast_addr };
                             socket.send_to(&packet, addr_reply).await;
@@ -200,6 +193,7 @@ impl ServiceDiscovery {
                             &recv_buffer[..count],
                             &service_name,
                             &known_instances,
+                            &resources.read().unwrap(),
                         );
                     }
                 }
@@ -208,20 +202,29 @@ impl ServiceDiscovery {
     }
 }
 
-fn add_response_to_known_instances(
+fn add_response_to_known_instances<'a>(
     recv_buffer: &[u8],
-    service_name: &Name<'static>,
+    service_name: &Name<'a>,
     known_instances: &RwLock<HashMap<SocketAddr, InstanceTimes>>,
+    owned_resources: &ResourceRecordManager,
 ) {
     if let Some(packet) = Packet::parse(&recv_buffer).ok() {
         let port = packet
             .answers
             .iter()
-            .filter(|aw| aw.name == *service_name && aw.match_qtype(QTYPE::SRV))
+            .filter(|aw| {
+                aw.name == *service_name
+                    && aw.match_qtype(QTYPE::SRV)
+                    && !owned_resources.has_resource(&aw)
+            })
             .find_map(|a| match &a.rdata {
                 RData::SRV(srv) => Some(srv.port),
                 _ => None,
             });
+
+        if port.is_none() {
+            return;
+        }
 
         let address = packet
             .additional_records
@@ -234,22 +237,24 @@ fn add_response_to_known_instances(
                 _ => None,
             });
 
-        if port.is_some() && address.is_some() {
-            let (address, ttl) = address.unwrap();
-            let address = SocketAddr::new(address, port.unwrap());
-            let instance_times = InstanceTimes::new(ttl as u64);
-
-            known_instances
-                .write()
-                .unwrap()
-                .insert(address, instance_times);
+        if address.is_none() {
+            return;
         }
+
+        let (address, ttl) = address.unwrap();
+        let address = SocketAddr::new(address, port.unwrap());
+        let instance_times = InstanceTimes::new(ttl as u64);
+
+        known_instances
+            .write()
+            .unwrap()
+            .insert(address, instance_times);
     }
 }
 
-async fn send_question(service_name: Name<'static>, socket: &UdpSocket, addr: SocketAddr, instance_id: u16) {
-    let mut packet = PacketBuf::new(PacketHeader::new_query(instance_id, false));
-    packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, true));
+async fn send_question<'a>(service_name: Name<'a>, socket: &UdpSocket, addr: SocketAddr) {
+    let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
+    packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false));
 
     if packet.has_questions() {
         socket.send_to(&packet, addr).await;

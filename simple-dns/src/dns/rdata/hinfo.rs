@@ -3,7 +3,7 @@ use crate::dns::{CharacterString, DnsPacketContent};
 /// HINFO records are used to acquire general information about a host.  
 /// The main use is for protocols such as FTP that can use special procedures
 /// when talking between machines or operating systems of the same type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct HINFO<'a> {
     /// A [CharacterString](`CharacterString`) which specifies the CPU type.
     pub cpu: CharacterString<'a>,

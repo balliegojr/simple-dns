@@ -10,7 +10,7 @@ use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 ///
 /// Inside a " delimited string any character can occur, except for a " itself,  
 /// which must be quoted using \ (back slash).
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CharacterString<'a> {
     data: &'a [u8]
 }
@@ -89,6 +89,8 @@ impl <'a> Display for CharacterString<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+
     use super::*;
 
     #[test]
@@ -119,5 +121,20 @@ mod tests {
         c_string.append_to_vec(&mut out).unwrap();
 
         assert_eq!(b"\x0esome_long_text", &out[..]);
+    }
+
+    #[test]
+    fn eq() {
+        let a = CharacterString::new(b"text").unwrap();
+        let b = CharacterString::new(b"text").unwrap();
+
+        assert_eq!(a, b);
+        assert_eq!(get_hash(a), get_hash(b));
+    }
+
+    fn get_hash(string: CharacterString) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        string.hash(&mut hasher);
+        hasher.finish()
     }
 }

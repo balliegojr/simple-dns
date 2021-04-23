@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt::Display};
+use std::{convert::TryFrom, fmt::Display, hash::Hash};
 
 use byteorder::{ByteOrder, BigEndian};
 
@@ -10,6 +10,7 @@ const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 /// A Name represents a domain-name, which consists of character strings separated by dots.  
 /// Each section of a name is called label  
 /// ex: `google.com` consists of two labels `google` and `com`
+#[derive(Eq)]
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
     data: &'a [u8],
@@ -164,11 +165,19 @@ impl<'a> PartialEq for Name<'a> {
     }
 }
 
+impl <'a> Hash for Name<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        for (pos, len) in &self.labels {
+           self.data[*pos..*pos+*len].hash(state);
+        }
+    }
+}
+
 impl<'a> Clone for Name<'a> {
     fn clone(&self) -> Self {
         
         Self {
-            data: self.data,
+            data: self.data.clone(),
             length_in_bytes: self.length_in_bytes,
             labels: self.labels.clone()
         }
@@ -177,6 +186,8 @@ impl<'a> Clone for Name<'a> {
 
 #[cfg(test)] 
 mod tests {
+    use std::{collections::hash_map::DefaultHasher, hash::Hasher};
+
     use crate::SimpleDnsError;
     use super::*;
 
@@ -261,4 +272,22 @@ mod tests {
         assert_eq!(8, name_two.len());
         assert_eq!(8, Name::new("ex.com").unwrap().len());
     }
+
+
+
+    #[test]
+    fn eq() {
+        let a = Name::new_unchecked("ex.com");
+        let b = Name::new_unchecked("ex.com");
+
+        assert_eq!(a, b);
+        assert_eq!(get_hash(a), get_hash(b));
+    }
+
+    fn get_hash(name: Name) -> u64 {
+        let mut hasher = DefaultHasher::default();
+        name.hash(&mut hasher);
+        hasher.finish()
+    }
+ 
 }

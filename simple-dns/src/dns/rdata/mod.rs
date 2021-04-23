@@ -21,7 +21,7 @@ pub use soa::SOA;
 pub use wks::WKS;
 pub use srv::SRV;
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub enum RData<'a> {
     A(A),
     AAAA(AAAA),

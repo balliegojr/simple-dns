@@ -5,7 +5,7 @@ use byteorder::{ByteOrder, BigEndian};
 use crate::dns::DnsPacketContent;
 
 /// Represents a Resource Address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AAAA {
     /// a 128 bit ip address
     pub address: u128,

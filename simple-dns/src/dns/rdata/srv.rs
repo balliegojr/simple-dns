@@ -4,7 +4,7 @@ use crate::Name;
 use crate::dns::DnsPacketContent;
 
 /// SRV records specifies the location of the server(s) for a specific protocol and domain.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct SRV<'a> {
     /// The priority of this target host.  
     /// A client MUST attempt to contact the target host with the lowest-numbered priority it can

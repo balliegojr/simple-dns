@@ -5,8 +5,8 @@ use simple_mdns::ServiceDiscovery;
 
 #[tokio::test]
 async fn service_discovery_can_find_services() {
-    let mut service_discovery_a = ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true, 1);
-    let mut service_discovery_b = ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true, 2);
+    let mut service_discovery_a = ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true);
+    let mut service_discovery_b = ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true);
 
     service_discovery_a.add_address_to_discovery(&SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8080));
     service_discovery_b.add_address_to_discovery(&SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8090));

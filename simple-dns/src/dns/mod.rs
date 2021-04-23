@@ -42,7 +42,7 @@ pub trait DnsPacketContent<'a> {
 
 /// Possible TYPE values in DNS Resource Records  
 /// Each value is described according to its own RFC
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TYPE {
     /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     A,
@@ -225,7 +225,7 @@ impl TryFrom<u16> for QTYPE {
 
 /// Possible CLASS values for a Resource in a DNS packet  
 /// Each value is described according to its own RFC
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum  CLASS {
     /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     IN = 1, 

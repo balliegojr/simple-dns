@@ -2,7 +2,7 @@ use crate::dns::{ DnsPacketContent, Name };
 use byteorder::{ ByteOrder, BigEndian };
 
 /// SOA records are used to mark the start of a zone of authority
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct SOA<'a> {
     /// The [Name](`Name`) of the name server that was the original or primary source of data for this zone.
     pub mname: Name<'a>,
