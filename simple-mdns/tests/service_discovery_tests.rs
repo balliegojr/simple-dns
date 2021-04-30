@@ -11,7 +11,9 @@ async fn service_discovery_can_find_services() {
     service_discovery_a.add_address_to_discovery(&SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8080));
     service_discovery_b.add_address_to_discovery(&SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8090));
 
+
     tokio::time::sleep(Duration::from_secs(1)).await;
+    assert!(false);
 
     let services_a = service_discovery_a.get_known_services();
     let services_b = service_discovery_b.get_known_services();
@@ -29,3 +31,4 @@ async fn service_discovery_can_find_services() {
         &services_b[0]
     );
 }
+

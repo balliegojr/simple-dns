@@ -4,7 +4,7 @@ use simple_dns::{Name, PacketBuf, PacketHeader, QTYPE, ResourceRecord, TYPE, rda
 
 use crate::{
     create_udp_socket, resource_record_manager::ResourceRecordManager, SimpleMdnsError,
-    ENABLE_LOOPBACK, MULTICAST_ADDR_IPV4, MULTICAST_PORT,
+    ENABLE_LOOPBACK, MULTICAST_IPV4_SOCKET
 };
 
 const FIVE_MINUTES: u32 = 60 * 5;
@@ -69,7 +69,9 @@ impl SimpleMdnsResponder {
         let enable_loopback = self.enable_loopback;
         let resources = self.resources.clone();
         tokio::spawn(async move {
-            Self::create_socket_and_wait_messages(enable_loopback, resources).await
+            if let Err(err) = Self::create_socket_and_wait_messages(enable_loopback, resources).await {
+                log::error!("Dns Responder failed: {}", err);
+            }
         });
     }
 
@@ -79,14 +81,14 @@ impl SimpleMdnsResponder {
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = vec![0; 4096];
 
-        let socket = create_udp_socket(enable_loopback)
-            .map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
+        let socket = create_udp_socket(enable_loopback)?;
 
         loop {
             let (count, addr) = socket
                 .recv_from(&mut recv_buffer)
-                .await
-                .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
+                .await?;
+
+            dbg!(addr);
 
             if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                 if !header.query {
@@ -100,13 +102,12 @@ impl SimpleMdnsResponder {
                 let target_addr = if unicast_response {
                     addr
                 } else {
-                    std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT)
+                    *MULTICAST_IPV4_SOCKET
                 };
 
                 socket
                     .send_to(&reply_packet, target_addr)
-                    .await
-                    .map_err(|_| SimpleMdnsError::ErrorSendingDNSPacket)?;
+                    .await?;
             }
         }
     }
@@ -172,9 +173,9 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
+    use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, Ipv6Addr}, time::Duration};
 
-    use simple_dns::Question;
+    use simple_dns::{CharacterString, Question};
 
     use super::*;
 
@@ -255,5 +256,4 @@ mod tests {
         assert_eq!(1, reply.answers.len());
         assert_eq!(2, reply.additional_records.len());
     }
-
 }

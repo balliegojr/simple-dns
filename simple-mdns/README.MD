@@ -1,6 +1,8 @@
 # Simple mDNS
 
 Pure Rust implementation for mDNS and DNS-SD protocols
+## ServiceDiscovery
+
 
 ## OneShotMdnsResolver (Legacy mDNS)
 One shot resolvers are considered legacy and not fully compliant with the mDNS protocol, but they are handy for service discovery if you have (or need) only one service instance

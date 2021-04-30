@@ -10,18 +10,16 @@ use simple_dns::{
 };
 use tokio::net::UdpSocket;
 
-use crate::{
-    create_udp_socket, resource_record_manager::ResourceRecordManager,
-    simple_responder::build_reply, MULTICAST_ADDR_IPV4, MULTICAST_PORT,
-};
+use crate::{MULTICAST_IPV4_SOCKET, SimpleMdnsError, create_udp_socket, resource_record_manager::ResourceRecordManager, simple_responder::build_reply};
 
+/// Provides known service expiration and refresh times
 #[derive(Debug, Clone, Copy)]
-struct InstanceTimes {
+struct ExpirationTimes {
     refresh_at: Instant,
     expire_at: Instant,
 }
 
-impl InstanceTimes {
+impl ExpirationTimes {
     pub fn new(ttl: u64) -> Self {
         let added = Instant::now();
         let expire_at = added + Duration::from_secs(ttl);
@@ -38,21 +36,32 @@ impl InstanceTimes {
     }
 }
 
+/// Service Discovery implementation using DNS-SD.
+/// This implementation advertise all the registered addresses, query for the same service on the same network and
+/// keeps a cache of known service instances
+///
+/// ## Example
+/// ```
+/// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
+///
+/// discovery.add_address_to_discovery(my_socket_addr);
+/// ```
 pub struct ServiceDiscovery {
     service_name: Name<'static>,
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
-    known_instances: Arc<RwLock<HashMap<SocketAddr, InstanceTimes>>>,
+    known_instances: Arc<RwLock<HashMap<SocketAddr, ExpirationTimes>>>,
     resource_ttl: u32,
     udp_socket: Arc<UdpSocket>,
-    multicast_addr: SocketAddr,
     enable_loopback: bool,
 }
 
 impl ServiceDiscovery {
+    /// Creates a new ServiceDiscovery by providing [service name](`simple_dns::Name`), resource ttl and loopback activation.
+    /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
+    /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
     pub fn new(service_name: Name<'static>, resource_ttl: u32, enable_loopback: bool) -> Self {
-        let service_discory = Self {
+        let service_discovery = Self {
             service_name,
-            multicast_addr: std::net::SocketAddr::new(MULTICAST_ADDR_IPV4.into(), MULTICAST_PORT),
             resource_manager: Arc::new(RwLock::new(ResourceRecordManager::new())),
             known_instances: Arc::new(RwLock::new(HashMap::new())),
             resource_ttl,
@@ -60,13 +69,15 @@ impl ServiceDiscovery {
             enable_loopback,
         };
 
-        service_discory.wait_replies();
-        service_discory.probe_instances();
-        service_discory.verify_instances_ttl();
+        service_discovery.wait_replies();
+        service_discovery.probe_instances();
+        service_discovery.verify_instances_ttl();
 
-        service_discory
+
+        service_discovery
     }
 
+    /// Add the given socket address to discovery. An advertise will be broadcasted just after adding the address.
     pub fn add_address_to_discovery(&mut self, socket_addr: &SocketAddr) {
         self.resource_manager.write().unwrap().add_service_address(
             self.service_name.clone(),
@@ -76,12 +87,16 @@ impl ServiceDiscovery {
 
         self.advertise_service();
     }
-    pub fn remove_service_from_discovery(&mut self, service_name: &'static Name) {
+
+    /// Remove all addresses from service discovery
+    pub fn remove_service_from_discovery(&'static mut self) {
         self.resource_manager
             .write()
             .unwrap()
-            .remove_all_resource_records(service_name);
+            .remove_all_resource_records(&self.service_name);
     }
+
+    /// Return the addresses of all known services
     pub fn get_known_services<'b>(&self) -> Vec<SocketAddr> {
         let instances = self.known_instances.read().unwrap();
         instances.keys().cloned().collect()
@@ -91,7 +106,6 @@ impl ServiceDiscovery {
         let known_instances = self.known_instances.clone();
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
-        let addr = self.multicast_addr;
 
         tokio::spawn(async move {
             let service_name = service_name;
@@ -113,7 +127,9 @@ impl ServiceDiscovery {
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
-                            send_question(service_name.clone(), &socket, addr).await;
+                            if let Err(err) = send_question(service_name.clone(), &socket, *MULTICAST_IPV4_SOCKET).await {
+                                log::error!("There was an error sending the question packet: {}", err);
+                            }
                         } else {
                             tokio::time::sleep_until(expiration.refresh_at.into()).await;
                         }
@@ -134,30 +150,37 @@ impl ServiceDiscovery {
                 .find_matching_resources(&self.service_name, QTYPE::SRV, QCLASS::IN)
                 .next()
             {
-                packet.add_answer(srv);
+                if let Err(err) =  packet.add_answer(srv) {
+                    log::error!("There was an error adding the answer to the packet: {}", err);
+                }
             }
 
             for additional_record in
                 resource_manager.find_matching_resources(&self.service_name, QTYPE::A, QCLASS::IN)
             {
-                packet.add_additional_record(additional_record);
+                if let Err(err) = packet.add_additional_record(additional_record) {
+                    log::error!("There was an error adding the additional record to the packet: {}", err);
+                }
             }
         }
 
         if packet.has_answers() && packet.has_additional_records() {
             let socket = self.udp_socket.clone();
-            let addr = self.multicast_addr;
-
-            tokio::spawn(async move { socket.send_to(&packet, addr).await });
+            tokio::spawn(async move {
+                if let Err(err) = socket.send_to(&packet, *MULTICAST_IPV4_SOCKET).await {
+                    log::error!("Error advertising the service: {}", err);
+                }
+            });
         }
     }
     fn probe_instances(&self) {
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
-        let dest = self.multicast_addr;
 
         tokio::spawn(async move {
-            send_question(service_name, &socket, dest).await;
+            if let Err(err) = send_question(service_name, &socket, *MULTICAST_IPV4_SOCKET).await {
+                log::error!("There was an error sending the question packet: {}", err);
+            }
         });
     }
 
@@ -165,7 +188,6 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
         let known_instances = self.known_instances.clone();
         let resources = self.resource_manager.clone();
-        let multicast_addr = self.multicast_addr;
         let enable_loopback = self.enable_loopback;
 
         tokio::spawn(async move {
@@ -175,7 +197,7 @@ impl ServiceDiscovery {
 
             loop {
                 let (count, addr) = socket.recv_from(&mut recv_buffer).await.unwrap();
-
+                dbg!(count, &addr);
                 if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                     if header.query {
                         let packet = PacketBuf::from(&recv_buffer[..count]);
@@ -185,8 +207,10 @@ impl ServiceDiscovery {
                         };
 
                         if let Some((unicast_reply, packet)) = reply {
-                            let addr_reply = if unicast_reply { addr } else { multicast_addr };
-                            socket.send_to(&packet, addr_reply).await;
+                            let addr_reply = if unicast_reply { addr } else { *MULTICAST_IPV4_SOCKET };
+                            if let Err(err) = socket.send_to(&packet, addr_reply).await {
+                                log::error!("There was an error sending the packet: {}", err);
+                            }
                         }
                     } else {
                         add_response_to_known_instances(
@@ -205,7 +229,7 @@ impl ServiceDiscovery {
 fn add_response_to_known_instances<'a>(
     recv_buffer: &[u8],
     service_name: &Name<'a>,
-    known_instances: &RwLock<HashMap<SocketAddr, InstanceTimes>>,
+    known_instances: &RwLock<HashMap<SocketAddr, ExpirationTimes>>,
     owned_resources: &ResourceRecordManager,
 ) {
     if let Some(packet) = Packet::parse(&recv_buffer).ok() {
@@ -243,7 +267,7 @@ fn add_response_to_known_instances<'a>(
 
         let (address, ttl) = address.unwrap();
         let address = SocketAddr::new(address, port.unwrap());
-        let instance_times = InstanceTimes::new(ttl as u64);
+        let instance_times = ExpirationTimes::new(ttl as u64);
 
         known_instances
             .write()
@@ -252,11 +276,13 @@ fn add_response_to_known_instances<'a>(
     }
 }
 
-async fn send_question<'a>(service_name: Name<'a>, socket: &UdpSocket, addr: SocketAddr) {
+async fn send_question<'a>(service_name: Name<'a>, socket: &UdpSocket, addr: SocketAddr) -> Result<(), SimpleMdnsError> {
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
-    packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false));
+    packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))?;
 
     if packet.has_questions() {
-        socket.send_to(&packet, addr).await;
+        socket.send_to(&packet, addr).await?;
     }
+
+    Ok(())
 }

@@ -23,7 +23,7 @@ impl OneShotMdnsResolver {
 
     /// Send a query packet and returns the first response
     pub async fn query_packet<'a>(&self, packet: PacketBuf) -> Result<Option<PacketBuf>, SimpleMdnsError> {
-        let socket = create_udp_socket(self.enable_loopback).map_err(|_| SimpleMdnsError::ErrorCreatingUDPSocket)?;
+        let socket = create_udp_socket(self.enable_loopback)?;
         send_packet_to_multicast_socket(&socket, &packet).await?;
 
         match super::timeout(self.query_timeout, get_first_response(&socket, packet.packet_id())).await {
@@ -121,8 +121,7 @@ async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> R
     
     loop {
         let (count, _) = socket.recv_from(&mut buf[..])
-            .await
-            .map_err(|_| SimpleMdnsError::ErrorReadingFromUDPSocket)?;
+            .await?;
 
         if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
             if !header.query && header.id == packet_id && header.answers_count > 0 {

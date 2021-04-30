@@ -13,13 +13,19 @@ pub struct PacketBuf {
 }
 
 impl PacketBuf {
-    /// Creates a new empty BufPacket
+    /// Creates a new empty PacketBuf
     pub fn new(header: PacketHeader) -> Self {
         let mut inner = vec![0; 12];
         header.write_to(&mut inner);
         Self {
             inner
         }
+    }
+
+    /// Creates a new empty PacketBuf with a query header
+    pub fn new_query() -> Self {
+        let header = PacketHeader::new_query(0, false);
+        Self::new(header)
     }
 
     /// Add a [`Question`] to this packet.  
@@ -133,7 +139,7 @@ impl Deref for PacketBuf {
     }
 }
 
-/// Iterate over the questions of a [`BufPacket`]
+/// Iterate over the questions of a [`PacketBuf`]
 /// If a question is not valid, the iterator will stop
 pub struct PacketSectionIter<'a, T> where T : DnsPacketContent<'a> {
     _marker: std::marker::PhantomData<&'a T>,

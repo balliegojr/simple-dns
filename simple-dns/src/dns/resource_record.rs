@@ -4,10 +4,10 @@ use crate::{QCLASS, QTYPE};
 
 use super::{CLASS, DnsPacketContent, Name, rdata::RData, TYPE, rdata::parse_rdata};
 use core::fmt::Debug;
-use std::convert::TryInto;
+use std::{convert::TryInto, hash::Hash};
 
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ResourceRecord<'a> {
     /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
@@ -89,6 +89,15 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
 
         out.extend(&buf);
         self.rdata.append_to_vec(out)
+    }
+}
+
+impl <'a> Hash for ResourceRecord<'a> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.rdatatype.hash(state);
+        self.class.hash(state);
+        self.rdata.hash(state);
     }
 }
 
@@ -193,10 +202,21 @@ mod tests {
         let b = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
 
         assert_eq!(a, b);
-        assert_eq!(get_hash(a), get_hash(b));
+        assert_eq!(get_hash(&a), get_hash(&b));
     }
 
-    fn get_hash(rr: ResourceRecord) -> u64 {
+    #[test]
+    fn test_hash_ignore_ttl() {
+        let a = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+        let mut b = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+
+        assert_eq!(get_hash(&a), get_hash(&b));
+        b.ttl = 50;
+
+        assert_eq!(get_hash(&a), get_hash(&b));
+    }
+
+    fn get_hash(rr: &ResourceRecord) -> u64 {
         let mut hasher = DefaultHasher::default();
         rr.hash(&mut hasher);
         hasher.finish()

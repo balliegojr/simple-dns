@@ -21,11 +21,11 @@ impl<'a> ResourceRecordManager<'a> {
 
     /// Register a Resource Record
     pub fn add_resource(&mut self, resource: ResourceRecord<'a>) {
-        let mut service_records = self
+        let service_records = self
             .resources
             .entry(resource.name.to_string())
             .or_insert(HashMap::new());
-        let mut type_records = service_records
+        let type_records = service_records
             .entry(resource.rdatatype.into())
             .or_insert(HashSet::new());
         type_records.insert(resource);
@@ -67,12 +67,38 @@ impl<'a> ResourceRecordManager<'a> {
 
     /// Helper function to remove a service address
     pub fn remove_service_address(&mut self, name: &'a Name, addr: &SocketAddr) {
-        todo!()
-        // let resource_type = match addr {
-        //     SocketAddr::V4(_) => TYPE::A,
-        //     SocketAddr::V6(_) => TYPE::AAAA
-        // };
-        // self.remove_resource_record(name, &resource_type)
+        let resource_addr = match addr {
+            SocketAddr::V4(addr) => ResourceRecord::new(
+                name.clone(),
+                TYPE::A,
+                CLASS::IN,
+                0,
+                RData::A(A::from(addr.ip())),
+            ),
+            SocketAddr::V6(addr) => ResourceRecord::new(
+                name.clone(),
+                TYPE::AAAA,
+                CLASS::IN,
+                0,
+                RData::AAAA(AAAA::from(addr.ip())),
+            ),
+        };
+
+        let resource_srv = ResourceRecord::new(
+            name.clone(),
+            TYPE::SRV,
+            CLASS::IN,
+            0,
+            RData::SRV(Box::new(SRV {
+                port: addr.port(),
+                priority: 0,
+                target: name.clone(),
+                weight: 0,
+            })),
+        );
+
+        self.remove_resource_record(&resource_addr);
+        self.remove_resource_record(&resource_srv);
     }
     /// Remove every resource record of the given type
     pub fn remove_resource_records_of_type(
@@ -88,7 +114,7 @@ impl<'a> ResourceRecordManager<'a> {
         }
     }
 
-    pub fn remove_resource_record(&mut self, resource_record: &'a ResourceRecord) {
+    pub fn remove_resource_record(&mut self, resource_record: &ResourceRecord<'a>) {
         if let Some(service_resource_records) =
             self.resources.get_mut(&resource_record.name.to_string())
         {
