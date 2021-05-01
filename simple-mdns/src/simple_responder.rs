@@ -75,9 +75,9 @@ impl SimpleMdnsResponder {
         });
     }
 
-    async fn create_socket_and_wait_messages<'b>(
+    async fn create_socket_and_wait_messages(
         enable_loopback: bool,
-        resources: Arc<RwLock<ResourceRecordManager<'b>>>,
+        resources: Arc<RwLock<ResourceRecordManager<'_>>>,
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = vec![0; 4096];
 
@@ -146,7 +146,7 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
         for answer in resources.find_matching_resources(
             &question.qname,
             question.qtype,
-            question.qclass,
+            |r| r.match_qclass(question.qclass),
         ) {
             reply_packet.add_answer(answer).ok()?;
 
@@ -154,7 +154,7 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
                 additional_records.extend(resources.find_matching_resources(
                     &srv.target,
                     QTYPE::A,
-                    question.qclass,
+                    |r| r.match_qclass(question.qclass),
                 ));
             }
         }
@@ -173,9 +173,9 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, Ipv6Addr}, time::Duration};
+    use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
 
-    use simple_dns::{CharacterString, Question};
+    use simple_dns::Question;
 
     use super::*;
 

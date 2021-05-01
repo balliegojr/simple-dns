@@ -41,7 +41,7 @@ impl ExpirationTimes {
 /// keeps a cache of known service instances
 ///
 /// ## Example
-/// ```
+/// ```ignore
 /// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
 ///
 /// discovery.add_address_to_discovery(my_socket_addr);
@@ -97,7 +97,7 @@ impl ServiceDiscovery {
     }
 
     /// Return the addresses of all known services
-    pub fn get_known_services<'b>(&self) -> Vec<SocketAddr> {
+    pub fn get_known_services(&self) -> Vec<SocketAddr> {
         let instances = self.known_instances.read().unwrap();
         instances.keys().cloned().collect()
     }
@@ -147,7 +147,7 @@ impl ServiceDiscovery {
         {
             let resource_manager = self.resource_manager.read().unwrap();
             if let Some(srv) = resource_manager
-                .find_matching_resources(&self.service_name, QTYPE::SRV, QCLASS::IN)
+                .find_matching_resources(&self.service_name, QTYPE::SRV, |r| r.match_qclass(QCLASS::IN))
                 .next()
             {
                 if let Err(err) =  packet.add_answer(srv) {
@@ -156,7 +156,7 @@ impl ServiceDiscovery {
             }
 
             for additional_record in
-                resource_manager.find_matching_resources(&self.service_name, QTYPE::A, QCLASS::IN)
+                resource_manager.find_matching_resources(&self.service_name, QTYPE::A, |r| r.match_qclass(QCLASS::IN))
             {
                 if let Err(err) = packet.add_additional_record(additional_record) {
                     log::error!("There was an error adding the additional record to the packet: {}", err);
@@ -226,13 +226,13 @@ impl ServiceDiscovery {
     }
 }
 
-fn add_response_to_known_instances<'a>(
+fn add_response_to_known_instances(
     recv_buffer: &[u8],
-    service_name: &Name<'a>,
+    service_name: &Name<'_>,
     known_instances: &RwLock<HashMap<SocketAddr, ExpirationTimes>>,
     owned_resources: &ResourceRecordManager,
 ) {
-    if let Some(packet) = Packet::parse(&recv_buffer).ok() {
+    if let Ok(packet) = Packet::parse(&recv_buffer) {
         let port = packet
             .answers
             .iter()
@@ -276,7 +276,7 @@ fn add_response_to_known_instances<'a>(
     }
 }
 
-async fn send_question<'a>(service_name: Name<'a>, socket: &UdpSocket, addr: SocketAddr) -> Result<(), SimpleMdnsError> {
+async fn send_question(service_name: Name<'_>, socket: &UdpSocket, addr: SocketAddr) -> Result<(), SimpleMdnsError> {
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
     packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))?;
 

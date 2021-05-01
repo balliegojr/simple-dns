@@ -5,7 +5,7 @@ use std::{
 
 use simple_dns::{
     rdata::{RData, A, AAAA, SRV},
-    Name, ResourceRecord, CLASS, QCLASS, QTYPE, TYPE,
+    Name, ResourceRecord, CLASS, QTYPE, TYPE,
 };
 
 pub struct ResourceRecordManager<'a> {
@@ -24,10 +24,10 @@ impl<'a> ResourceRecordManager<'a> {
         let service_records = self
             .resources
             .entry(resource.name.to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
         let type_records = service_records
             .entry(resource.rdatatype.into())
-            .or_insert(HashSet::new());
+            .or_insert_with(HashSet::new);
         type_records.insert(resource);
     }
 
@@ -108,7 +108,7 @@ impl<'a> ResourceRecordManager<'a> {
     ) {
         if let Some(service_resource_records) = self.resources.get_mut(&service_name.to_string()) {
             service_resource_records.remove(&u16::from(*resource_type));
-            if service_resource_records.len() == 0 {
+            if service_resource_records.is_empty() {
                 self.resources.remove(&service_name.to_string());
             }
         }
@@ -139,48 +139,29 @@ impl<'a> ResourceRecordManager<'a> {
     }
 
     /// Returns an [`Iterator`<Item=`&ResourceRecord`>] with all matching resources
-    pub fn find_matching_resources(
+    pub fn find_matching_resources<P : FnMut(&&ResourceRecord) -> bool>(
         &self,
         service_name: &Name,
         qtype: QTYPE,
-        qclass: QCLASS,
+        filter: P,
     ) -> impl Iterator<Item = &ResourceRecord> {
-        let mut matching = Vec::new();
+         let mut matching = Vec::new();
 
-        match self.resources.get(&service_name.to_string()) {
-            Some(resource_records) => match qtype {
-                QTYPE::A | QTYPE::AAAA => {
-                    match resource_records.get(&(QTYPE::A as u16)) {
-                        Some(resource_set) => {
-                            matching
-                                .extend(resource_set.iter().filter(|rr| rr.match_qclass(qclass)));
-                        }
-                        None => {}
-                    }
-                    match resource_records.get(&(QTYPE::AAAA as u16)) {
-                        Some(resource_set) => {
-                            matching
-                                .extend(resource_set.iter().filter(|rr| rr.match_qclass(qclass)));
-                        }
-                        None => {}
-                    }
-                }
-                QTYPE::ANY => {
-                    for resource_set in resource_records.values() {
-                        matching.extend(resource_set.iter().filter(|rr| rr.match_qclass(qclass)));
-                    }
-                }
-                _ => match resource_records.get(&(qtype as u16)) {
-                    Some(resource_set) => {
-                        matching.extend(resource_set.iter().filter(|rr| rr.match_qclass(qclass)));
-                    }
-                    None => {}
-                },
-            },
-            None => {}
-        }
+        if let Some(resource_records) = self.resources.get(&service_name.to_string()) { match qtype {
+                QTYPE::A | QTYPE::AAAA => matching.extend(resource_records.get(&(QTYPE::A as u16))
+                        .iter()
+                        .chain(resource_records.get(&(QTYPE::AAAA as u16)).iter())
+                        .flat_map(|r| r.iter())),
+                QTYPE::ANY => matching.extend(resource_records.values()
+                        .flat_map(|r| r.iter())
+                        .filter(filter)),
+                _ => matching.extend(resource_records.get(&(qtype as u16))
+                        .iter()
+                        .flat_map(|r| r.iter())
+                        .filter(filter))
+        } }
 
-        return matching.into_iter();
+        matching.into_iter()
     }
 
     pub fn has_resource(&self, resource: &ResourceRecord) -> bool {
@@ -196,7 +177,7 @@ impl<'a> ResourceRecordManager<'a> {
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-    use simple_dns::{rdata::RData, rdata::A, CharacterString, Name};
+    use simple_dns::{rdata::RData, rdata::A, CharacterString, Name, QCLASS};
 
     use super::*;
 
@@ -237,19 +218,19 @@ mod tests {
         assert_eq!(
             2,
             resources
-                .find_matching_resources(&service_name, QTYPE::ANY, QCLASS::ANY)
+                .find_matching_resources(&service_name, QTYPE::ANY, |r| r.match_qclass(QCLASS::ANY))
                 .count()
         );
         assert_eq!(
             1,
             resources
-                .find_matching_resources(&service_name, QTYPE::TXT, QCLASS::ANY)
+                .find_matching_resources(&service_name, QTYPE::TXT, |r| r.match_qclass(QCLASS::ANY))
                 .count()
         );
         assert_eq!(
             1,
             resources
-                .find_matching_resources(&service_name, QTYPE::ANY, QCLASS::CS)
+                .find_matching_resources(&service_name, QTYPE::ANY, |r| r.match_qclass(QCLASS::CS))
                 .count()
         );
         assert_eq!(
@@ -258,7 +239,7 @@ mod tests {
                 .find_matching_resources(
                     &Name::new_unchecked("_srv2._tcp"),
                     QTYPE::ANY,
-                    QCLASS::ANY
+                    |r| r.match_qclass(QCLASS::ANY)
                 )
                 .count()
         );
@@ -289,7 +270,7 @@ mod tests {
                 .find_matching_resources(
                     &Name::new_unchecked("_res1._tcp.com"),
                     QTYPE::ANY,
-                    QCLASS::IN
+                    |r| r.match_qclass(QCLASS::IN)
                 )
                 .count()
         );
@@ -299,7 +280,7 @@ mod tests {
                 .find_matching_resources(
                     &Name::new_unchecked("_res1._tcp.com"),
                     QTYPE::SRV,
-                    QCLASS::IN
+                    |r| r.match_qclass(QCLASS::IN)
                 )
                 .count()
         );
@@ -309,7 +290,7 @@ mod tests {
                 .find_matching_resources(
                     &Name::new_unchecked("_res2._tcp.com"),
                     QTYPE::ANY,
-                    QCLASS::ANY
+                    |r| r.match_qclass(QCLASS::ANY)
                 )
                 .count()
         );
