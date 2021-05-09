@@ -137,13 +137,15 @@ async fn get_first_response(socket: &tokio::net::UdpSocket, packet_id: u16) -> R
 mod tests {
     use std::str::FromStr;
     
-    use crate::SimpleMdnsResponder;
+    use crate::{SimpleMdnsResponder, conversion_utils::socket_addr_to_srv_and_address};
 
     use super::*;
 
     fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
         let mut responder = SimpleMdnsResponder::default();
-        responder.add_service_address(srv_name, &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080));
+        let (r1, r2) = socket_addr_to_srv_and_address(&srv_name, &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080), 0);
+        responder.add_resource(r1);
+        responder.add_resource(r2);
 
         responder
     }

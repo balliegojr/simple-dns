@@ -1,10 +1,10 @@
-use std::{net::SocketAddr, sync::{Arc, RwLock}};
+use std::sync::{Arc, RwLock};
 
-use simple_dns::{Name, PacketBuf, PacketHeader, QTYPE, ResourceRecord, TYPE, rdata::RData};
+use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, QTYPE};
 
 use crate::{
     create_udp_socket, resource_record_manager::ResourceRecordManager, SimpleMdnsError,
-    ENABLE_LOOPBACK, MULTICAST_IPV4_SOCKET
+    ENABLE_LOOPBACK, MULTICAST_IPV4_SOCKET,
 };
 
 const FIVE_MINUTES: u32 = 60 * 5;
@@ -36,32 +36,16 @@ impl SimpleMdnsResponder {
         resources.add_resource(resource);
     }
 
-    /// Remove a resource record by service name and resource type
-    pub fn remove_resource_record(&mut self, service_name: &'static Name, resource_type: TYPE) {
+    /// Remove a resource record
+    pub fn remove_resource_record(&mut self, resource: &ResourceRecord<'static>) {
         let mut resources = self.resources.write().unwrap();
-        resources.remove_resource_records_of_type(service_name, &resource_type);
+        resources.remove_resource_record(resource);
     }
 
-    /// Remove all resource records for a service name
-    pub fn remove_all_resource_records(&mut self, service_name: &'static Name) {
+    /// Remove all resource records
+    pub fn clear(&mut self) {
         let mut resources = self.resources.write().unwrap();
-        resources.remove_all_resource_records(service_name);
-    }
-
-    /// Register the service address as a Resource Record
-    pub fn add_service_address(
-        &mut self,
-        name: Name<'static>,
-        addr: &SocketAddr,
-    ) {
-        let mut resources = self.resources.write().unwrap();
-        resources.add_service_address(name, addr, self.rr_ttl)
-    }
-
-    /// Remove the service address from the resource records
-    pub fn remove_service_address(&mut self, name: &'static Name, addr: &SocketAddr) {
-        let mut resources = self.resources.write().unwrap();
-        resources.remove_service_address(name, addr);
+        resources.clear();
     }
 
     /// Start listening to requests
@@ -69,7 +53,9 @@ impl SimpleMdnsResponder {
         let enable_loopback = self.enable_loopback;
         let resources = self.resources.clone();
         tokio::spawn(async move {
-            if let Err(err) = Self::create_socket_and_wait_messages(enable_loopback, resources).await {
+            if let Err(err) =
+                Self::create_socket_and_wait_messages(enable_loopback, resources).await
+            {
                 log::error!("Dns Responder failed: {}", err);
             }
         });
@@ -84,11 +70,7 @@ impl SimpleMdnsResponder {
         let socket = create_udp_socket(enable_loopback)?;
 
         loop {
-            let (count, addr) = socket
-                .recv_from(&mut recv_buffer)
-                .await?;
-
-            dbg!(addr);
+            let (count, addr) = socket.recv_from(&mut recv_buffer).await?;
 
             if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                 if !header.query {
@@ -105,9 +87,7 @@ impl SimpleMdnsResponder {
                     *MULTICAST_IPV4_SOCKET
                 };
 
-                socket
-                    .send_to(&reply_packet, target_addr)
-                    .await?;
+                socket.send_to(&reply_packet, target_addr).await?;
             }
         }
     }
@@ -129,7 +109,10 @@ impl Default for SimpleMdnsResponder {
     }
 }
 
-pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordManager<'b>) -> Option<(bool, PacketBuf)> {
+pub(crate) fn build_reply<'b>(
+    packet: PacketBuf,
+    resources: &'b ResourceRecordManager<'b>,
+) -> Option<(bool, PacketBuf)> {
     let header = PacketHeader::parse(&packet).ok()?;
     let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode));
 
@@ -143,19 +126,19 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
             unicast_response = question.unicast_response
         }
 
-        for answer in resources.find_matching_resources(
-            &question.qname,
-            question.qtype,
-            |r| r.match_qclass(question.qclass),
-        ) {
+        for answer in resources.find_matching_resources(|r| {
+            r.name == question.qname
+                && r.match_qtype(question.qtype)
+                && r.match_qclass(question.qclass)
+        }) {
             reply_packet.add_answer(answer).ok()?;
 
             if let RData::SRV(srv) = &answer.rdata {
-                additional_records.extend(resources.find_matching_resources(
-                    &srv.target,
-                    QTYPE::A,
-                    |r| r.match_qclass(question.qclass),
-                ));
+                additional_records.extend(resources.find_matching_resources(|r| {
+                    r.name == srv.target
+                        && r.match_qtype(QTYPE::A)
+                        && r.match_qclass(question.qclass)
+                }));
             }
         }
     }
@@ -173,18 +156,46 @@ pub(crate) fn build_reply<'b>(packet: PacketBuf, resources: &'b ResourceRecordMa
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryInto, net::{IpAddr, Ipv4Addr, Ipv6Addr}};
+    use simple_dns::Name;
+    use std::{
+        convert::TryInto,
+        net::{Ipv4Addr, Ipv6Addr},
+    };
 
     use simple_dns::Question;
+
+    use crate::conversion_utils::{ip_addr_to_resource_record, port_to_srv_record};
 
     use super::*;
 
     fn get_resources() -> ResourceRecordManager<'static> {
         let mut resources = ResourceRecordManager::new();
-        resources.add_service_address(Name::new_unchecked("_res1._tcp.com"), &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080), 0);
-        resources.add_service_address(Name::new_unchecked("_res1._tcp.com"), &SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 8080), 0);
+        resources.add_resource(port_to_srv_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            8080,
+            0,
+        ));
+        resources.add_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            &Ipv4Addr::LOCALHOST.into(),
+            0,
+        ));
+        resources.add_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            &Ipv6Addr::LOCALHOST.into(),
+            0,
+        ));
 
-        resources.add_service_address(Name::new_unchecked("_res2._tcp.com"), &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080), 0);
+        resources.add_resource(port_to_srv_record(
+            &Name::new_unchecked("_res2._tcp.com"),
+            8080,
+            0,
+        ));
+        resources.add_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res2._tcp.com"),
+            &Ipv4Addr::LOCALHOST.into(),
+            0,
+        ));
         resources
     }
 

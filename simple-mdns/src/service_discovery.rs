@@ -10,7 +10,15 @@ use simple_dns::{
 };
 use tokio::net::UdpSocket;
 
-use crate::{MULTICAST_IPV4_SOCKET, SimpleMdnsError, create_udp_socket, resource_record_manager::ResourceRecordManager, simple_responder::build_reply};
+use crate::{
+    conversion_utils::{
+        ip_addr_to_resource_record, port_to_srv_record, socket_addr_to_srv_and_address,
+    },
+    create_udp_socket,
+    resource_record_manager::ResourceRecordManager,
+    simple_responder::build_reply,
+    SimpleMdnsError, MULTICAST_IPV4_SOCKET,
+};
 
 /// Provides known service expiration and refresh times
 #[derive(Debug, Clone, Copy)]
@@ -73,27 +81,44 @@ impl ServiceDiscovery {
         service_discovery.probe_instances();
         service_discovery.verify_instances_ttl();
 
-
         service_discovery
     }
 
-    /// Add the given socket address to discovery. An advertise will be broadcasted just after adding the address.
-    pub fn add_address_to_discovery(&mut self, socket_addr: &SocketAddr) {
-        self.resource_manager.write().unwrap().add_service_address(
-            self.service_name.clone(),
+    /// Add the given ip address to discovery as A or AAAA record, advertise will happen as soon as there is at least one ip and port registered
+    pub fn add_ip_address(&'static mut self, ip_addr: &IpAddr) {
+        let addr = ip_addr_to_resource_record(&self.service_name, ip_addr, self.resource_ttl);
+        self.resource_manager.write().unwrap().add_resource(addr);
+
+        self.advertise_service();
+    }
+
+    /// Add the given port to discovery as SRV record, advertise will happen as soon as there is at leas one ip and port registered
+    pub fn add_port(&'static mut self, port: u16) {
+        let srv = port_to_srv_record(&self.service_name, port, self.resource_ttl);
+        self.resource_manager.write().unwrap().add_resource(srv);
+
+        self.advertise_service();
+    }
+
+    /// Add the given socket address to discovery as SRV and A or AAAA records, there will be an advertise just after adding the address
+    pub fn add_socket_address(&mut self, socket_addr: &SocketAddr) {
+        let (r1, r2) = socket_addr_to_srv_and_address(
+            &self.service_name.clone(),
             socket_addr,
             self.resource_ttl,
         );
+        {
+            let mut resource_manager = self.resource_manager.write().unwrap();
+            resource_manager.add_resource(r1);
+            resource_manager.add_resource(r2);
+        }
 
         self.advertise_service();
     }
 
     /// Remove all addresses from service discovery
     pub fn remove_service_from_discovery(&'static mut self) {
-        self.resource_manager
-            .write()
-            .unwrap()
-            .remove_all_resource_records(&self.service_name);
+        self.resource_manager.write().unwrap().clear();
     }
 
     /// Return the addresses of all known services
@@ -127,8 +152,14 @@ impl ServiceDiscovery {
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
-                            if let Err(err) = send_question(service_name.clone(), &socket, *MULTICAST_IPV4_SOCKET).await {
-                                log::error!("There was an error sending the question packet: {}", err);
+                            if let Err(err) =
+                                send_question(service_name.clone(), &socket, *MULTICAST_IPV4_SOCKET)
+                                    .await
+                            {
+                                log::error!(
+                                    "There was an error sending the question packet: {}",
+                                    err
+                                );
                             }
                         } else {
                             tokio::time::sleep_until(expiration.refresh_at.into()).await;
@@ -146,20 +177,26 @@ impl ServiceDiscovery {
         let mut packet = PacketBuf::new(PacketHeader::new_reply(0, OPCODE::StandardQuery));
         {
             let resource_manager = self.resource_manager.read().unwrap();
-            if let Some(srv) = resource_manager
-                .find_matching_resources(&self.service_name, QTYPE::SRV, |r| r.match_qclass(QCLASS::IN))
-                .next()
-            {
-                if let Err(err) =  packet.add_answer(srv) {
-                    log::error!("There was an error adding the answer to the packet: {}", err);
+
+            for srv in resource_manager.find_matching_resources(|r| {
+                r.match_qtype(QTYPE::SRV) && r.match_qclass(QCLASS::IN)
+            }) {
+                if let Err(err) = packet.add_answer(srv) {
+                    log::error!(
+                        "There was an error adding the answer to the packet: {}",
+                        err
+                    );
                 }
             }
 
-            for additional_record in
-                resource_manager.find_matching_resources(&self.service_name, QTYPE::A, |r| r.match_qclass(QCLASS::IN))
+            for additional_record in resource_manager
+                .find_matching_resources(|r| r.match_qtype(QTYPE::A) && r.match_qclass(QCLASS::IN))
             {
                 if let Err(err) = packet.add_additional_record(additional_record) {
-                    log::error!("There was an error adding the additional record to the packet: {}", err);
+                    log::error!(
+                        "There was an error adding the additional record to the packet: {}",
+                        err
+                    );
                 }
             }
         }
@@ -197,7 +234,6 @@ impl ServiceDiscovery {
 
             loop {
                 let (count, addr) = socket.recv_from(&mut recv_buffer).await.unwrap();
-                dbg!(count, &addr);
                 if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                     if header.query {
                         let packet = PacketBuf::from(&recv_buffer[..count]);
@@ -207,7 +243,11 @@ impl ServiceDiscovery {
                         };
 
                         if let Some((unicast_reply, packet)) = reply {
-                            let addr_reply = if unicast_reply { addr } else { *MULTICAST_IPV4_SOCKET };
+                            let addr_reply = if unicast_reply {
+                                addr
+                            } else {
+                                *MULTICAST_IPV4_SOCKET
+                            };
                             if let Err(err) = socket.send_to(&packet, addr_reply).await {
                                 log::error!("There was an error sending the packet: {}", err);
                             }
@@ -233,56 +273,52 @@ fn add_response_to_known_instances(
     owned_resources: &ResourceRecordManager,
 ) {
     if let Ok(packet) = Packet::parse(&recv_buffer) {
-        let port = packet
+        let mut known_instances = known_instances.write().unwrap();
+        let srvs = packet
             .answers
             .iter()
-            .filter(|aw| {
-                aw.name == *service_name
-                    && aw.match_qtype(QTYPE::SRV)
-                    && !owned_resources.has_resource(&aw)
-            })
-            .find_map(|a| match &a.rdata {
-                RData::SRV(srv) => Some(srv.port),
-                _ => None,
-            });
+            .filter(|aw| aw.name == *service_name && aw.match_qtype(QTYPE::SRV));
 
-        if port.is_none() {
-            return;
+        for srv in srvs {
+            let (target, port) = match &srv.rdata {
+                RData::SRV(rdata) => (&rdata.target, rdata.port),
+                _ => continue,
+            };
+
+            let addresses = packet
+                .additional_records
+                .iter()
+                .chain(packet.answers.iter())
+                .filter(|ar| {
+                    ar.name == *target
+                        && ar.match_qtype(QTYPE::A)
+                        && !owned_resources.has_resource(ar)
+                });
+
+            for addr in addresses {
+                let ip_addr = match &addr.rdata {
+                    RData::A(addr) => IpAddr::V4(Ipv4Addr::from(addr.address)),
+                    RData::AAAA(addr) => IpAddr::V6(Ipv6Addr::from(addr.address)),
+                    _ => continue,
+                };
+
+                known_instances.insert(
+                    SocketAddr::new(ip_addr, port),
+                    ExpirationTimes::new(addr.ttl as u64),
+                );
+            }
         }
-
-        let address = packet
-            .additional_records
-            .iter()
-            .chain(packet.answers.iter())
-            .filter(|ar| ar.name == *service_name && ar.match_qtype(QTYPE::A))
-            .find_map(|ar| match &ar.rdata {
-                RData::A(a) => Some((IpAddr::V4(Ipv4Addr::from(a.address)), ar.ttl)),
-                RData::AAAA(aaaa) => Some((IpAddr::V6(Ipv6Addr::from(aaaa.address)), ar.ttl)),
-                _ => None,
-            });
-
-        if address.is_none() {
-            return;
-        }
-
-        let (address, ttl) = address.unwrap();
-        let address = SocketAddr::new(address, port.unwrap());
-        let instance_times = ExpirationTimes::new(ttl as u64);
-
-        known_instances
-            .write()
-            .unwrap()
-            .insert(address, instance_times);
     }
 }
 
-async fn send_question(service_name: Name<'_>, socket: &UdpSocket, addr: SocketAddr) -> Result<(), SimpleMdnsError> {
+async fn send_question(
+    service_name: Name<'_>,
+    socket: &UdpSocket,
+    addr: SocketAddr,
+) -> Result<(), SimpleMdnsError> {
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
     packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))?;
-
-    if packet.has_questions() {
-        socket.send_to(&packet, addr).await?;
-    }
+    socket.send_to(&packet, addr).await?;
 
     Ok(())
 }

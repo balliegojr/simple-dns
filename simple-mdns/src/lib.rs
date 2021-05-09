@@ -18,6 +18,7 @@ mod oneshot_resolver;
 mod simple_responder;
 mod service_discovery;
 mod resource_record_manager;
+pub mod conversion_utils;
 
 pub use oneshot_resolver::OneShotMdnsResolver;
 pub use simple_responder::SimpleMdnsResponder;
