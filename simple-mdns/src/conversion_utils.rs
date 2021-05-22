@@ -1,3 +1,5 @@
+//! Provides helper functions to create resource records from Socket and Ip Addresses
+
 use simple_dns::{CLASS, Name, ResourceRecord, TYPE, rdata::{A, AAAA, RData, SRV}};
 use std::{convert::From, net::SocketAddr};
 use std::net::IpAddr;

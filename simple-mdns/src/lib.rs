@@ -1,6 +1,7 @@
 /*!
 Pure Rust implementation for mDNS and DNS-SD protocols  
 
+For Service Discovery, see [`ServiceDiscovery`]
 For IpAddress and/or Port querying just one single time, see [`OneShotMdnsResolver`]  
 For Dns Responder, see [`SimpleMdnsResponder`]
 */

@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr },
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -52,7 +52,7 @@ impl ExpirationTimes {
 /// ```ignore
 /// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
 ///
-/// discovery.add_address_to_discovery(my_socket_addr);
+/// discovery.add_socket_address(my_socket_addr);
 /// ```
 pub struct ServiceDiscovery {
     service_name: Name<'static>,
@@ -79,7 +79,7 @@ impl ServiceDiscovery {
 
         service_discovery.wait_replies();
         service_discovery.probe_instances();
-        service_discovery.verify_instances_ttl();
+        service_discovery.refresh_known_instances();
 
         service_discovery
     }
@@ -92,7 +92,7 @@ impl ServiceDiscovery {
         self.advertise_service();
     }
 
-    /// Add the given port to discovery as SRV record, advertise will happen as soon as there is at leas one ip and port registered
+    /// Add the given port to discovery as SRV record, advertise will happen as soon as there is at least one ip and port registered
     pub fn add_port(&'static mut self, port: u16) {
         let srv = port_to_srv_record(&self.service_name, port, self.resource_ttl);
         self.resource_manager.write().unwrap().add_resource(srv);
@@ -127,7 +127,7 @@ impl ServiceDiscovery {
         instances.keys().cloned().collect()
     }
 
-    fn verify_instances_ttl(&self) {
+    fn refresh_known_instances(&self) {
         let known_instances = self.known_instances.clone();
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
@@ -166,7 +166,7 @@ impl ServiceDiscovery {
                         }
                     }
                     None => {
-                        tokio::time::sleep(Duration::from_secs(3)).await;
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
             }
