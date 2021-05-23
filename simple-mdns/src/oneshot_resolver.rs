@@ -9,7 +9,9 @@ use std::{
 };
 
 /// Provides One Shot queries (legacy mDNS)
+///
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
+///
 /// One Shot queries returns only the first valid response to arrive
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
