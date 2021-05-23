@@ -1,14 +1,14 @@
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
-use crate::Name;
 use crate::dns::DnsPacketContent;
+use crate::Name;
 
 /// SRV records specifies the location of the server(s) for a specific protocol and domain.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct SRV<'a> {
     /// The priority of this target host.  
     /// A client MUST attempt to contact the target host with the lowest-numbered priority it can
-    /// reach; target hosts with the same priority SHOULD be tried in an order defined by the weight field. 
+    /// reach; target hosts with the same priority SHOULD be tried in an order defined by the weight field.
     pub priority: u16,
     /// A server selection mechanism.  
     /// The weight field specifies arelative weight for entries with the same priority.  
@@ -17,21 +17,24 @@ pub struct SRV<'a> {
     /// The port on this target host of this service
     pub port: u16,
     /// The domain name of the target host
-    pub target: Name<'a>
+    pub target: Name<'a>,
 }
 
-impl <'a> DnsPacketContent<'a> for SRV<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let priority = BigEndian::read_u16(&data[position..position+2]);
-        let weight = BigEndian::read_u16(&data[position+2..position+4]);
-        let port = BigEndian::read_u16(&data[position+4..position+6]);
-        let target = Name::parse(data, position+6)?;
+impl<'a> DnsPacketContent<'a> for SRV<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let priority = BigEndian::read_u16(&data[position..position + 2]);
+        let weight = BigEndian::read_u16(&data[position + 2..position + 4]);
+        let port = BigEndian::read_u16(&data[position + 4..position + 6]);
+        let target = Name::parse(data, position + 6)?;
 
         Ok(Self {
             priority,
             weight,
             port,
-            target
+            target,
         })
     }
 
@@ -53,14 +56,14 @@ impl <'a> DnsPacketContent<'a> for SRV<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn parse_and_write_srv() {
         let srv = SRV {
             priority: 1,
             weight: 2,
             port: 3,
-            target: Name::new("_srv._tcp.example.com").unwrap()
+            target: Name::new("_srv._tcp.example.com").unwrap(),
         };
 
         let mut bytes = Vec::new();

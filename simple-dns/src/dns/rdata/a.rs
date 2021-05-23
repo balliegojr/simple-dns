@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 use crate::dns::DnsPacketContent;
 
@@ -11,12 +11,13 @@ pub struct A {
     pub address: u32,
 }
 
-impl <'a> DnsPacketContent<'a> for A {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let address = BigEndian::read_u32(&data[position..position+4]);
-        Ok(Self{
-            address
-        })
+impl<'a> DnsPacketContent<'a> for A {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let address = BigEndian::read_u32(&data[position..position + 4]);
+        Ok(Self { address })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -35,18 +36,20 @@ impl <'a> DnsPacketContent<'a> for A {
 
 impl From<&Ipv4Addr> for A {
     fn from(addr: &Ipv4Addr) -> Self {
-        Self {  address: (*addr).into() }
+        Self {
+            address: (*addr).into(),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn parse_and_write_a() {
         let a = A {
-            address: 2130706433
+            address: 2130706433,
         };
 
         let mut bytes = Vec::new();

@@ -1,6 +1,6 @@
 use std::{convert::TryFrom, fmt::Display, hash::Hash};
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
@@ -14,10 +14,10 @@ const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 pub struct Name<'a> {
     labels: Vec<(usize, usize)>,
     data: &'a [u8],
-    length_in_bytes: usize
+    length_in_bytes: usize,
 }
 
-impl <'a> Name<'a> {
+impl<'a> Name<'a> {
     /// Creates a new validated Name
     pub fn new(name: &'a str) -> crate::Result<Self> {
         if name.len() > MAX_NAME_LENGTH {
@@ -26,9 +26,9 @@ impl <'a> Name<'a> {
 
         let name = Self::new_unchecked(name);
         if name.labels.iter().any(|(_, len)| *len > MAX_LABEL_LENGTH) {
-            return Err(crate::SimpleDnsError::InvalidServiceLabel)
+            return Err(crate::SimpleDnsError::InvalidServiceLabel);
         }
-        
+
         Ok(name)
     }
 
@@ -45,14 +45,14 @@ impl <'a> Name<'a> {
         Self {
             labels,
             data: name.as_bytes(),
-            length_in_bytes: name.len() + if last_pos == name.len() { 1 } else { 2 }
+            length_in_bytes: name.len() + if last_pos == name.len() { 1 } else { 2 },
         }
     }
 
     /// Verify if name ends with .local.
     pub fn is_link_local(&self) -> bool {
         if self.labels.len() < 2 {
-            return false
+            return false;
         }
 
         let (start, end) = &self.labels[self.labels.len() - 2];
@@ -60,8 +60,11 @@ impl <'a> Name<'a> {
     }
 }
 
-impl <'a> DnsPacketContent<'a> for Name<'a> {
-    fn parse(data: &'a [u8], initial_position: usize) -> crate::Result<Self> where Self: Sized {
+impl<'a> DnsPacketContent<'a> for Name<'a> {
+    fn parse(data: &'a [u8], initial_position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
         let mut labels = Vec::new();
 
         let mut position = initial_position;
@@ -69,52 +72,52 @@ impl <'a> DnsPacketContent<'a> for Name<'a> {
 
         while data[position] != 0 {
             match data[position] {
-                len if len & POINTER_MASK == POINTER_MASK => { //compression
+                len if len & POINTER_MASK == POINTER_MASK => {
+                    //compression
                     if end == initial_position {
                         end = position + 1;
                     }
 
-                    position = (BigEndian::read_u16(
-                        &data[position..position + 2]) & !POINTER_MASK_U16) as usize;
+                    position = (BigEndian::read_u16(&data[position..position + 2])
+                        & !POINTER_MASK_U16) as usize;
                 }
                 len => {
                     labels.push((position + 1, len as usize));
                     position += len as usize + 1;
-
                 }
             }
 
             if position > data.len() {
-                return Err(crate::SimpleDnsError::InvalidDnsPacket)
+                return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
         }
 
         if end == initial_position {
             end = position;
         }
-        
+
         Ok(Self {
             data,
             labels,
-            length_in_bytes: end - initial_position + 1
+            length_in_bytes: end - initial_position + 1,
         })
     }
-    
+
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         for (pos, length) in self.labels.iter().filter(|(_, l)| *l > 0) {
             out.push(*length as u8);
-            out.extend(&self.data[*pos..(pos+length)])
+            out.extend(&self.data[*pos..(pos + length)])
         }
         out.push(0);
         Ok(())
     }
-    
+
     fn len(&self) -> usize {
         self.length_in_bytes
     }
 }
 
-impl <'a> TryFrom<&'a str> for Name<'a> {
+impl<'a> TryFrom<&'a str> for Name<'a> {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
@@ -122,14 +125,14 @@ impl <'a> TryFrom<&'a str> for Name<'a> {
     }
 }
 
-impl <'a> Display for Name<'a> {
+impl<'a> Display for Name<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, (pos, len)) in self.labels.iter().enumerate() {
             if i != 0 {
                 f.write_str(".")?;
             }
 
-            let s = std::str::from_utf8(&self.data[*pos..*pos+*len]).unwrap();
+            let s = std::str::from_utf8(&self.data[*pos..*pos + *len]).unwrap();
             f.write_str(s)?
         }
 
@@ -139,9 +142,7 @@ impl <'a> Display for Name<'a> {
 
 impl<'a> std::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Name")
-            .field(&format!("{}", self))
-            .finish()
+        f.debug_tuple("Name").field(&format!("{}", self)).finish()
     }
 }
 
@@ -151,12 +152,12 @@ impl<'a> PartialEq for Name<'a> {
             return false;
         }
 
-        for (&(l_pos, l_len), &(r_pos, r_len) ) in self.labels.iter().zip(other.labels.iter()) {
+        for (&(l_pos, l_len), &(r_pos, r_len)) in self.labels.iter().zip(other.labels.iter()) {
             if l_len != r_len {
                 return false;
             }
 
-            if self.data[l_pos..l_pos + l_len] != other.data[r_pos..r_pos+r_len] {
+            if self.data[l_pos..l_pos + l_len] != other.data[r_pos..r_pos + r_len] {
                 return false;
             }
         }
@@ -165,31 +166,30 @@ impl<'a> PartialEq for Name<'a> {
     }
 }
 
-impl <'a> Hash for Name<'a> {
+impl<'a> Hash for Name<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         for (pos, len) in &self.labels {
-           self.data[*pos..*pos+*len].hash(state);
+            self.data[*pos..*pos + *len].hash(state);
         }
     }
 }
 
 impl<'a> Clone for Name<'a> {
     fn clone(&self) -> Self {
-        
         Self {
             data: self.data.clone(),
             length_in_bytes: self.length_in_bytes,
-            labels: self.labels.clone()
+            labels: self.labels.clone(),
         }
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod tests {
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
-    use crate::SimpleDnsError;
     use super::*;
+    use crate::SimpleDnsError;
 
     #[test]
     fn construct_valid_names() {
@@ -208,11 +208,12 @@ mod tests {
 
     #[test]
     fn parse_without_compression() {
-        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00";
+        let data =
+            b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00";
         let name = Name::parse(data, 3).unwrap();
         assert_eq!("F.ISI.ARPA", name.to_string());
-        
-        let name = Name::parse(data, 3 + name.len() ).unwrap();
+
+        let name = Name::parse(data, 3 + name.len()).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", name.to_string());
     }
 
@@ -233,17 +234,21 @@ mod tests {
         assert_eq!("BAR.F.ISI.ARPA", name.to_string());
     }
 
-
     #[test]
     fn convert_to_bytes_vec() {
-        
         let mut bytes = Vec::with_capacity(30);
-        Name::new("_srv._udp.local").unwrap().append_to_vec(&mut bytes).unwrap();
+        Name::new("_srv._udp.local")
+            .unwrap()
+            .append_to_vec(&mut bytes)
+            .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
 
         let mut bytes = Vec::with_capacity(30);
-        Name::new("_srv._udp.local.").unwrap().append_to_vec(&mut bytes).unwrap();
+        Name::new("_srv._udp.local.")
+            .unwrap()
+            .append_to_vec(&mut bytes)
+            .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
     }
@@ -273,8 +278,6 @@ mod tests {
         assert_eq!(8, Name::new("ex.com").unwrap().len());
     }
 
-
-
     #[test]
     fn eq() {
         let a = Name::new_unchecked("ex.com");
@@ -289,5 +292,4 @@ mod tests {
         name.hash(&mut hasher);
         hasher.finish()
     }
- 
 }

@@ -1,19 +1,19 @@
 //! Provides parsing and manipulation for DNS packets
 
-mod packet_header;
-mod packet;
-mod question;
-mod name;
-mod resource_record;
-pub mod rdata;
 mod character_string;
+mod name;
+mod packet;
+mod packet_header;
+mod question;
+pub mod rdata;
+mod resource_record;
 
-use std::{convert::TryFrom };
+use std::convert::TryFrom;
 
-pub use packet_header::PacketHeader;
-pub use packet::{Packet, PacketBuf, PacketSectionIter};
-pub use question::Question;
 pub use name::Name;
+pub use packet::{Packet, PacketBuf, PacketSectionIter};
+pub use packet_header::PacketHeader;
+pub use question::Question;
 pub use resource_record::ResourceRecord;
 // pub use rdata::RData;
 pub use character_string::CharacterString;
@@ -25,14 +25,16 @@ const MAX_NULL_LENGTH: usize = 65535;
 
 /// The maximum DNS packet size is 9000 bytes less the maximum
 /// sizes of the IP (60) and UDP (8) headers.
-// const MAX_PACKET_SIZE: usize = 9000 - 68; 
+// const MAX_PACKET_SIZE: usize = 9000 - 68;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub trait DnsPacketContent<'a> {
     /// Parse the contents of the data buffer begining in the given position
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized;
-    
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized;
+
     /// Append the bytes of this content to a given vector
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
 
@@ -53,35 +55,35 @@ pub enum TYPE {
     /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
     MD,
     /// Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MF, 
+    MF,
     /// Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CNAME, 
+    CNAME,
     /// Marks the start of a zone of authority, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    SOA, 
+    SOA,
     /// Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MB, 
+    MB,
     /// Mail group member (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MG, 
+    MG,
     /// Mail rename domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MR, 
+    MR,
     /// Null RR (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    NULL, 
+    NULL,
     /// Well known service description, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    WKS, 
+    WKS,
     /// Domain name pointer, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    PTR, 
+    PTR,
     /// Host information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    HINFO, 
+    HINFO,
     /// Mailbox or mail list information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MINFO, 
+    MINFO,
     /// Mail exchange, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MX, 
+    MX,
     /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    TXT, 
+    TXT,
     /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
     SRV,
     /// Unknown value, for future (or unimplemented RFC) compatibility
-    Unknown(u16)
+    Unknown(u16),
 }
 
 impl From<TYPE> for u16 {
@@ -105,7 +107,7 @@ impl From<TYPE> for u16 {
             TYPE::MX => 15,
             TYPE::TXT => 16,
             TYPE::SRV => 33,
-            TYPE::Unknown(x) => x
+            TYPE::Unknown(x) => x,
         }
     }
 }
@@ -133,7 +135,7 @@ impl From<u16> for TYPE {
             16 => TXT,
             28 => AAAA,
             33 => SRV,
-            v => TYPE::Unknown(v)
+            v => TYPE::Unknown(v),
         }
     }
 }
@@ -147,21 +149,21 @@ pub enum QTYPE {
     /// Host address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
     AAAA = 28,
     /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    NS =  2,
+    NS = 2,
     /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MD =  3,
+    MD = 3,
     /// Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MF =  4,
+    MF = 4,
     /// Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CNAME =  5,
+    CNAME = 5,
     /// Marks the start of a zone of authority, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    SOA =  6,
+    SOA = 6,
     /// Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MB =  7,
+    MB = 7,
     /// Mail group member (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MG =  8,
+    MG = 8,
     /// Mail rename domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MR =  9,
+    MR = 9,
     /// Null RR (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
     NULL = 10,
     /// Well known service description, [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -217,24 +219,23 @@ impl TryFrom<u16> for QTYPE {
             253 => Ok(MAILB),
             254 => Ok(MAILA),
             255 => Ok(ANY),
-            v => Err(Self::Error::InvalidQType(v))
+            v => Err(Self::Error::InvalidQType(v)),
         }
-
     }
 }
 
 /// Possible CLASS values for a Resource in a DNS packet  
 /// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum  CLASS {
+pub enum CLASS {
     /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    IN = 1, 
+    IN = 1,
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CS = 2, 
+    CS = 2,
     /// The CHAOS class, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CH = 3, 
+    CH = 3,
     /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    HS = 4, 
+    HS = 4,
 }
 
 impl TryFrom<u16> for CLASS {
@@ -247,7 +248,7 @@ impl TryFrom<u16> for CLASS {
             2 => Ok(CS),
             3 => Ok(CH),
             4 => Ok(HS),
-            v => Err(Self::Error::InvalidClass(v))
+            v => Err(Self::Error::InvalidClass(v)),
         }
     }
 }
@@ -257,15 +258,15 @@ impl TryFrom<u16> for CLASS {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum QCLASS {
     /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    IN = 1, 
+    IN = 1,
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CS = 2, 
+    CS = 2,
     /// The CHAOS class, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CH = 3, 
+    CH = 3,
     /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    HS = 4, 
+    HS = 4,
     /// [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    ANY = 255
+    ANY = 255,
 }
 
 impl TryFrom<u16> for QCLASS {
@@ -279,11 +280,10 @@ impl TryFrom<u16> for QCLASS {
             3 => Ok(CH),
             4 => Ok(HS),
             255 => Ok(ANY),
-            v => Err(Self::Error::InvalidQClass(v))
+            v => Err(Self::Error::InvalidQClass(v)),
         }
     }
 }
-
 
 /// Possible OPCODE values for a DNS packet, use to specify the type of operation.  
 /// [RFC 1035](https://tools.ietf.org/html/rfc1035): A four bit field that specifies kind of query in this message.  
@@ -306,7 +306,7 @@ impl From<u16> for OPCODE {
             0 => OPCODE::StandardQuery,
             1 => OPCODE::InverseQuery,
             2 => OPCODE::ServerStatusRequest,
-            _ => OPCODE::Reserved
+            _ => OPCODE::Reserved,
         }
     }
 }
@@ -329,22 +329,22 @@ pub enum RCODE {
     NotImplemented = 4,
     /// Refused - The name server refuses to perform the specified operation for policy reasons.  
     /// For example, a name server may not wish to provide the information to the particular requester,   
-    /// or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data. 
+    /// or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data.
     Refused = 5,
     /// Reserved for future use.
-    Reserved
+    Reserved,
 }
 
 impl From<u16> for RCODE {
     fn from(code: u16) -> Self {
         match code {
-            0  => RCODE::NoError,
-            1  => RCODE::FormatError,
-            2  => RCODE::ServerFailure,
-            3  => RCODE::NameError,
-            4  => RCODE::NotImplemented,
-            5  => RCODE::Refused,
-            _  => RCODE::Reserved,
+            0 => RCODE::NoError,
+            1 => RCODE::FormatError,
+            2 => RCODE::ServerFailure,
+            3 => RCODE::NameError,
+            4 => RCODE::NotImplemented,
+            5 => RCODE::Refused,
+            _ => RCODE::Reserved,
         }
     }
 }

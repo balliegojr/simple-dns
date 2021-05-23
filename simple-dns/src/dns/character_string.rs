@@ -4,27 +4,25 @@ use crate::SimpleDnsError;
 
 use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 
-/// CharacterString is expressed in one or two ways: 
-/// - as a contiguous set of characters without interior spaces, 
+/// CharacterString is expressed in one or two ways:
+/// - as a contiguous set of characters without interior spaces,
 /// - or as a string beginning with a " and ending with a ".  
 ///
 /// Inside a " delimited string any character can occur, except for a " itself,  
 /// which must be quoted using \ (back slash).
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CharacterString<'a> {
-    data: &'a [u8]
+    data: &'a [u8],
 }
 
-impl <'a> CharacterString<'a> {
+impl<'a> CharacterString<'a> {
     /// Creates a new validated CharacterString
     pub fn new(data: &'a [u8]) -> crate::Result<Self> {
         if data.len() > MAX_CHARACTER_STRING_LENGTH || !CharacterString::is_valid(data) {
-            return Err(SimpleDnsError::InvalidCharacterString)
+            return Err(SimpleDnsError::InvalidCharacterString);
         }
 
-        Ok(Self { 
-            data 
-        })
+        Ok(Self { data })
     }
 
     fn is_valid(data: &'a [u8]) -> bool {
@@ -33,26 +31,29 @@ impl <'a> CharacterString<'a> {
                 return false;
             }
 
-            for (p, c) in data[1..data.len()-1].iter().enumerate() {
+            for (p, c) in data[1..data.len() - 1].iter().enumerate() {
                 if *c == b'"' && data[p] != b'\\' {
-                    return false
+                    return false;
                 }
             }
 
-            return true
+            return true;
         }
 
-        return data.iter().all(|c| *c != b' ') 
+        return data.iter().all(|c| *c != b' ');
     }
 }
 
-impl <'a> DnsPacketContent<'a> for CharacterString<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
+impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
         let length = data[position] as usize;
 
         if Self::is_valid(&data[position + 1..position + 1 + length]) {
             Ok(Self {
-                data: &data[position + 1..position + 1 + length]
+                data: &data[position + 1..position + 1 + length],
             })
         } else {
             Err(SimpleDnsError::InvalidCharacterString)
@@ -62,7 +63,7 @@ impl <'a> DnsPacketContent<'a> for CharacterString<'a> {
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         out.push(self.data.len() as u8);
         out.extend(self.data);
-        
+
         Ok(())
     }
 
@@ -71,7 +72,7 @@ impl <'a> DnsPacketContent<'a> for CharacterString<'a> {
     }
 }
 
-impl <'a> TryFrom<&'a str> for CharacterString<'a> {
+impl<'a> TryFrom<&'a str> for CharacterString<'a> {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
@@ -79,17 +80,19 @@ impl <'a> TryFrom<&'a str> for CharacterString<'a> {
     }
 }
 
-impl <'a> Display for CharacterString<'a> {
+impl<'a> Display for CharacterString<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = std::str::from_utf8(&self.data).unwrap();
         f.write_str(s)
-
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
 
     use super::*;
 
@@ -100,14 +103,13 @@ mod tests {
         assert!(CharacterString::new(br#""I am \" also valid""#).is_ok());
         assert!(CharacterString::new(b"I am invalid").is_err());
 
-        let long_string= [0u8; 300];
+        let long_string = [0u8; 300];
         assert!(CharacterString::new(&long_string).is_err());
     }
 
-
     #[test]
     fn parse() {
-        let c_string= CharacterString::parse(b"\x0esome_long_text", 0);
+        let c_string = CharacterString::parse(b"\x0esome_long_text", 0);
         assert!(c_string.is_ok());
         let c_string = c_string.unwrap();
         assert_eq!(15, c_string.len());
@@ -117,7 +119,7 @@ mod tests {
     #[test]
     fn append_to_vec() {
         let mut out = Vec::new();
-        let c_string= CharacterString::new("some_long_text".as_bytes()).unwrap();
+        let c_string = CharacterString::new("some_long_text".as_bytes()).unwrap();
         c_string.append_to_vec(&mut out).unwrap();
 
         assert_eq!(b"\x0esome_long_text", &out[..]);

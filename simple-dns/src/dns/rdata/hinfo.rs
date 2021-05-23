@@ -8,20 +8,18 @@ pub struct HINFO<'a> {
     /// A [CharacterString](`CharacterString`) which specifies the CPU type.
     pub cpu: CharacterString<'a>,
     /// A [CharacterString](`CharacterString`) which specifies the operating system type.
-    pub os: CharacterString<'a>
+    pub os: CharacterString<'a>,
 }
 
-impl <'a> DnsPacketContent<'a> for HINFO<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
+impl<'a> DnsPacketContent<'a> for HINFO<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
         let cpu = CharacterString::parse(data, position)?;
         let os = CharacterString::parse(data, position + cpu.len())?;
 
-        Ok(
-            Self {
-                cpu,
-                os
-            }
-        )
+        Ok(Self { cpu, os })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -34,7 +32,7 @@ impl <'a> DnsPacketContent<'a> for HINFO<'a> {
     }
 }
 
-#[cfg(test)] 
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -42,7 +40,7 @@ mod tests {
     fn parse_and_write_hinfo() {
         let hinfo = HINFO {
             cpu: CharacterString::new(b"\"some cpu\"").unwrap(),
-            os: CharacterString::new(b"\"some os\"").unwrap()
+            os: CharacterString::new(b"\"some os\"").unwrap(),
         };
 
         let mut data = Vec::new();
@@ -55,6 +53,5 @@ mod tests {
         assert_eq!(data.len(), hinfo.len());
         assert_eq!("\"some cpu\"", hinfo.cpu.to_string());
         assert_eq!("\"some os\"", hinfo.os.to_string());
-
     }
 }

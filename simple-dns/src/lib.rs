@@ -1,5 +1,4 @@
 #![warn(missing_docs)]
-#![allow(upper_case_acronyms)]
 
 //! Pure Rust implementation to work with DNS packets
 //!
@@ -14,7 +13,7 @@
 //! # use simple_dns::rdata::*;
 //! let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
 //! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
-//! 
+//!
 //! let mut packet = Packet::new_query(1, false);
 //! packet.questions.push(question);
 //! packet.additional_records.push(resource);
@@ -36,7 +35,7 @@
 //! ## PacketBuf
 //! PacketBuf holds an internal buffer that is populated right when a resource is added.  
 //! It DOES matter the order in which the resources are added
-//! 
+//!
 //! ```rust
 //! # use simple_dns::*;
 //! # use simple_dns::rdata::*;
@@ -47,14 +46,13 @@
 //! assert!(packet.add_answer(&resource).is_ok());
 //! assert!(packet.add_question(&question).is_err()); //This will fail, since an answer is already added
 //! ```
-//! 
+//!
 //! It is possible to create a `PacketBuf` from a buffer by calling [`PacketBuf::from`], but be aware that this will clone the contents from the buffer
-
 
 mod dns;
 
-use std::{error::Error, fmt::Display};
 pub use dns::*;
+use std::{error::Error, fmt::Display};
 
 /// Alias type for Result<T, SimpleDnsError>;
 pub type Result<T> = std::result::Result<T, SimpleDnsError>;
@@ -89,14 +87,28 @@ impl Error for SimpleDnsError {
 impl Display for SimpleDnsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SimpleDnsError::InvalidClass(class) => write!(f, "Provided class is invalid: {}", class),
-            SimpleDnsError::InvalidQClass(qclass) => write!(f, "Provided Qclass is invalid: {}", qclass),
-            SimpleDnsError::InvalidQType(qtype) => write!(f, "Provided QType is invalid: {}", qtype),
+            SimpleDnsError::InvalidClass(class) => {
+                write!(f, "Provided class is invalid: {}", class)
+            }
+            SimpleDnsError::InvalidQClass(qclass) => {
+                write!(f, "Provided Qclass is invalid: {}", qclass)
+            }
+            SimpleDnsError::InvalidQType(qtype) => {
+                write!(f, "Provided QType is invalid: {}", qtype)
+            }
             SimpleDnsError::InvalidServiceName => write!(f, "Provided service name is not valid"),
-            SimpleDnsError::InvalidServiceLabel => write!(f, "Provied service name contains invalid label"),
-            SimpleDnsError::InvalidCharacterString => write!(f, "Provided character string is not valid"),
-            SimpleDnsError::InvalidHeaderData => write!(f, "Provided header information is invalid"),
-            SimpleDnsError::InvalidDnsPacket => write!(f, "Provided information is not a valid DNS packet")
+            SimpleDnsError::InvalidServiceLabel => {
+                write!(f, "Provied service name contains invalid label")
+            }
+            SimpleDnsError::InvalidCharacterString => {
+                write!(f, "Provided character string is not valid")
+            }
+            SimpleDnsError::InvalidHeaderData => {
+                write!(f, "Provided header information is invalid")
+            }
+            SimpleDnsError::InvalidDnsPacket => {
+                write!(f, "Provided information is not a valid DNS packet")
+            }
         }
     }
 }

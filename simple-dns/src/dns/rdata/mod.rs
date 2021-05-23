@@ -2,14 +2,14 @@ use super::{CharacterString, DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
 
 mod a;
+mod aaaa;
 mod hinfo;
 mod minfo;
 mod mx;
 mod null;
 mod soa;
-mod wks;
 mod srv;
-mod aaaa;
+mod wks;
 
 pub use a::A;
 pub use aaaa::AAAA;
@@ -18,8 +18,8 @@ pub use minfo::MINFO;
 pub use mx::MX;
 pub use null::NULL;
 pub use soa::SOA;
-pub use wks::WKS;
 pub use srv::SRV;
+pub use wks::WKS;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum RData<'a> {
@@ -40,23 +40,22 @@ pub enum RData<'a> {
     TXT(CharacterString<'a>),
     SOA(Box<SOA<'a>>),
     WKS(WKS<'a>),
-    SRV(Box<SRV<'a>>)
-    
+    SRV(Box<SRV<'a>>),
 }
 
-impl <'a> RData<'a> {
+impl<'a> RData<'a> {
     pub(crate) fn len(&self) -> usize {
         match &self {
             RData::A(data) => data.len(),
             RData::AAAA(data) => data.len(),
-            RData::NS(data) | 
-            RData::CNAME(data) |
-            RData::MB(data) |
-            RData::MG(data) |
-            RData::MR(data) |
-            RData::PTR(data) |
-            RData::MF(data) |
-            RData::MD(data) => data.len(),
+            RData::NS(data)
+            | RData::CNAME(data)
+            | RData::MB(data)
+            | RData::MG(data)
+            | RData::MR(data)
+            | RData::PTR(data)
+            | RData::MF(data)
+            | RData::MD(data) => data.len(),
             RData::HINFO(data) => data.len(),
             RData::MINFO(data) => data.len(),
             RData::MX(data) => data.len(),
@@ -64,7 +63,7 @@ impl <'a> RData<'a> {
             RData::TXT(data) => data.len(),
             RData::SOA(data) => data.len(),
             RData::WKS(data) => data.len(),
-            RData::SRV(data) => data.len()
+            RData::SRV(data) => data.len(),
         }
     }
 
@@ -72,14 +71,14 @@ impl <'a> RData<'a> {
         match &self {
             RData::A(data) => data.append_to_vec(out),
             RData::AAAA(data) => data.append_to_vec(out),
-            RData::NS(data) |
-            RData::CNAME(data) |
-            RData::MB(data) |
-            RData::MG(data) |
-            RData::MR(data) |
-            RData::PTR(data) |
-            RData::MF(data) |
-            RData::MD(data) => data.append_to_vec(out),
+            RData::NS(data)
+            | RData::CNAME(data)
+            | RData::MB(data)
+            | RData::MG(data)
+            | RData::MR(data)
+            | RData::PTR(data)
+            | RData::MF(data)
+            | RData::MD(data) => data.append_to_vec(out),
             RData::HINFO(data) => data.append_to_vec(out),
             RData::MINFO(data) => data.append_to_vec(out),
             RData::MX(data) => data.append_to_vec(out),
@@ -111,7 +110,7 @@ pub(crate) fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crat
         TYPE::MX => RData::MX(MX::parse(data, position)?),
         TYPE::TXT => RData::TXT(CharacterString::parse(data, position)?),
         TYPE::SRV => RData::SRV(Box::new(SRV::parse(data, position)?)),
-        _ => RData::NULL(NULL::parse(data, position)?)
+        _ => RData::NULL(NULL::parse(data, position)?),
     };
 
     Ok(rdata)

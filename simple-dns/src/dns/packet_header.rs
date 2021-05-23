@@ -1,19 +1,18 @@
-
-use byteorder::{ ByteOrder, BigEndian };
+use byteorder::{BigEndian, ByteOrder};
 
 use super::{OPCODE, RCODE};
 
 mod flag {
-    pub const QUERY:               u16 = 0b1000_0000_0000_0000;
-    pub const OPCODE_MASK:         u16 = 0b0111_1000_0000_0000;
-    pub const AUTHORITATIVE:       u16 = 0b0000_0100_0000_0000;
-    pub const TRUNCATED:           u16 = 0b0000_0010_0000_0000;
-    pub const RECURSION_DESIRED:   u16 = 0b0000_0001_0000_0000;
+    pub const QUERY: u16 = 0b1000_0000_0000_0000;
+    pub const OPCODE_MASK: u16 = 0b0111_1000_0000_0000;
+    pub const AUTHORITATIVE: u16 = 0b0000_0100_0000_0000;
+    pub const TRUNCATED: u16 = 0b0000_0010_0000_0000;
+    pub const RECURSION_DESIRED: u16 = 0b0000_0001_0000_0000;
     pub const RECURSION_AVAILABLE: u16 = 0b0000_0000_1000_0000;
-    pub const AUTHENTIC_DATA:      u16 = 0b0000_0000_0010_0000;
-    pub const CHECKING_DISABLED:   u16 = 0b0000_0000_0001_0000;
-    pub const RESERVED_MASK:       u16 = 0b0000_0000_0100_0000;
-    pub const RESPONSE_CODE_MASK:  u16 = 0b0000_0000_0000_1111;
+    pub const AUTHENTIC_DATA: u16 = 0b0000_0000_0010_0000;
+    pub const CHECKING_DISABLED: u16 = 0b0000_0000_0001_0000;
+    pub const RESERVED_MASK: u16 = 0b0000_0000_0100_0000;
+    pub const RESPONSE_CODE_MASK: u16 = 0b0000_0000_0000_1111;
 }
 
 /// Contains general information about the packet
@@ -49,8 +48,7 @@ pub struct PacketHeader {
     /// Indicate the number of additional records in the packet
     pub additional_records_count: u16,
     pub authentic_data: bool,
-    pub checking_disabled: bool
-
+    pub checking_disabled: bool,
 }
 
 impl PacketHeader {
@@ -70,7 +68,7 @@ impl PacketHeader {
             name_servers_count: 0,
             questions_count: 0,
             authentic_data: false,
-            checking_disabled: false
+            checking_disabled: false,
         }
     }
 
@@ -91,7 +89,6 @@ impl PacketHeader {
             additional_records_count: 0,
             authentic_data: false,
             checking_disabled: false,
-            
         }
     }
 
@@ -109,15 +106,14 @@ impl PacketHeader {
         let header = Self {
             id: BigEndian::read_u16(&data[..2]),
             query: flags & flag::QUERY == 0,
-            opcode: ((flags & flag::OPCODE_MASK)
-                     >> flag::OPCODE_MASK.trailing_zeros()).into(),
+            opcode: ((flags & flag::OPCODE_MASK) >> flag::OPCODE_MASK.trailing_zeros()).into(),
             authoritative_answer: flags & flag::AUTHORITATIVE != 0,
             truncated: flags & flag::TRUNCATED != 0,
             recursion_desired: flags & flag::RECURSION_DESIRED != 0,
             recursion_available: flags & flag::RECURSION_AVAILABLE != 0,
             authentic_data: flags & flag::AUTHENTIC_DATA != 0,
             checking_disabled: flags & flag::CHECKING_DISABLED != 0,
-            response_code: (flags&flag::RESPONSE_CODE_MASK).into(),
+            response_code: (flags & flag::RESPONSE_CODE_MASK).into(),
             questions_count: BigEndian::read_u16(&data[4..6]),
             answers_count: BigEndian::read_u16(&data[6..8]),
             name_servers_count: BigEndian::read_u16(&data[8..10]),
@@ -141,14 +137,23 @@ impl PacketHeader {
 
     fn get_flags(&self) -> u16 {
         let mut flags = 0u16;
-        flags |= (self.opcode as u16)
-            << flag::OPCODE_MASK.trailing_zeros();
+        flags |= (self.opcode as u16) << flag::OPCODE_MASK.trailing_zeros();
         flags |= self.response_code as u16;
-        if !self.query { flags |= flag::QUERY; }
-        if self.authoritative_answer { flags |= flag::AUTHORITATIVE; }
-        if self.recursion_desired { flags |= flag::RECURSION_DESIRED; }
-        if self.recursion_available { flags |= flag::RECURSION_AVAILABLE; }
-        if self.truncated { flags |= flag::TRUNCATED; }
+        if !self.query {
+            flags |= flag::QUERY;
+        }
+        if self.authoritative_answer {
+            flags |= flag::AUTHORITATIVE;
+        }
+        if self.recursion_desired {
+            flags |= flag::RECURSION_DESIRED;
+        }
+        if self.recursion_available {
+            flags |= flag::RECURSION_AVAILABLE;
+        }
+        if self.truncated {
+            flags |= flag::TRUNCATED;
+        }
 
         flags
     }
@@ -197,7 +202,6 @@ impl PacketHeader {
     pub fn write_additional_records(buffer: &mut [u8], additional_records_count: u16) {
         BigEndian::write_u16(&mut buffer[10..12], additional_records_count);
     }
-
 }
 
 #[cfg(test)]
@@ -220,7 +224,7 @@ mod tests {
             name_servers_count: 2,
             questions_count: 2,
             authentic_data: false,
-            checking_disabled: false 
+            checking_disabled: false,
         };
 
         let mut buf = [0u8; 12];
@@ -231,7 +235,8 @@ mod tests {
 
     #[test]
     fn parse_example_query() {
-        let header = PacketHeader::parse(b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02").unwrap();
+        let header =
+            PacketHeader::parse(b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02").unwrap();
 
         assert_eq!(core::u16::MAX, header.id);
         assert_eq!(true, header.query);

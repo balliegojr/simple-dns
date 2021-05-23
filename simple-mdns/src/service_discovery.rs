@@ -48,11 +48,20 @@ impl ExpirationTimes {
 /// This implementation advertise all the registered addresses, query for the same service on the same network and
 /// keeps a cache of known service instances
 ///
-/// ## Example
-/// ```ignore
-/// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
+/// Notice that this crate does not provide any means of finding your own ip address. There are crates that provide this kind of feature.
 ///
-/// discovery.add_address_to_discovery(my_socket_addr);
+/// ## Example
+/// ```
+/// use simple_dns::Name;
+/// use simple_mdns::ServiceDiscovery;
+/// use std::net::SocketAddr;
+/// # tokio_test::block_on(async {
+///
+/// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
+/// let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
+/// discovery.add_socket_address(&my_socket_addr);
+///
+/// # })
 /// ```
 pub struct ServiceDiscovery {
     service_name: Name<'static>,

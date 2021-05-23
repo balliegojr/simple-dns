@@ -1,5 +1,5 @@
-use byteorder::{ByteOrder, BigEndian};
 use crate::dns::{DnsPacketContent, Name};
+use byteorder::{BigEndian, ByteOrder};
 
 /// MX is used to acquire mail exchange information
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -9,20 +9,21 @@ pub struct MX<'a> {
     pub preference: u16,
 
     /// A [Name](`Name`) which specifies a host willing to act as a mail exchange for the owner name.
-    pub exchange: Name<'a>
+    pub exchange: Name<'a>,
 }
 
-impl <'a> DnsPacketContent<'a> for MX<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let preference = BigEndian::read_u16(&data[position..position+2]);
-        let exchange = Name::parse(data, position+2)?;
+impl<'a> DnsPacketContent<'a> for MX<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let preference = BigEndian::read_u16(&data[position..position + 2]);
+        let exchange = Name::parse(data, position + 2)?;
 
-        Ok(
-            Self {
-                preference,
-                exchange
-            }
-        )
+        Ok(Self {
+            preference,
+            exchange,
+        })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -46,7 +47,7 @@ mod tests {
     fn parse_and_write_mx() {
         let mx = MX {
             preference: 10,
-            exchange: Name::new("e.exchange.com").unwrap()
+            exchange: Name::new("e.exchange.com").unwrap(),
         };
 
         let mut data = Vec::new();
@@ -59,6 +60,5 @@ mod tests {
         assert_eq!(data.len(), mx.len());
         assert_eq!(10, mx.preference);
         assert_eq!("e.exchange.com", mx.exchange.to_string());
-
     }
 }

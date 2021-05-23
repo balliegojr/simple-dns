@@ -1,12 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-};
+use std::collections::HashSet;
 
-use simple_dns::{
-    rdata::{RData, A, AAAA, SRV},
-    Name, ResourceRecord, CLASS, QTYPE, TYPE,
-};
+use simple_dns::ResourceRecord;
 
 pub struct ResourceRecordManager<'a> {
     resources: HashSet<ResourceRecord<'a>>,
@@ -48,9 +42,9 @@ impl<'a> ResourceRecordManager<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::net::Ipv4Addr;
 
-    use simple_dns::{rdata::RData, rdata::A, CharacterString, Name, QCLASS};
+    use simple_dns::{rdata::RData, rdata::A, CharacterString, Name, QCLASS, QTYPE, TYPE};
 
     use super::*;
 

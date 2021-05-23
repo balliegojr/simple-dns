@@ -1,8 +1,8 @@
-use byteorder::{ ByteOrder, BigEndian };
+use byteorder::{BigEndian, ByteOrder};
 
 use crate::{QCLASS, QTYPE};
 
-use super::{CLASS, DnsPacketContent, Name, rdata::RData, TYPE, rdata::parse_rdata};
+use super::{rdata::parse_rdata, rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{convert::TryInto, hash::Hash};
 
@@ -19,10 +19,10 @@ pub struct ResourceRecord<'a> {
     /// Zero values are interpreted to mean that the RR can only be used for the transaction in progress, and should not be cached.
     pub ttl: u32,
     /// A [`RData`] with the contents of this resource record
-    pub rdata: RData<'a>
+    pub rdata: RData<'a>,
 }
 
-impl <'a> ResourceRecord<'a> {
+impl<'a> ResourceRecord<'a> {
     /// Creates a new ResourceRecord
     pub fn new(name: Name<'a>, rdatatype: TYPE, class: CLASS, ttl: u32, rdata: RData<'a>) -> Self {
         Self {
@@ -30,51 +30,52 @@ impl <'a> ResourceRecord<'a> {
             class,
             ttl,
             rdata,
-            rdatatype
+            rdatatype,
         }
     }
-
 
     /// Return true if current resource match given query class
     pub fn match_qclass(&self, qclass: QCLASS) -> bool {
         qclass == QCLASS::ANY || self.class as u16 == qclass as u16
     }
 
-    /// Return true if current resource match given query type 
+    /// Return true if current resource match given query type
     /// The types `A` and `AAAA` will match each other
     pub fn match_qtype(&self, qtype: QTYPE) -> bool {
         match qtype {
             QTYPE::A | QTYPE::AAAA => self.rdatatype == TYPE::A || self.rdatatype == TYPE::AAAA,
             QTYPE::ANY => true,
-            qtype => Into::<u16>::into(self.rdatatype) == qtype as u16
+            qtype => Into::<u16>::into(self.rdatatype) == qtype as u16,
         }
     }
-    
 }
 
-impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
+impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
     fn len(&self) -> usize {
         self.name.len() + self.rdata.len() + 10
     }
-    
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
+
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
-        let rdatatype = BigEndian::read_u16(&data[offset..offset+2]).into();
-        let class = BigEndian::read_u16(&data[offset+2..offset+4]).try_into()?;
-        let ttl = BigEndian::read_u32(&data[offset+4..offset+8]);
-        let rdatalen = BigEndian::read_u16(&data[offset+8..offset+10]) as usize;
+        let rdatatype = BigEndian::read_u16(&data[offset..offset + 2]).into();
+        let class = BigEndian::read_u16(&data[offset + 2..offset + 4]).try_into()?;
+        let ttl = BigEndian::read_u32(&data[offset + 4..offset + 8]);
+        let rdatalen = BigEndian::read_u16(&data[offset + 8..offset + 10]) as usize;
 
         let position = offset + 10;
-        let rdata = parse_rdata(&data[..position+rdatalen], position, rdatatype)?;
+        let rdata = parse_rdata(&data[..position + rdatalen], position, rdatatype)?;
 
-        Ok(Self{
+        Ok(Self {
             name,
             rdatatype,
             class,
             ttl,
-            rdata
+            rdata,
         })
     }
 
@@ -92,7 +93,7 @@ impl <'a> DnsPacketContent<'a> for ResourceRecord<'a> {
     }
 }
 
-impl <'a> Hash for ResourceRecord<'a> {
+impl<'a> Hash for ResourceRecord<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.rdatatype.hash(state);
@@ -103,18 +104,21 @@ impl <'a> Hash for ResourceRecord<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
 
     use crate::dns::rdata::NULL;
     use crate::dns::CharacterString;
 
     use super::*;
-    
+
     #[test]
     fn test_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
         let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
-        
+
         assert_eq!("_srv._udp.local", rr.name.to_string());
         assert_eq!(TYPE::A, rr.rdatatype);
         assert_eq!(CLASS::IN, rr.class);
@@ -122,7 +126,7 @@ mod tests {
         assert_eq!(4, rr.rdata.len());
         match rr.rdata {
             RData::A(a) => assert_eq!(4294967295, a.address),
-            _ => panic!("invalid rdata")
+            _ => panic!("invalid rdata"),
         }
     }
 
@@ -136,7 +140,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::Unknown(0),
             ttl: 10,
-            rdata: RData::NULL(NULL::new(&rdata).unwrap())
+            rdata: RData::NULL(NULL::new(&rdata).unwrap()),
         };
 
         assert!(rr.append_to_vec(&mut out).is_ok());
@@ -154,7 +158,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::Unknown(0),
             ttl: 10,
-            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap()),
         };
 
         assert!(rr.match_qclass(QCLASS::ANY));
@@ -169,7 +173,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::A,
             ttl: 10,
-            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap()),
         };
 
         assert!(rr.match_qtype(QTYPE::ANY));
@@ -184,7 +188,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             rdatatype: TYPE::A,
             ttl: 10,
-            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap())
+            rdata: RData::NULL(NULL::new(&[255u8; 4]).unwrap()),
         };
 
         assert!(rr.match_qtype(QTYPE::A));
@@ -198,8 +202,20 @@ mod tests {
 
     #[test]
     fn test_eq() {
-        let a = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
-        let b = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+        let a = ResourceRecord::new(
+            Name::new_unchecked("_srv.local"),
+            TYPE::TXT,
+            CLASS::IN,
+            10,
+            RData::TXT(CharacterString::new(b"text").unwrap()),
+        );
+        let b = ResourceRecord::new(
+            Name::new_unchecked("_srv.local"),
+            TYPE::TXT,
+            CLASS::IN,
+            10,
+            RData::TXT(CharacterString::new(b"text").unwrap()),
+        );
 
         assert_eq!(a, b);
         assert_eq!(get_hash(&a), get_hash(&b));
@@ -207,8 +223,20 @@ mod tests {
 
     #[test]
     fn test_hash_ignore_ttl() {
-        let a = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
-        let mut b = ResourceRecord::new(Name::new_unchecked("_srv.local"), TYPE::TXT, CLASS::IN, 10, RData::TXT(CharacterString::new(b"text").unwrap()));
+        let a = ResourceRecord::new(
+            Name::new_unchecked("_srv.local"),
+            TYPE::TXT,
+            CLASS::IN,
+            10,
+            RData::TXT(CharacterString::new(b"text").unwrap()),
+        );
+        let mut b = ResourceRecord::new(
+            Name::new_unchecked("_srv.local"),
+            TYPE::TXT,
+            CLASS::IN,
+            10,
+            RData::TXT(CharacterString::new(b"text").unwrap()),
+        );
 
         assert_eq!(get_hash(&a), get_hash(&b));
         b.ttl = 50;

@@ -1,6 +1,6 @@
 use std::net::Ipv6Addr;
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 use crate::dns::DnsPacketContent;
 
@@ -11,12 +11,13 @@ pub struct AAAA {
     pub address: u128,
 }
 
-impl <'a> DnsPacketContent<'a> for AAAA {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let address = BigEndian::read_u128(&data[position..position+16]);
-        Ok(Self{
-            address
-        })
+impl<'a> DnsPacketContent<'a> for AAAA {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let address = BigEndian::read_u128(&data[position..position + 16]);
+        Ok(Self { address })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -35,7 +36,9 @@ impl <'a> DnsPacketContent<'a> for AAAA {
 
 impl From<&Ipv6Addr> for AAAA {
     fn from(ip: &Ipv6Addr) -> Self {
-        Self { address: (*ip).into() }
+        Self {
+            address: (*ip).into(),
+        }
     }
 }
 
@@ -44,12 +47,12 @@ mod tests {
     use std::{net::Ipv6Addr, str::FromStr};
 
     use super::*;
-    
+
     #[test]
     fn parse_and_write_a() {
         let address = std::net::Ipv6Addr::from_str("FF02::FB").unwrap();
         let a = AAAA {
-            address: address.into()
+            address: address.into(),
         };
 
         let mut bytes = Vec::new();

@@ -15,3 +15,6 @@ rand = "0.8.0"
 log = "0.4"
 thiserror = "1.0.24"
 lazy_static = "1.4.0"
+
+[dev-dependencies]
+tokio-test = "0.4.2"

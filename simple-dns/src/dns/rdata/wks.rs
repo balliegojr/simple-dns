@@ -9,16 +9,19 @@ pub struct WKS<'a> {
     /// An 8 bit IP protocol number
     pub protocol: u8,
     /// A variable length bit map.  The bit map must be a multiple of 8 bits long.
-    pub bit_map: &'a [u8]
+    pub bit_map: &'a [u8],
 }
 
-impl <'a> DnsPacketContent<'a> for WKS<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> where Self: Sized {
-        let address = BigEndian::read_u32(&data[position..position+4]);
+impl<'a> DnsPacketContent<'a> for WKS<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let address = BigEndian::read_u32(&data[position..position + 4]);
         Ok(Self {
             address,
-            protocol: data[position+4],
-            bit_map: &data[position+5..]
+            protocol: data[position + 4],
+            bit_map: &data[position + 5..],
         })
     }
 

@@ -1,9 +1,18 @@
-use simple_dns::{CLASS, Name, ResourceRecord, TYPE, rdata::{A, AAAA, RData, SRV}};
-use std::{convert::From, net::SocketAddr};
+//! Provides helper functions to convert net addresses to resource records
+
+use simple_dns::{
+    rdata::{RData, A, AAAA, SRV},
+    Name, ResourceRecord, CLASS, TYPE,
+};
 use std::net::IpAddr;
+use std::{convert::From, net::SocketAddr};
 
 /// Convert the addr to an A (IpV4) or AAAA (IpV6) record
-pub fn ip_addr_to_resource_record<'a>(name: &Name<'a>, addr: &IpAddr, rr_ttl: u32) -> ResourceRecord<'a> {
+pub fn ip_addr_to_resource_record<'a>(
+    name: &Name<'a>,
+    addr: &IpAddr,
+    rr_ttl: u32,
+) -> ResourceRecord<'a> {
     match addr {
         IpAddr::V4(ip) => ResourceRecord::new(
             name.clone(),
@@ -39,9 +48,13 @@ pub fn port_to_srv_record<'a>(name: &Name<'a>, port: u16, rr_ttl: u32) -> Resour
 }
 
 /// Convert the socket address to a SRV and an A (IpV4) or AAAA (IpV6) record, the return will be a tuple where the SRV is the first item
-pub fn socket_addr_to_srv_and_address<'a>(name: &Name<'a>, addr: &SocketAddr, rr_ttl: u32) -> (ResourceRecord<'a>, ResourceRecord<'a>){
+pub fn socket_addr_to_srv_and_address<'a>(
+    name: &Name<'a>,
+    addr: &SocketAddr,
+    rr_ttl: u32,
+) -> (ResourceRecord<'a>, ResourceRecord<'a>) {
     (
         port_to_srv_record(name, addr.port(), rr_ttl),
-        ip_addr_to_resource_record(name, &addr.ip(), rr_ttl)
+        ip_addr_to_resource_record(name, &addr.ip(), rr_ttl),
     )
 }
