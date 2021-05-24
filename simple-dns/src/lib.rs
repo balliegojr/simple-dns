@@ -12,7 +12,7 @@
 //! # use simple_dns::*;
 //! # use simple_dns::rdata::*;
 //! let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
-//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
+//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 //!
 //! let mut packet = Packet::new_query(1, false);
 //! packet.questions.push(question);
@@ -40,7 +40,7 @@
 //! # use simple_dns::*;
 //! # use simple_dns::rdata::*;
 //! let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
-//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), TYPE::A, CLASS::IN, 10, RData::A(A { address: 10 }));
+//! let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 //!
 //! let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
 //! assert!(packet.add_answer(&resource).is_ok());
@@ -52,7 +52,6 @@
 mod dns;
 
 pub use dns::*;
-use std::fmt::Display;
 use thiserror::Error;
 
 /// Alias type for Result<T, SimpleDnsError>;

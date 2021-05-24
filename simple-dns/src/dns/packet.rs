@@ -293,7 +293,7 @@ impl<'a> Packet<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{dns::CLASS, dns::TYPE, rdata::RData, rdata::A, Name, SimpleDnsError};
+    use crate::{dns::CLASS, rdata::RData, rdata::A, Name, SimpleDnsError};
 
     use super::super::{QCLASS, QTYPE};
     use super::*;
@@ -353,7 +353,6 @@ mod tests {
         assert_eq!(11, packet.answers.len());
 
         assert_eq!("google.com", packet.answers[0].name.to_string());
-        assert_eq!(TYPE::A, packet.answers[0].rdatatype);
         assert_eq!(CLASS::IN, packet.answers[0].class);
         assert_eq!(4, packet.answers[0].ttl);
         assert_eq!(4, packet.answers[0].rdata.len());
@@ -379,7 +378,6 @@ mod tests {
         );
         let resource = ResourceRecord::new(
             Name::new_unchecked("_srv._udp.local"),
-            TYPE::A,
             CLASS::IN,
             10,
             RData::A(A { address: 10 }),
@@ -409,7 +407,6 @@ mod tests {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
         let resource = ResourceRecord::new(
             Name::new_unchecked("srv._udp.local"),
-            TYPE::A,
             CLASS::IN,
             10,
             RData::A(A { address: 10 }),
@@ -434,7 +431,6 @@ mod tests {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
         let resource = ResourceRecord::new(
             Name::new_unchecked("_srv._udp.local"),
-            TYPE::A,
             CLASS::IN,
             10,
             RData::A(A { address: 10 }),
@@ -454,7 +450,6 @@ mod tests {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
         let resource = ResourceRecord::new(
             Name::new_unchecked("_srv._udp.local"),
-            TYPE::A,
             CLASS::IN,
             10,
             RData::A(A { address: 10 }),

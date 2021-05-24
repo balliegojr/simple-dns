@@ -36,11 +36,11 @@ pub enum RData<'a> {
     HINFO(HINFO<'a>),
     MINFO(MINFO<'a>),
     MX(MX<'a>),
-    NULL(NULL<'a>),
     TXT(CharacterString<'a>),
     SOA(Box<SOA<'a>>),
     WKS(WKS<'a>),
     SRV(Box<SRV<'a>>),
+    NULL(u16, NULL<'a>),
 }
 
 impl<'a> RData<'a> {
@@ -59,7 +59,7 @@ impl<'a> RData<'a> {
             RData::HINFO(data) => data.len(),
             RData::MINFO(data) => data.len(),
             RData::MX(data) => data.len(),
-            RData::NULL(data) => data.len(),
+            RData::NULL(_, data) => data.len(),
             RData::TXT(data) => data.len(),
             RData::SOA(data) => data.len(),
             RData::WKS(data) => data.len(),
@@ -82,11 +82,34 @@ impl<'a> RData<'a> {
             RData::HINFO(data) => data.append_to_vec(out),
             RData::MINFO(data) => data.append_to_vec(out),
             RData::MX(data) => data.append_to_vec(out),
-            RData::NULL(data) => data.append_to_vec(out),
+            RData::NULL(_, data) => data.append_to_vec(out),
             RData::TXT(data) => data.append_to_vec(out),
             RData::SOA(data) => data.append_to_vec(out),
             RData::WKS(data) => data.append_to_vec(out),
             RData::SRV(data) => data.append_to_vec(out),
+        }
+    }
+
+    pub fn type_code(&self) -> TYPE {
+        match self {
+            RData::A(_) => TYPE::A,
+            RData::AAAA(_) => TYPE::AAAA,
+            RData::NS(_) => TYPE::NS,
+            RData::MD(_) => TYPE::MD,
+            RData::CNAME(_) => TYPE::CNAME,
+            RData::MB(_) => TYPE::MB,
+            RData::MG(_) => TYPE::MG,
+            RData::MR(_) => TYPE::MR,
+            RData::PTR(_) => TYPE::PTR,
+            RData::MF(_) => TYPE::MF,
+            RData::HINFO(_) => TYPE::HINFO,
+            RData::MINFO(_) => TYPE::MINFO,
+            RData::MX(_) => TYPE::MX,
+            RData::TXT(_) => TYPE::TXT,
+            RData::SOA(_) => TYPE::SOA,
+            RData::WKS(_) => TYPE::WKS,
+            RData::SRV(_) => TYPE::SRV,
+            RData::NULL(type_code, _) => TYPE::Unknown(*type_code),
         }
     }
 }
@@ -110,7 +133,7 @@ pub(crate) fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crat
         TYPE::MX => RData::MX(MX::parse(data, position)?),
         TYPE::TXT => RData::TXT(CharacterString::parse(data, position)?),
         TYPE::SRV => RData::SRV(Box::new(SRV::parse(data, position)?)),
-        _ => RData::NULL(NULL::parse(data, position)?),
+        rdatatype => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
     };
 
     Ok(rdata)
