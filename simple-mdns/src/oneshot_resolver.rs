@@ -2,7 +2,7 @@ use crate::{
     create_udp_socket, send_packet_to_multicast_socket, SimpleMdnsError, ENABLE_LOOPBACK,
     UNICAST_RESPONSE,
 };
-use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE, TYPE};
+use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     time::Duration,
@@ -101,7 +101,7 @@ impl OneShotMdnsResolver {
             let port = response
                 .answers
                 .iter()
-                .filter(|a| a.name == parsed_name_service && a.rdatatype == TYPE::SRV)
+                .filter(|a| a.name == parsed_name_service && a.match_qtype(QTYPE::SRV))
                 .find_map(|a| match &a.rdata {
                     RData::SRV(srv) => Some(srv.port),
                     _ => None,

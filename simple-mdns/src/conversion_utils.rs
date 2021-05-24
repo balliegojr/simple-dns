@@ -2,7 +2,7 @@
 
 use simple_dns::{
     rdata::{RData, A, AAAA, SRV},
-    Name, ResourceRecord, CLASS, TYPE,
+    Name, ResourceRecord, CLASS,
 };
 use std::net::IpAddr;
 use std::{convert::From, net::SocketAddr};
@@ -14,20 +14,12 @@ pub fn ip_addr_to_resource_record<'a>(
     rr_ttl: u32,
 ) -> ResourceRecord<'a> {
     match addr {
-        IpAddr::V4(ip) => ResourceRecord::new(
-            name.clone(),
-            TYPE::A,
-            CLASS::IN,
-            rr_ttl,
-            RData::A(A::from(ip)),
-        ),
-        IpAddr::V6(ip) => ResourceRecord::new(
-            name.clone(),
-            TYPE::AAAA,
-            CLASS::IN,
-            rr_ttl,
-            RData::AAAA(AAAA::from(ip)),
-        ),
+        IpAddr::V4(ip) => {
+            ResourceRecord::new(name.clone(), CLASS::IN, rr_ttl, RData::A(A::from(ip)))
+        }
+        IpAddr::V6(ip) => {
+            ResourceRecord::new(name.clone(), CLASS::IN, rr_ttl, RData::AAAA(AAAA::from(ip)))
+        }
     }
 }
 
@@ -35,7 +27,6 @@ pub fn ip_addr_to_resource_record<'a>(
 pub fn port_to_srv_record<'a>(name: &Name<'a>, port: u16, rr_ttl: u32) -> ResourceRecord<'a> {
     ResourceRecord::new(
         name.clone(),
-        TYPE::SRV,
         CLASS::IN,
         rr_ttl,
         RData::SRV(Box::new(SRV {
