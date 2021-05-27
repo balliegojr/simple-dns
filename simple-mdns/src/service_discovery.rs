@@ -99,7 +99,7 @@ impl ServiceDiscovery {
     }
 
     /// Add the given ip address to discovery as A or AAAA record, advertise will happen as soon as there is at least one ip and port registered
-    pub fn add_ip_address(&'static mut self, ip_addr: IpAddr) {
+    pub fn add_ip_address(&mut self, ip_addr: IpAddr) {
         let addr = ip_addr_to_resource_record(&self.service_name, ip_addr, self.resource_ttl);
         self.resource_manager.write().unwrap().add_resource(addr);
 
@@ -107,7 +107,7 @@ impl ServiceDiscovery {
     }
 
     /// Add the given port to discovery as SRV record, advertise will happen as soon as there is at least one ip and port registered
-    pub fn add_port(&'static mut self, port: u16) {
+    pub fn add_port(&mut self, port: u16) {
         let srv = port_to_srv_record(&self.service_name, port, self.resource_ttl);
         self.resource_manager.write().unwrap().add_resource(srv);
 
@@ -131,7 +131,7 @@ impl ServiceDiscovery {
     }
 
     /// Remove all addresses from service discovery
-    pub fn remove_service_from_discovery(&'static mut self) {
+    pub fn remove_service_from_discovery(&mut self) {
         self.resource_manager.write().unwrap().clear();
     }
 
