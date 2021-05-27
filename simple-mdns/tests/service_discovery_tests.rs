@@ -1,13 +1,10 @@
-use simple_dns::Name;
 use simple_mdns::ServiceDiscovery;
 use std::{net::SocketAddr, time::Duration};
 
 #[tokio::test]
 async fn service_discovery_can_find_services() {
-    let mut service_discovery_a =
-        ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true);
-    let mut service_discovery_b =
-        ServiceDiscovery::new(Name::new_unchecked("_srv3._tcp.com"), 50, true);
+    let mut service_discovery_a = ServiceDiscovery::new("_srv3._tcp.com", 50, true).unwrap();
+    let mut service_discovery_b = ServiceDiscovery::new("_srv3._tcp.com", 50, true).unwrap();
 
     service_discovery_a.add_socket_address(&("192.168.1.2:8080".parse().unwrap()));
     service_discovery_b.add_socket_address(&("192.168.1.3:8080".parse().unwrap()));

@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr },
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -52,12 +52,11 @@ impl ExpirationTimes {
 ///
 /// ## Example
 /// ```
-/// use simple_dns::Name;
 /// use simple_mdns::ServiceDiscovery;
 /// use std::net::SocketAddr;
 /// # tokio_test::block_on(async {
 ///
-/// let mut discovery = ServiceDiscovery::new(Name::new_unchecked("_mysrv._tcp.local"), 60, true);
+/// let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
 /// let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
 /// discovery.add_socket_address(&my_socket_addr);
 ///
@@ -73,12 +72,18 @@ pub struct ServiceDiscovery {
 }
 
 impl ServiceDiscovery {
-    /// Creates a new ServiceDiscovery by providing [service name](`simple_dns::Name`), resource ttl and loopback activation.
+    /// Creates a new ServiceDiscovery by providing `service_name`, `resource ttl` and loopback activation.
+    ///
+    /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
-    pub fn new(service_name: Name<'static>, resource_ttl: u32, enable_loopback: bool) -> Self {
+    pub fn new(
+        service_name: &'static str,
+        resource_ttl: u32,
+        enable_loopback: bool,
+    ) -> Result<Self, SimpleMdnsError> {
         let service_discovery = Self {
-            service_name,
+            service_name: Name::new(service_name)?,
             resource_manager: Arc::new(RwLock::new(ResourceRecordManager::new())),
             known_instances: Arc::new(RwLock::new(HashMap::new())),
             resource_ttl,
@@ -90,7 +95,7 @@ impl ServiceDiscovery {
         service_discovery.probe_instances();
         service_discovery.refresh_known_instances();
 
-        service_discovery
+        Ok(service_discovery)
     }
 
     /// Add the given ip address to discovery as A or AAAA record, advertise will happen as soon as there is at least one ip and port registered

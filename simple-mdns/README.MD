@@ -1,7 +1,18 @@
 # Simple mDNS
 
 Pure Rust implementation for mDNS and DNS-SD protocols
+
 ## ServiceDiscovery
+Advertise registered addresses and query for available instances on the same network.
+
+```rust
+    use simple_mdns::ServiceDiscovery;
+    use std::net::SocketAddr;
+
+    let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
+    let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
+    discovery.add_socket_address(&my_socket_addr);
+```
 
 
 ## OneShotMdnsResolver (Legacy mDNS)
@@ -33,29 +44,31 @@ In case you don't have a mDNS responder in your network, or for some reason don'
 This responder will list for any mDNS query in the network via Multicast and will reply only to the resources that were added.
 
 ```rust
-    let mut responder = SimpleMdnsResponder::new();
-    responder.add_resouce(ResourceRecord { 
-        class: CLASS::IN, 
-        name: srv_name.try_into().unwrap(),
-        rdatatype: simple_dns::TYPE::A,
-        ttl: 10,
-        rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }), 
-    });
+     let mut responder = SimpleMdnsResponder::new(10, true);
+     let srv_name = Name::new_unchecked("_srvname._tcp.local");
 
-    responder.add_resouce(ResourceRecord { 
-        class: CLASS::IN, 
-        name: srv_name.try_into().unwrap(),
-        rdatatype: simple_dns::TYPE::SRV,
-        ttl: 10,
-        rdata: RData::SRV(Box::new(SRV {  
-            port: 8080,
-            priority: 0,
-            weight: 0,
-            target: srv_name.try_into().unwrap()
-        })), 
+     responder.add_resource(ResourceRecord {
+         class: CLASS::IN,
+         name: srv_name.clone(),
+         ttl: 10,
+         rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }),
+     });
+
+     responder.add_resource(ResourceRecord {
+         class: CLASS::IN,
+         name: srv_name.clone(),
+         ttl: 10,
+         rdata: RData::SRV(Box::new(SRV {
+             port: 8080,
+             priority: 0,
+             weight: 0,
+             target: srv_name
+         }))
+     });
+
 ```
 
+
 # TODOs
-- A full compliant mDNS resolver and advertiser
 - IPv6 queries
-- Support to other runtimes besides Tokio
+- Support to runtimes other than Tokio

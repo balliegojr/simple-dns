@@ -13,6 +13,25 @@ use std::{
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
 ///
 /// One Shot queries returns only the first valid response to arrive
+/// ```
+///     use simple_mdns::OneShotMdnsResolver;
+///     use std::time::Duration;
+/// # tokio_test::block_on(async {
+///     
+///     let mut resolver = OneShotMdnsResolver::new();
+///     resolver.set_query_timeout(Duration::from_secs(1));
+///     
+///     // querying for IP Address
+///     let answer = resolver.query_service_address("_myservice._tcp.local").await.unwrap();
+///     println!("{:?}", answer);
+///     // IpV4Addr or IpV6Addr, depending on what was returned
+///    
+///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").await.unwrap();
+///     println!("{:?}", answer);
+///     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
+/// # })
+/// ```
+
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     enable_loopback: bool,
