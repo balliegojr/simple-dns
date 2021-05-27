@@ -34,11 +34,9 @@ impl<'a> DnsPacketContent<'a> for AAAA {
     }
 }
 
-impl From<&Ipv6Addr> for AAAA {
-    fn from(ip: &Ipv6Addr) -> Self {
-        Self {
-            address: (*ip).into(),
-        }
+impl From<Ipv6Addr> for AAAA {
+    fn from(ip: Ipv6Addr) -> Self {
+        Self { address: ip.into() }
     }
 }
 

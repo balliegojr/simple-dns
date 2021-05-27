@@ -11,7 +11,7 @@ Advertise registered addresses and query for available instances on the same net
 
     let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
     let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
-    discovery.add_socket_address(&my_socket_addr);
+    discovery.add_socket_address(my_socket_addr);
 ```
 
 

@@ -212,12 +212,12 @@ mod tests {
         ));
         resources.add_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
-            &Ipv4Addr::LOCALHOST.into(),
+            Ipv4Addr::LOCALHOST.into(),
             0,
         ));
         resources.add_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
-            &Ipv6Addr::LOCALHOST.into(),
+            Ipv6Addr::LOCALHOST.into(),
             0,
         ));
 
@@ -228,7 +228,7 @@ mod tests {
         ));
         resources.add_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res2._tcp.com"),
-            &Ipv4Addr::LOCALHOST.into(),
+            Ipv4Addr::LOCALHOST.into(),
             0,
         ));
         resources

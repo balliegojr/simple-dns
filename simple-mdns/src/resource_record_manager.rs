@@ -75,7 +75,7 @@ mod tests {
             service_name.clone(),
             simple_dns::CLASS::CS,
             0,
-            RData::A(A::from(&Ipv4Addr::LOCALHOST)),
+            RData::A(A::from(Ipv4Addr::LOCALHOST)),
         ));
 
         assert_eq!(

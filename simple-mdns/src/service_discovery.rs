@@ -58,7 +58,7 @@ impl ExpirationTimes {
 ///
 /// let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
 /// let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
-/// discovery.add_socket_address(&my_socket_addr);
+/// discovery.add_socket_address(my_socket_addr);
 ///
 /// # })
 /// ```
@@ -99,7 +99,7 @@ impl ServiceDiscovery {
     }
 
     /// Add the given ip address to discovery as A or AAAA record, advertise will happen as soon as there is at least one ip and port registered
-    pub fn add_ip_address(&'static mut self, ip_addr: &IpAddr) {
+    pub fn add_ip_address(&'static mut self, ip_addr: IpAddr) {
         let addr = ip_addr_to_resource_record(&self.service_name, ip_addr, self.resource_ttl);
         self.resource_manager.write().unwrap().add_resource(addr);
 
@@ -115,7 +115,7 @@ impl ServiceDiscovery {
     }
 
     /// Add the given socket address to discovery as SRV and A or AAAA records, there will be an advertise just after adding the address
-    pub fn add_socket_address(&mut self, socket_addr: &SocketAddr) {
+    pub fn add_socket_address(&mut self, socket_addr: SocketAddr) {
         let (r1, r2) = socket_addr_to_srv_and_address(
             &self.service_name.clone(),
             socket_addr,

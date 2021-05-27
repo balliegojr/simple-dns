@@ -199,7 +199,7 @@ mod tests {
         let mut responder = SimpleMdnsResponder::default();
         let (r1, r2) = socket_addr_to_srv_and_address(
             &srv_name,
-            &SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080),
             0,
         );
         responder.add_resource(r1);
