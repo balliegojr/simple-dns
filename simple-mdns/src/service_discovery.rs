@@ -101,6 +101,7 @@ impl ServiceDiscovery {
     /// Add the given ip address to discovery as A or AAAA record, advertise will happen as soon as there is at least one ip and port registered
     pub fn add_ip_address(&mut self, ip_addr: IpAddr) {
         let addr = ip_addr_to_resource_record(&self.service_name, ip_addr, self.resource_ttl);
+        log::info!("added {:?} to discovery", addr);
         self.resource_manager.write().unwrap().add_resource(addr);
 
         self.advertise_service();
@@ -109,6 +110,7 @@ impl ServiceDiscovery {
     /// Add the given port to discovery as SRV record, advertise will happen as soon as there is at least one ip and port registered
     pub fn add_port(&mut self, port: u16) {
         let srv = port_to_srv_record(&self.service_name, port, self.resource_ttl);
+        log::info!("added {:?} to discovery", srv);
         self.resource_manager.write().unwrap().add_resource(srv);
 
         self.advertise_service();
@@ -123,6 +125,9 @@ impl ServiceDiscovery {
         );
         {
             let mut resource_manager = self.resource_manager.write().unwrap();
+            log::info!("added {:?} to discovery", r1);
+            log::info!("added {:?} to discovery", r2);
+
             resource_manager.add_resource(r1);
             resource_manager.add_resource(r2);
         }
@@ -150,7 +155,7 @@ impl ServiceDiscovery {
             let service_name = service_name;
             loop {
                 let now = Instant::now();
-
+                log::info!("Refreshing known services");
                 known_instances
                     .write()
                     .unwrap()
@@ -163,6 +168,8 @@ impl ServiceDiscovery {
                         .min_by(|a, b| a.refresh_at.cmp(&b.refresh_at))
                         .cloned()
                 };
+
+                log::debug!("next expiration: {:?}", next_expiration);
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
@@ -180,7 +187,7 @@ impl ServiceDiscovery {
                         }
                     }
                     None => {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                     }
                 }
             }
@@ -188,6 +195,7 @@ impl ServiceDiscovery {
     }
 
     fn advertise_service(&self) {
+        log::info!("Advertising service");
         let mut packet = PacketBuf::new(PacketHeader::new_reply(0, OPCODE::StandardQuery));
         {
             let resource_manager = self.resource_manager.read().unwrap();
@@ -195,6 +203,7 @@ impl ServiceDiscovery {
             for srv in resource_manager.find_matching_resources(|r| {
                 r.match_qtype(QTYPE::SRV) && r.match_qclass(QCLASS::IN)
             }) {
+                log::debug!("adding srv to packet: {:?}", srv);
                 if let Err(err) = packet.add_answer(srv) {
                     log::error!(
                         "There was an error adding the answer to the packet: {}",
@@ -206,6 +215,7 @@ impl ServiceDiscovery {
             for additional_record in resource_manager
                 .find_matching_resources(|r| r.match_qtype(QTYPE::A) && r.match_qclass(QCLASS::IN))
             {
+                log::debug!("adding address to packet: {:?}", additional_record);
                 if let Err(err) = packet.add_additional_record(additional_record) {
                     log::error!(
                         "There was an error adding the additional record to the packet: {}",
@@ -216,18 +226,23 @@ impl ServiceDiscovery {
         }
 
         if packet.has_answers() && packet.has_additional_records() {
+            log::debug!("sending advertising packet");
             let socket = self.udp_socket.clone();
             tokio::spawn(async move {
                 if let Err(err) = socket.send_to(&packet, *MULTICAST_IPV4_SOCKET).await {
                     log::error!("Error advertising the service: {}", err);
                 }
             });
+        } else {
+            log::debug!("packet don't have enough answers or additional records for advertising");
         }
     }
+
     fn probe_instances(&self) {
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
 
+        log::info!("probing service instances");
         tokio::spawn(async move {
             if let Err(err) = send_question(service_name, &socket, *MULTICAST_IPV4_SOCKET).await {
                 log::error!("There was an error sending the question packet: {}", err);
@@ -257,6 +272,7 @@ impl ServiceDiscovery {
                         };
 
                         if let Some((unicast_reply, packet)) = reply {
+                            log::debug!("sending reply for received query");
                             let addr_reply = if unicast_reply {
                                 addr
                             } else {
@@ -287,6 +303,7 @@ fn add_response_to_known_instances(
     owned_resources: &ResourceRecordManager,
 ) {
     if let Ok(packet) = Packet::parse(&recv_buffer) {
+        log::debug!("received packet");
         let mut known_instances = known_instances.write().unwrap();
         let srvs = packet
             .answers
@@ -299,15 +316,12 @@ fn add_response_to_known_instances(
                 _ => continue,
             };
 
+            log::debug!("received srv: {:?}", srv);
             let addresses = packet
                 .additional_records
                 .iter()
                 .chain(packet.answers.iter())
-                .filter(|ar| {
-                    ar.name == *target
-                        && ar.match_qtype(QTYPE::A)
-                        && !owned_resources.has_resource(ar)
-                });
+                .filter(|ar| ar.name == *target && ar.match_qtype(QTYPE::A));
 
             for addr in addresses {
                 let ip_addr = match &addr.rdata {
@@ -316,10 +330,13 @@ fn add_response_to_known_instances(
                     _ => continue,
                 };
 
-                known_instances.insert(
-                    SocketAddr::new(ip_addr, port),
-                    ExpirationTimes::new(addr.ttl as u64),
-                );
+                if !owned_resources.has_resource(addr) || !owned_resources.has_resource(srv) {
+                    log::info!("adding known address: {:?}:{:?}", ip_addr, port);
+                    known_instances.insert(
+                        SocketAddr::new(ip_addr, port),
+                        ExpirationTimes::new(addr.ttl as u64),
+                    );
+                }
             }
         }
     }
