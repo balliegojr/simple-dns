@@ -3,6 +3,11 @@ name = "simple-mdns"
 version = "0.1.0"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2018"
+description = "Rust implementation of mDNS for service discovering (DNS-SD)"
+repository = "https://github.com/balliegojr/simple-dns"
+license-file = "../LICENSE"
+keywords = ["dns", "dns-sd", "mdns", "service discovery", "zeroconf"]
+categories = ["network-programming"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
