@@ -1,6 +1,6 @@
 [package]
 name = "simple-mdns"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2018"
 description = "Rust implementation of mDNS for service discovering (DNS-SD)"
@@ -13,13 +13,13 @@ categories = ["network-programming"]
 
 [dependencies]
 simple-dns = "^0.1"
-futures = "0.3.12"
-socket2 = { version="0.3.19", features=["reuseport"] }
+futures = "^0.3"
+socket2 = { version="^0.3", features=["reuseport"] }
 tokio = { version="^1.0", features=["full"] }
 rand = "0.8.0"
 log = "^0.4"
-thiserror = "1.0.24"
-lazy_static = "1.4.0"
+thiserror = "^1.0.24"
+lazy_static = "^1.4.0"
 
 [dev-dependencies]
 tokio-test = "0.4.2"
