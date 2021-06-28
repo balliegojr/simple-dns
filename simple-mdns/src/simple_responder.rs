@@ -19,7 +19,6 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///     use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
 ///     use std::net::Ipv4Addr;
 ///
-/// # tokio_test::block_on(async {
 ///
 ///     let mut responder = SimpleMdnsResponder::new(10, true);
 ///     let srv_name = Name::new_unchecked("_srvname._tcp.local");
@@ -42,7 +41,6 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///             target: srv_name
 ///         }))
 ///     });
-/// # })
 /// ```
 ///
 /// This struct heavily relies on [`simple_dns`] crate and the same must be added as a dependency
@@ -87,16 +85,14 @@ impl SimpleMdnsResponder {
     fn listen(&self) {
         let enable_loopback = self.enable_loopback;
         let resources = self.resources.clone();
-        tokio::spawn(async move {
-            if let Err(err) =
-                Self::create_socket_and_wait_messages(enable_loopback, resources).await
-            {
+        std::thread::spawn(move || {
+            if let Err(err) = Self::create_socket_and_wait_messages(enable_loopback, resources) {
                 log::error!("Dns Responder failed: {}", err);
             }
         });
     }
 
-    async fn create_socket_and_wait_messages(
+    fn create_socket_and_wait_messages(
         enable_loopback: bool,
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
     ) -> Result<(), SimpleMdnsError> {
@@ -105,7 +101,7 @@ impl SimpleMdnsResponder {
         let socket = create_udp_socket(enable_loopback)?;
 
         loop {
-            let (count, addr) = socket.recv_from(&mut recv_buffer).await?;
+            let (count, addr) = socket.recv_from(&mut recv_buffer)?;
 
             if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                 if !header.query {
@@ -122,7 +118,7 @@ impl SimpleMdnsResponder {
                     *MULTICAST_IPV4_SOCKET
                 };
 
-                socket.send_to(&reply_packet, target_addr).await?;
+                socket.send_to(&reply_packet, target_addr)?;
             }
         }
     }

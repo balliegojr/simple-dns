@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -8,7 +8,6 @@ use std::{
 use simple_dns::{
     rdata::RData, Name, Packet, PacketBuf, PacketHeader, Question, OPCODE, QCLASS, QTYPE,
 };
-use tokio::net::UdpSocket;
 
 use crate::{
     conversion_utils::{
@@ -54,13 +53,11 @@ impl ExpirationTimes {
 /// ```
 /// use simple_mdns::ServiceDiscovery;
 /// use std::net::SocketAddr;
-/// # tokio_test::block_on(async {
 ///
 /// let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
 /// let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
 /// discovery.add_socket_address(my_socket_addr);
 ///
-/// # })
 /// ```
 pub struct ServiceDiscovery {
     service_name: Name<'static>,
@@ -87,7 +84,7 @@ impl ServiceDiscovery {
             resource_manager: Arc::new(RwLock::new(ResourceRecordManager::new())),
             known_instances: Arc::new(RwLock::new(HashMap::new())),
             resource_ttl,
-            udp_socket: Arc::new(create_udp_socket(enable_loopback).unwrap()),
+            udp_socket: Arc::new(create_udp_socket(enable_loopback)?),
             enable_loopback,
         };
 
@@ -151,7 +148,7 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
         let socket = self.udp_socket.clone();
 
-        tokio::spawn(async move {
+        std::thread::spawn(move || {
             let service_name = service_name;
             loop {
                 let now = Instant::now();
@@ -175,7 +172,6 @@ impl ServiceDiscovery {
                         if expiration.refresh_at < now {
                             if let Err(err) =
                                 send_question(service_name.clone(), &socket, *MULTICAST_IPV4_SOCKET)
-                                    .await
                             {
                                 log::error!(
                                     "There was an error sending the question packet: {}",
@@ -183,11 +179,11 @@ impl ServiceDiscovery {
                                 );
                             }
                         } else {
-                            tokio::time::sleep_until(expiration.refresh_at.into()).await;
+                            std::thread::sleep(Instant::now() - expiration.refresh_at);
                         }
                     }
                     None => {
-                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        std::thread::sleep(Duration::from_secs(5));
                     }
                 }
             }
@@ -228,11 +224,9 @@ impl ServiceDiscovery {
         if packet.has_answers() && packet.has_additional_records() {
             log::debug!("sending advertising packet");
             let socket = self.udp_socket.clone();
-            tokio::spawn(async move {
-                if let Err(err) = socket.send_to(&packet, *MULTICAST_IPV4_SOCKET).await {
-                    log::error!("Error advertising the service: {}", err);
-                }
-            });
+            if let Err(err) = socket.send_to(&packet, *MULTICAST_IPV4_SOCKET) {
+                log::error!("Error advertising the service: {}", err);
+            }
         } else {
             log::debug!("packet don't have enough answers or additional records for advertising");
         }
@@ -243,11 +237,9 @@ impl ServiceDiscovery {
         let socket = self.udp_socket.clone();
 
         log::info!("probing service instances");
-        tokio::spawn(async move {
-            if let Err(err) = send_question(service_name, &socket, *MULTICAST_IPV4_SOCKET).await {
-                log::error!("There was an error sending the question packet: {}", err);
-            }
-        });
+        if let Err(err) = send_question(service_name, &socket, *MULTICAST_IPV4_SOCKET) {
+            log::error!("There was an error sending the question packet: {}", err);
+        }
     }
 
     fn wait_replies(&self) {
@@ -256,40 +248,66 @@ impl ServiceDiscovery {
         let resources = self.resource_manager.clone();
         let enable_loopback = self.enable_loopback;
 
-        tokio::spawn(async move {
+        std::thread::spawn(move || {
             let mut recv_buffer = vec![0; 4096];
-            let socket = create_udp_socket(enable_loopback).unwrap();
+            let socket = match create_udp_socket(enable_loopback) {
+                Ok(socket) => {
+                    if let Err(_) = socket.set_read_timeout(None) {
+                        log::error!("Can't set socket timeout, will poll for packets");
+                    }
+
+                    socket
+                }
+                Err(err) => {
+                    log::error!("{}", err);
+                    return;
+                }
+            };
+
             let service_name = service_name;
 
             loop {
-                let (count, addr) = socket.recv_from(&mut recv_buffer).await.unwrap();
-                if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
-                    if header.query {
-                        let packet = PacketBuf::from(&recv_buffer[..count]);
-                        let reply = {
-                            let resources = resources.read().unwrap();
-                            build_reply(packet, &resources)
-                        };
+                match socket.recv_from(&mut recv_buffer) {
+                    Ok((count, addr)) => match PacketHeader::parse(&recv_buffer[..12]) {
+                        Ok(header) => {
+                            if header.query {
+                                let packet = PacketBuf::from(&recv_buffer[..count]);
+                                let reply = match resources.read() {
+                                    Ok(resources) => build_reply(packet, &resources),
+                                    Err(_) => break,
+                                };
 
-                        if let Some((unicast_reply, packet)) = reply {
-                            log::debug!("sending reply for received query");
-                            let addr_reply = if unicast_reply {
-                                addr
+                                if let Some((unicast_reply, packet)) = reply {
+                                    log::debug!("sending reply for received query");
+                                    let addr_reply = if unicast_reply {
+                                        addr
+                                    } else {
+                                        *MULTICAST_IPV4_SOCKET
+                                    };
+                                    if let Err(err) = socket.send_to(&packet, addr_reply) {
+                                        log::error!(
+                                            "There was an error sending the packet: {}",
+                                            err
+                                        );
+                                    }
+                                }
                             } else {
-                                *MULTICAST_IPV4_SOCKET
-                            };
-                            if let Err(err) = socket.send_to(&packet, addr_reply).await {
-                                log::error!("There was an error sending the packet: {}", err);
+                                match resources.read() {
+                                    Ok(resources) => add_response_to_known_instances(
+                                        &recv_buffer[..count],
+                                        &service_name,
+                                        &known_instances,
+                                        &resources,
+                                    ),
+                                    Err(_) => break,
+                                }
                             }
                         }
-                    } else {
-                        add_response_to_known_instances(
-                            &recv_buffer[..count],
-                            &service_name,
-                            &known_instances,
-                            &resources.read().unwrap(),
-                        );
-                    }
+                        Err(_) => {
+                            log::error!("Received invalid package");
+                        }
+                    },
+                    Err(_) => break,
                 }
             }
         });
@@ -342,14 +360,14 @@ fn add_response_to_known_instances(
     }
 }
 
-async fn send_question(
+fn send_question(
     service_name: Name<'_>,
     socket: &UdpSocket,
     addr: SocketAddr,
 ) -> Result<(), SimpleMdnsError> {
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
     packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))?;
-    socket.send_to(&packet, addr).await?;
+    socket.send_to(&packet, addr)?;
 
     Ok(())
 }

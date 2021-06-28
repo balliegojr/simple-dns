@@ -4,10 +4,9 @@ use crate::{
 };
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     time::Duration,
 };
-
 /// Provides One Shot queries (legacy mDNS)
 ///
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
@@ -16,20 +15,18 @@ use std::{
 /// ```
 ///     use simple_mdns::OneShotMdnsResolver;
 ///     use std::time::Duration;
-/// # tokio_test::block_on(async {
 ///     
 ///     let mut resolver = OneShotMdnsResolver::new();
 ///     resolver.set_query_timeout(Duration::from_secs(1));
 ///     
 ///     // querying for IP Address
-///     let answer = resolver.query_service_address("_myservice._tcp.local").await.unwrap();
+///     let answer = resolver.query_service_address("_myservice._tcp.local").unwrap();
 ///     println!("{:?}", answer);
 ///     // IpV4Addr or IpV6Addr, depending on what was returned
 ///    
-///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").await.unwrap();
+///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").unwrap();
 ///     println!("{:?}", answer);
 ///     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
-/// # })
 /// ```
 
 pub struct OneShotMdnsResolver {
@@ -49,26 +46,18 @@ impl OneShotMdnsResolver {
     }
 
     /// Send a query packet and returns the first response
-    pub async fn query_packet<'a>(
+    pub fn query_packet<'a>(
         &self,
         packet: PacketBuf,
     ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
-        let socket = create_udp_socket(self.enable_loopback)?;
-        send_packet_to_multicast_socket(&socket, &packet).await?;
+        let mut socket = create_udp_socket(self.enable_loopback)?;
+        send_packet_to_multicast_socket(&socket, &packet)?;
 
-        match super::timeout(
-            self.query_timeout,
-            get_first_response(&socket, packet.packet_id()),
-        )
-        .await
-        {
-            Ok(packet) => Ok(Some(packet?)),
-            Err(_) => Ok(None),
-        }
+        get_first_response(&mut socket, packet.packet_id(), self.query_timeout)
     }
 
     /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
-    pub async fn query_service_address(
+    pub fn query_service_address(
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::IpAddr>, SimpleMdnsError> {
@@ -81,8 +70,7 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ))?;
 
-        let response = self.query_packet(packet).await?;
-        if let Some(response) = response {
+        if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
             for anwser in response.answers {
                 if anwser.name != service_name {
@@ -101,7 +89,7 @@ impl OneShotMdnsResolver {
     }
 
     /// Send a query for SRV resources and return the first address and port
-    pub async fn query_service_address_and_port(
+    pub fn query_service_address_and_port(
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::SocketAddr>, SimpleMdnsError> {
@@ -114,8 +102,7 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ))?;
 
-        let response = self.query_packet(packet).await?;
-        if let Some(response) = response {
+        if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
             let port = response
                 .answers
@@ -137,7 +124,7 @@ impl OneShotMdnsResolver {
                 });
 
             if port.is_some() && address.is_none() {
-                address = self.query_service_address(service_name).await?;
+                address = self.query_service_address(service_name)?;
             }
 
             if port.is_some() && address.is_some() {
@@ -170,18 +157,26 @@ impl Default for OneShotMdnsResolver {
     }
 }
 
-async fn get_first_response(
-    socket: &tokio::net::UdpSocket,
+fn get_first_response(
+    socket: &mut UdpSocket,
     packet_id: u16,
-) -> Result<PacketBuf, SimpleMdnsError> {
+    query_timeout: Duration,
+) -> Result<Option<PacketBuf>, SimpleMdnsError> {
     let mut buf = [0u8; 4096];
-
+    let timeout = std::time::Instant::now();
     loop {
-        let (count, _) = socket.recv_from(&mut buf[..]).await?;
-
-        if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
-            if !header.query && header.id == packet_id && header.answers_count > 0 {
-                return Ok(buf[..count].into());
+        match socket.recv_from(&mut buf[..]) {
+            Ok((count, _)) => {
+                if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
+                    if !header.query && header.id == packet_id && header.answers_count > 0 {
+                        return Ok(Some(buf[..count].into()));
+                    }
+                }
+            }
+            Err(_) => {
+                if timeout.elapsed() > query_timeout {
+                    return Ok(None);
+                }
             }
         }
     }
@@ -208,26 +203,33 @@ mod tests {
         responder
     }
 
-    #[tokio::test]
-    async fn one_shot_resolver_address_query() {
+    #[test]
+    fn one_shot_resolver_address_query() {
         let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
-        let answer = resolver.query_service_address("_srv._tcp.local").await;
+        let answer = resolver.query_service_address("_srv._tcp.local");
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
         assert_eq!(Ipv4Addr::LOCALHOST, answer.unwrap());
     }
 
-    #[tokio::test]
-    async fn one_shot_resolver_address_port_query() {
+    #[test]
+    fn one_shot_resolver_timeout() {
+        let resolver = OneShotMdnsResolver::new();
+        let answer = resolver.query_service_address("_srv_miss._tcp.local");
+        assert!(answer.is_ok());
+        let answer = answer.unwrap();
+        assert!(answer.is_none());
+    }
+
+    #[test]
+    fn one_shot_resolver_address_port_query() {
         let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
-        let answer = resolver
-            .query_service_address_and_port("_srv._tcp.local")
-            .await;
+        let answer = resolver.query_service_address_and_port("_srv._tcp.local");
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());

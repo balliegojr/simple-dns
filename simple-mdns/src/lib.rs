@@ -12,13 +12,12 @@ For Service discovery, see [`ServiceDiscovery`]
 extern crate lazy_static;
 
 use std::{
-    net::{Ipv4Addr, SocketAddr},
+    net::{Ipv4Addr, SocketAddr, UdpSocket},
     time::Duration,
 };
 
 use simple_dns::{PacketBuf, SimpleDnsError};
 use thiserror::Error;
-use tokio::net::UdpSocket;
 
 pub mod conversion_utils;
 mod oneshot_resolver;
@@ -52,17 +51,17 @@ pub enum SimpleMdnsError {
     DnsParsing(#[from] SimpleDnsError),
 }
 
-async fn send_packet_to_multicast_socket(
+fn send_packet_to_multicast_socket(
     socket: &UdpSocket,
     packet: &PacketBuf,
 ) -> Result<(), SimpleMdnsError> {
     // TODO: also send to ipv6
-    socket.send_to(&packet, *MULTICAST_IPV4_SOCKET).await?;
+    socket.send_to(&packet, *MULTICAST_IPV4_SOCKET)?;
 
     Ok(())
 }
 
-fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, SimpleMdnsError> {
+fn create_udp_socket(multicast_loop: bool) -> Result<UdpSocket, SimpleMdnsError> {
     // let addrs = [
     //     SocketAddr::from(([0, 0, 0, 0], MULTICAST_PORT)),
     //     // SocketAddr::from(([0, 0, 0, 0], 0)),
@@ -72,23 +71,13 @@ fn create_udp_socket(multicast_loop: bool) -> Result<tokio::net::UdpSocket, Simp
     socket.set_multicast_loop_v4(multicast_loop)?;
     socket.join_multicast_v4(&MULTICAST_IPV4, &Ipv4Addr::new(0, 0, 0, 0))?;
     socket.set_reuse_address(true)?;
-    socket.set_nonblocking(true)?;
+    // socket.set_nonblocking(true)?;
+    socket.set_read_timeout(Some(Duration::from_millis(100)))?;
 
     #[cfg(not(windows))]
     socket.set_reuse_port(true)?;
 
     socket.bind(&SocketAddr::from(([0, 0, 0, 0], MULTICAST_PORT)).into())?;
 
-    let socket = tokio::net::UdpSocket::from_std(socket.into_udp_socket())?;
-    Ok(socket)
-}
-
-async fn timeout<T: futures::Future>(
-    duration: Duration,
-    future: T,
-) -> Result<T::Output, Box<dyn std::error::Error>> {
-    match tokio::time::timeout(duration, future).await {
-        Ok(result) => Ok(result),
-        Err(err) => Err(Box::new(err)),
-    }
+    Ok(socket.into_udp_socket())
 }
