@@ -1,0 +1,11 @@
+# Simple MDNS
+
+## 0.2.0
+
+Remove Futures and Tokio dependencies by switching to a simple thread implementation
+
+## 0.1.0
+
+Initial project release
+
+Add oneshot resolver, simple responder and service discovery implementations
