@@ -73,7 +73,6 @@ impl OneShotMdnsResolver {
 
         if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
-            dbg!(&response);
             for anwser in response.answers {
                 if anwser.name != service_name {
                     continue;
@@ -106,7 +105,6 @@ impl OneShotMdnsResolver {
 
         if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
-            dbg!(&response);
             let port = response
                 .answers
                 .iter()
@@ -165,7 +163,6 @@ fn get_first_response(
     query_timeout: Duration,
 ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
     let socket = join_multicast(*super::MULTICAST_IPV4_SOCKET)?;
-    socket.set_read_timeout(Some(query_timeout));
 
     let mut buf = [0u8; 4096];
     let timeout = std::time::Instant::now();
@@ -173,13 +170,12 @@ fn get_first_response(
         match socket.recv_from(&mut buf[..]) {
             Ok((count, _)) => {
                 if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
-                    dbg!(&header);
                     if !header.query && header.id == packet_id && header.answers_count > 0 {
                         return Ok(Some(buf[..count].into()));
                     }
                 }
             }
-            Err(err) => {
+            Err(_) => {
                 if timeout.elapsed() > query_timeout {
                     return Ok(None);
                 }
@@ -190,21 +186,13 @@ fn get_first_response(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::{str::FromStr, thread};
 
     use crate::{conversion_utils::socket_addr_to_srv_and_address, SimpleMdnsResponder};
 
     use super::*;
 
-    static mut RESPONDER: Option<SimpleMdnsResponder> = None;
-
-    fn get_oneshot_responder(srv_name: Name<'static>) {
-        unsafe {
-            if RESPONDER.is_some() {
-                return;
-            }
-        }
-
+    fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
         let mut responder = SimpleMdnsResponder::default();
         let (r1, r2) = socket_addr_to_srv_and_address(
             &srv_name,
@@ -213,19 +201,17 @@ mod tests {
         );
         responder.add_resource(r1);
         responder.add_resource(r2);
-
-        unsafe {
-            RESPONDER = Some(responder);
-        }
+        responder
     }
 
     #[test]
     fn one_shot_resolver_address_query() {
-        get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        thread::sleep(Duration::from_millis(500));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address("_srv._tcp.local");
-        dbg!(&answer);
+
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
@@ -243,7 +229,8 @@ mod tests {
 
     #[test]
     fn one_shot_resolver_address_port_query() {
-        get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        thread::sleep(Duration::from_millis(500));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address_and_port("_srv._tcp.local");

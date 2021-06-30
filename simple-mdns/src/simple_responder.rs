@@ -96,8 +96,8 @@ impl SimpleMdnsResponder {
         let mut recv_buffer = vec![0; 4096];
 
         let socket = join_multicast(*MULTICAST_IPV4_SOCKET)?;
+        let _ = socket.set_read_timeout(None);
         let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
-        // let socket = create_udp_socket(enable_loopback)?;
 
         loop {
             let (count, addr) = socket.recv_from(&mut recv_buffer)?;
@@ -110,6 +110,7 @@ impl SimpleMdnsResponder {
 
             let packet = PacketBuf::from(&recv_buffer[..count]);
             let response = build_reply(packet, &resources.read().unwrap());
+
             if let Some((unicast_response, reply_packet)) = response {
                 if unicast_response {
                     sender_socket.send_to(&reply_packet, &addr)?;
