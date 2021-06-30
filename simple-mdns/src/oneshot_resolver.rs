@@ -177,7 +177,8 @@ fn get_first_response(
                     }
                 }
             }
-            Err(_) => {
+            Err(err) => {
+                dbg!(err);
                 if timeout.elapsed() > query_timeout {
                     return Ok(None);
                 }
