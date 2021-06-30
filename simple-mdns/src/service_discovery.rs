@@ -1,22 +1,23 @@
-use std::{
-    collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
-    sync::{Arc, RwLock},
-    time::{Duration, Instant},
-};
-
 use simple_dns::{
     rdata::RData, Name, Packet, PacketBuf, PacketHeader, Question, OPCODE, QCLASS, QTYPE,
+};
+use socket2::{SockAddr, Socket};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    sync::{Arc, RwLock},
+    time::{Duration, Instant},
 };
 
 use crate::{
     conversion_utils::{
         ip_addr_to_resource_record, port_to_srv_record, socket_addr_to_srv_and_address,
     },
-    create_udp_socket,
+    join_multicast,
     resource_record_manager::ResourceRecordManager,
+    sender_socket,
     simple_responder::build_reply,
-    SimpleMdnsError, MULTICAST_IPV4_SOCKET,
+    SimpleMdnsError,
 };
 
 /// Provides known service expiration and refresh times
@@ -54,7 +55,7 @@ impl ExpirationTimes {
 /// use simple_mdns::ServiceDiscovery;
 /// use std::net::SocketAddr;
 ///
-/// let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
+/// let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60).expect("Invalid Service Name");
 /// let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
 /// discovery.add_socket_address(my_socket_addr);
 ///
@@ -64,8 +65,7 @@ pub struct ServiceDiscovery {
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     known_instances: Arc<RwLock<HashMap<SocketAddr, ExpirationTimes>>>,
     resource_ttl: u32,
-    udp_socket: Arc<UdpSocket>,
-    enable_loopback: bool,
+    sender_socket: Socket,
 }
 
 impl ServiceDiscovery {
@@ -74,18 +74,13 @@ impl ServiceDiscovery {
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
-    pub fn new(
-        service_name: &'static str,
-        resource_ttl: u32,
-        enable_loopback: bool,
-    ) -> Result<Self, SimpleMdnsError> {
+    pub fn new(service_name: &'static str, resource_ttl: u32) -> Result<Self, SimpleMdnsError> {
         let service_discovery = Self {
             service_name: Name::new(service_name)?,
             resource_manager: Arc::new(RwLock::new(ResourceRecordManager::new())),
             known_instances: Arc::new(RwLock::new(HashMap::new())),
             resource_ttl,
-            udp_socket: Arc::new(create_udp_socket(enable_loopback)?),
-            enable_loopback,
+            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET)?,
         };
 
         service_discovery.wait_replies();
@@ -146,7 +141,7 @@ impl ServiceDiscovery {
     fn refresh_known_instances(&self) {
         let known_instances = self.known_instances.clone();
         let service_name = self.service_name.clone();
-        let socket = self.udp_socket.clone();
+        let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
 
         std::thread::spawn(move || {
             let service_name = service_name;
@@ -170,8 +165,18 @@ impl ServiceDiscovery {
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
-                            if let Err(err) =
-                                send_question(service_name.clone(), &socket, *MULTICAST_IPV4_SOCKET)
+                            let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
+                            packet
+                                .add_question(&Question::new(
+                                    service_name.clone(),
+                                    QTYPE::SRV,
+                                    QCLASS::IN,
+                                    false,
+                                ))
+                                .unwrap();
+
+                            if let Err(err) = socket
+                                .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
                             {
                                 log::error!(
                                     "There was an error sending the question packet: {}",
@@ -223,8 +228,10 @@ impl ServiceDiscovery {
 
         if packet.has_answers() && packet.has_additional_records() {
             log::debug!("sending advertising packet");
-            let socket = self.udp_socket.clone();
-            if let Err(err) = socket.send_to(&packet, *MULTICAST_IPV4_SOCKET) {
+            if let Err(err) = self
+                .sender_socket
+                .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
+            {
                 log::error!("Error advertising the service: {}", err);
             }
         } else {
@@ -234,10 +241,17 @@ impl ServiceDiscovery {
 
     fn probe_instances(&self) {
         let service_name = self.service_name.clone();
-        let socket = self.udp_socket.clone();
 
         log::info!("probing service instances");
-        if let Err(err) = send_question(service_name, &socket, *MULTICAST_IPV4_SOCKET) {
+        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
+        packet
+            .add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))
+            .unwrap();
+
+        if let Err(err) = self
+            .sender_socket
+            .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
+        {
             log::error!("There was an error sending the question packet: {}", err);
         }
     }
@@ -246,11 +260,11 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
         let known_instances = self.known_instances.clone();
         let resources = self.resource_manager.clone();
-        let enable_loopback = self.enable_loopback;
 
         std::thread::spawn(move || {
             let mut recv_buffer = vec![0; 4096];
-            let socket = match create_udp_socket(enable_loopback) {
+            let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).expect("merda");
+            let socket = match join_multicast(*super::MULTICAST_IPV4_SOCKET) {
                 Ok(socket) => {
                     if let Err(_) = socket.set_read_timeout(None) {
                         log::error!("Can't set socket timeout, will poll for packets");
@@ -279,14 +293,15 @@ impl ServiceDiscovery {
 
                                 if let Some((unicast_reply, packet)) = reply {
                                     log::debug!("sending reply for received query");
-                                    let addr_reply = if unicast_reply {
+                                    let reply_addr = if unicast_reply {
                                         addr
                                     } else {
-                                        *MULTICAST_IPV4_SOCKET
+                                        SockAddr::from(*super::MULTICAST_IPV4_SOCKET)
                                     };
-                                    if let Err(err) = socket.send_to(&packet, addr_reply) {
+
+                                    if let Err(err) = sender_socket.send_to(&packet, &reply_addr) {
                                         log::error!(
-                                            "There was an error sending the packet: {}",
+                                            "There was an error sending the packet {}",
                                             err
                                         );
                                     }
@@ -358,16 +373,4 @@ fn add_response_to_known_instances(
             }
         }
     }
-}
-
-fn send_question(
-    service_name: Name<'_>,
-    socket: &UdpSocket,
-    addr: SocketAddr,
-) -> Result<(), SimpleMdnsError> {
-    let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
-    packet.add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))?;
-    socket.send_to(&packet, addr)?;
-
-    Ok(())
 }

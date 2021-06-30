@@ -1,10 +1,11 @@
 use std::sync::{Arc, RwLock};
 
 use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, QTYPE};
+use socket2::SockAddr;
 
 use crate::{
-    create_udp_socket, resource_record_manager::ResourceRecordManager, SimpleMdnsError,
-    ENABLE_LOOPBACK, MULTICAST_IPV4_SOCKET,
+    join_multicast, resource_record_manager::ResourceRecordManager, sender_socket, SimpleMdnsError,
+    MULTICAST_IPV4_SOCKET,
 };
 
 const FIVE_MINUTES: u32 = 60 * 5;
@@ -20,7 +21,7 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///     use std::net::Ipv4Addr;
 ///
 ///
-///     let mut responder = SimpleMdnsResponder::new(10, true);
+///     let mut responder = SimpleMdnsResponder::new(10);
 ///     let srv_name = Name::new_unchecked("_srvname._tcp.local");
 ///
 ///     responder.add_resource(ResourceRecord {
@@ -45,17 +46,15 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///
 /// This struct heavily relies on [`simple_dns`] crate and the same must be added as a dependency
 pub struct SimpleMdnsResponder {
-    enable_loopback: bool,
     resources: Arc<RwLock<ResourceRecordManager<'static>>>,
     rr_ttl: u32,
 }
 
 impl SimpleMdnsResponder {
     /// Creates a new SimpleMdnsResponder with ttl of 5 minutes and enabled loopback
-    pub fn new(rr_ttl: u32, enable_loopback: bool) -> Self {
+    pub fn new(rr_ttl: u32) -> Self {
         let responder = Self {
             resources: Arc::new(RwLock::new(ResourceRecordManager::new())),
-            enable_loopback,
             rr_ttl,
         };
 
@@ -83,22 +82,22 @@ impl SimpleMdnsResponder {
 
     /// Start listening to requests
     fn listen(&self) {
-        let enable_loopback = self.enable_loopback;
         let resources = self.resources.clone();
         std::thread::spawn(move || {
-            if let Err(err) = Self::create_socket_and_wait_messages(enable_loopback, resources) {
+            if let Err(err) = Self::create_socket_and_wait_messages(resources) {
                 log::error!("Dns Responder failed: {}", err);
             }
         });
     }
 
     fn create_socket_and_wait_messages(
-        enable_loopback: bool,
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = vec![0; 4096];
 
-        let socket = create_udp_socket(enable_loopback)?;
+        let socket = join_multicast(*MULTICAST_IPV4_SOCKET)?;
+        let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
+        // let socket = create_udp_socket(enable_loopback)?;
 
         loop {
             let (count, addr) = socket.recv_from(&mut recv_buffer)?;
@@ -112,20 +111,14 @@ impl SimpleMdnsResponder {
             let packet = PacketBuf::from(&recv_buffer[..count]);
             let response = build_reply(packet, &resources.read().unwrap());
             if let Some((unicast_response, reply_packet)) = response {
-                let target_addr = if unicast_response {
-                    addr
+                if unicast_response {
+                    sender_socket.send_to(&reply_packet, &addr)?;
                 } else {
-                    *MULTICAST_IPV4_SOCKET
-                };
-
-                socket.send_to(&reply_packet, target_addr)?;
+                    sender_socket
+                        .send_to(&reply_packet, &SockAddr::from(*MULTICAST_IPV4_SOCKET))?;
+                }
             }
         }
-    }
-
-    /// Set the simple mdns responder's enable loopback.
-    pub fn set_enable_loopback(&mut self, enable_loopback: bool) {
-        self.enable_loopback = enable_loopback;
     }
 
     /// Set the simple mdns responder's rr default ttl in seconds (defaults to 300).
@@ -136,7 +129,7 @@ impl SimpleMdnsResponder {
 
 impl Default for SimpleMdnsResponder {
     fn default() -> Self {
-        Self::new(FIVE_MINUTES, ENABLE_LOOPBACK)
+        Self::new(FIVE_MINUTES)
     }
 }
 

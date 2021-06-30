@@ -12,11 +12,13 @@ For Service discovery, see [`ServiceDiscovery`]
 extern crate lazy_static;
 
 use std::{
-    net::{Ipv4Addr, SocketAddr, UdpSocket},
+    io,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     time::Duration,
 };
 
-use simple_dns::{PacketBuf, SimpleDnsError};
+use simple_dns::SimpleDnsError;
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use thiserror::Error;
 
 pub mod conversion_utils;
@@ -32,13 +34,16 @@ pub use simple_responder::SimpleMdnsResponder;
 const ENABLE_LOOPBACK: bool = cfg!(test);
 const UNICAST_RESPONSE: bool = cfg!(not(test));
 
-const MULTICAST_IPV4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
 const MULTICAST_PORT: u16 = 5353;
+const MULTICAST_ADDR_IPV4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
+const MULTICAST_ADDR_IPV6: Ipv6Addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0xFB);
+
 lazy_static! {
     pub(crate) static ref MULTICAST_IPV4_SOCKET: SocketAddr =
-        SocketAddr::new(MULTICAST_IPV4.into(), MULTICAST_PORT);
+        SocketAddr::new(IpAddr::V4(MULTICAST_ADDR_IPV4), MULTICAST_PORT);
+    pub(crate) static ref MULTICAST_IPV6_SOCKET: SocketAddr =
+        SocketAddr::new(IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT);
 }
-// const MULTICAST_ADDR_IPV6: Ipv6Addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0xFB);
 
 /// Error types for simple-mdns
 #[derive(Debug, Error)]
@@ -51,33 +56,71 @@ pub enum SimpleMdnsError {
     DnsParsing(#[from] SimpleDnsError),
 }
 
-fn send_packet_to_multicast_socket(
-    socket: &UdpSocket,
-    packet: &PacketBuf,
-) -> Result<(), SimpleMdnsError> {
-    // TODO: also send to ipv6
-    socket.send_to(&packet, *MULTICAST_IPV4_SOCKET)?;
+fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
+    let domain = if addr.is_ipv4() {
+        Domain::ipv4()
+    } else {
+        Domain::ipv6()
+    };
 
-    Ok(())
-}
-
-fn create_udp_socket(multicast_loop: bool) -> Result<UdpSocket, SimpleMdnsError> {
-    // let addrs = [
-    //     SocketAddr::from(([0, 0, 0, 0], MULTICAST_PORT)),
-    //     // SocketAddr::from(([0, 0, 0, 0], 0)),
-    // ];
-
-    let socket = socket2::Socket::new(socket2::Domain::ipv4(), socket2::Type::dgram(), None)?;
-    socket.set_multicast_loop_v4(multicast_loop)?;
-    socket.join_multicast_v4(&MULTICAST_IPV4, &Ipv4Addr::new(0, 0, 0, 0))?;
-    socket.set_reuse_address(true)?;
-    // socket.set_nonblocking(true)?;
+    let socket = Socket::new(domain, Type::dgram(), Some(Protocol::udp()))?;
     socket.set_read_timeout(Some(Duration::from_millis(100)))?;
+    socket.set_reuse_address(true)?;
 
     #[cfg(not(windows))]
     socket.set_reuse_port(true)?;
 
-    socket.bind(&SocketAddr::from(([0, 0, 0, 0], MULTICAST_PORT)).into())?;
+    Ok(socket)
+}
 
-    Ok(socket.into_udp_socket())
+fn join_multicast(addr: SocketAddr) -> io::Result<Socket> {
+    let ip_addr = addr.ip();
+
+    let socket = create_socket(&addr)?;
+
+    // depending on the IP protocol we have slightly different work
+    match ip_addr {
+        IpAddr::V4(ref mdns_v4) => {
+            socket.join_multicast_v4(mdns_v4, &Ipv4Addr::UNSPECIFIED)?;
+        }
+        IpAddr::V6(ref mdns_v6) => {
+            socket.join_multicast_v6(mdns_v6, 0)?;
+            socket.set_only_v6(true)?;
+        }
+    };
+
+    bind_multicast(socket, addr)
+}
+
+#[cfg(unix)]
+fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
+    socket.bind(&SockAddr::from(addr))?;
+    Ok(socket)
+}
+
+#[cfg(windows)]
+fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
+    let addr = match addr {
+        SocketAddr::V4(addr) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED, addr.port())),
+        SocketAddr::V6(addr) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED, addr.port())),
+    };
+
+    socket.bind(&addr)?;
+    Ok(socket)
+}
+
+fn sender_socket(addr: &SocketAddr) -> io::Result<Socket> {
+    let socket = create_socket(addr)?;
+    if addr.is_ipv4() {
+        socket.bind(&SockAddr::from(SocketAddr::new(
+            Ipv4Addr::UNSPECIFIED.into(),
+            0,
+        )))?;
+    } else {
+        socket.bind(&SockAddr::from(SocketAddr::new(
+            Ipv6Addr::UNSPECIFIED.into(),
+            0,
+        )))?;
+    }
+    Ok(socket)
 }

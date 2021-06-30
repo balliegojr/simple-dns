@@ -1,10 +1,8 @@
-use crate::{
-    create_udp_socket, send_packet_to_multicast_socket, SimpleMdnsError, ENABLE_LOOPBACK,
-    UNICAST_RESPONSE,
-};
+use crate::{join_multicast, sender_socket, SimpleMdnsError, ENABLE_LOOPBACK, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
+use socket2::SockAddr;
 use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     time::Duration,
 };
 /// Provides One Shot queries (legacy mDNS)
@@ -50,10 +48,13 @@ impl OneShotMdnsResolver {
         &self,
         packet: PacketBuf,
     ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
-        let mut socket = create_udp_socket(self.enable_loopback)?;
-        send_packet_to_multicast_socket(&socket, &packet)?;
+        let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET)?;
 
-        get_first_response(&mut socket, packet.packet_id(), self.query_timeout)
+        // let mut socket = create_udp_socket(self.enable_loopback)?;
+        // send_packet_to_multicast_socket(&socket, &packet)?;
+        sender_socket.send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))?;
+
+        get_first_response(packet.packet_id(), self.query_timeout)
     }
 
     /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
@@ -158,10 +159,11 @@ impl Default for OneShotMdnsResolver {
 }
 
 fn get_first_response(
-    socket: &mut UdpSocket,
     packet_id: u16,
     query_timeout: Duration,
 ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
+    let socket = join_multicast(*super::MULTICAST_IPV4_SOCKET)?;
+
     let mut buf = [0u8; 4096];
     let timeout = std::time::Instant::now();
     loop {
@@ -190,7 +192,15 @@ mod tests {
 
     use super::*;
 
-    fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
+    static mut RESPONDER: Option<SimpleMdnsResponder> = None;
+
+    fn get_oneshot_responder(srv_name: Name<'static>) {
+        unsafe {
+            if RESPONDER.is_some() {
+                return;
+            }
+        }
+
         let mut responder = SimpleMdnsResponder::default();
         let (r1, r2) = socket_addr_to_srv_and_address(
             &srv_name,
@@ -200,15 +210,18 @@ mod tests {
         responder.add_resource(r1);
         responder.add_resource(r2);
 
-        responder
+        unsafe {
+            RESPONDER = Some(responder);
+        }
     }
 
     #[test]
     fn one_shot_resolver_address_query() {
-        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address("_srv._tcp.local");
+        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
@@ -226,7 +239,7 @@ mod tests {
 
     #[test]
     fn one_shot_resolver_address_port_query() {
-        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
+        get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
 
         let resolver = OneShotMdnsResolver::new();
         let answer = resolver.query_service_address_and_port("_srv._tcp.local");
