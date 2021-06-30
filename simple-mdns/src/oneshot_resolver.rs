@@ -73,6 +73,7 @@ impl OneShotMdnsResolver {
 
         if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
+            dbg!(&response);
             for anwser in response.answers {
                 if anwser.name != service_name {
                     continue;
@@ -105,6 +106,7 @@ impl OneShotMdnsResolver {
 
         if let Some(response) = self.query_packet(packet)? {
             let response = response.to_packet()?;
+            dbg!(&response);
             let port = response
                 .answers
                 .iter()
