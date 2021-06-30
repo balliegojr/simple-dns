@@ -100,8 +100,12 @@ fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
 #[cfg(windows)]
 fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
     let addr = match addr {
-        SocketAddr::V4(addr) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED, addr.port())),
-        SocketAddr::V6(addr) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED, addr.port())),
+        SocketAddr::V4(addr) => {
+            SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), addr.port()))
+        }
+        SocketAddr::V6(addr) => {
+            SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), addr.port()))
+        }
     };
 
     socket.bind(&addr)?;
