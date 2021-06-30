@@ -165,6 +165,7 @@ fn get_first_response(
     query_timeout: Duration,
 ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
     let socket = join_multicast(*super::MULTICAST_IPV4_SOCKET)?;
+    socket.set_read_timeout(Some(query_timeout));
 
     let mut buf = [0u8; 4096];
     let timeout = std::time::Instant::now();
@@ -172,13 +173,13 @@ fn get_first_response(
         match socket.recv_from(&mut buf[..]) {
             Ok((count, _)) => {
                 if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
+                    dbg!(&header);
                     if !header.query && header.id == packet_id && header.answers_count > 0 {
                         return Ok(Some(buf[..count].into()));
                     }
                 }
             }
             Err(err) => {
-                dbg!(err);
                 if timeout.elapsed() > query_timeout {
                     return Ok(None);
                 }
