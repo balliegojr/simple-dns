@@ -1,4 +1,4 @@
-use crate::{join_multicast, sender_socket, SimpleMdnsError, ENABLE_LOOPBACK, UNICAST_RESPONSE};
+use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 use socket2::SockAddr;
 use std::{
@@ -29,7 +29,6 @@ use std::{
 
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
-    enable_loopback: bool,
     unicast_response: bool,
 }
 
@@ -37,7 +36,6 @@ impl OneShotMdnsResolver {
     /// Creates a new OneShotMdnsResolver
     pub fn new() -> Self {
         Self {
-            enable_loopback: ENABLE_LOOPBACK,
             query_timeout: Duration::from_secs(3),
             unicast_response: UNICAST_RESPONSE,
         }
@@ -141,11 +139,6 @@ impl OneShotMdnsResolver {
         self.query_timeout = query_timeout;
     }
 
-    /// Set the one shot mdns resolver's enable loopback.
-    pub fn set_enable_loopback(&mut self, enable_loopback: bool) {
-        self.enable_loopback = enable_loopback;
-    }
-
     /// Set the one shot mdns resolver's unicast response.
     pub fn set_unicast_response(&mut self, unicast_response: bool) {
         self.unicast_response = unicast_response;
@@ -216,6 +209,15 @@ mod tests {
         let answer = answer.unwrap();
         assert!(answer.is_some());
         assert_eq!(Ipv4Addr::LOCALHOST, answer.unwrap());
+
+        let answer = resolver.query_service_address_and_port("_srv._tcp.local");
+        assert!(answer.is_ok());
+        let answer = answer.unwrap();
+        assert!(answer.is_some());
+        assert_eq!(
+            SocketAddr::from_str("127.0.0.1:8080").unwrap(),
+            answer.unwrap()
+        )
     }
 
     #[test]
@@ -225,21 +227,5 @@ mod tests {
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_none());
-    }
-
-    #[test]
-    fn one_shot_resolver_address_port_query() {
-        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
-        thread::sleep(Duration::from_millis(500));
-
-        let resolver = OneShotMdnsResolver::new();
-        let answer = resolver.query_service_address_and_port("_srv._tcp.local");
-        assert!(answer.is_ok());
-        let answer = answer.unwrap();
-        assert!(answer.is_some());
-        assert_eq!(
-            SocketAddr::from_str("127.0.0.1:8080").unwrap(),
-            answer.unwrap()
-        )
     }
 }

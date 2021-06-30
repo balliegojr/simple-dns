@@ -31,7 +31,6 @@ pub use oneshot_resolver::OneShotMdnsResolver;
 pub use service_discovery::ServiceDiscovery;
 pub use simple_responder::SimpleMdnsResponder;
 
-const ENABLE_LOOPBACK: bool = cfg!(test);
 const UNICAST_RESPONSE: bool = cfg!(not(test));
 
 const MULTICAST_PORT: u16 = 5353;
