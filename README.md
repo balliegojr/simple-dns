@@ -1,4 +1,6 @@
-Pure Rust implementation to work with DNS packets
+[![Rust](https://github.com/balliegojr/simple-dns/actions/workflows/rust.yml/badge.svg)](https://github.com/balliegojr/simple-dns/actions/workflows/rust.yml)
+
+Pure Rust implementation to work with DNS packets 
 
 This repository provide two crates [simple-dns](simple-dns/README.md) and [simple-mdns](simple-mdns/README.md)
 

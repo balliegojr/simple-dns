@@ -17,7 +17,9 @@ fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
 #[test]
 fn service_discovery_can_find_services() {
     let _responder = get_oneshot_responder(Name::new_unchecked("_srv3._tcp.com"));
-    let mut service_discovery_a = ServiceDiscovery::new("_srv3._tcp.com", 50).unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+
+    let mut service_discovery_a = ServiceDiscovery::new("_srv3._tcp.com", 500).unwrap();
 
     service_discovery_a.add_socket_address("192.168.1.2:8080".parse().unwrap());
 
