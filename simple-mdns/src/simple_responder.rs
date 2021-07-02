@@ -95,12 +95,11 @@ impl SimpleMdnsResponder {
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = vec![0; 4096];
 
-        let socket = join_multicast(*MULTICAST_IPV4_SOCKET)?;
-        let _ = socket.set_read_timeout(None);
-        let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
+        let receiver_socket = join_multicast(&MULTICAST_IPV4_SOCKET)?;
+        let _ = receiver_socket.set_read_timeout(None);
 
         loop {
-            let (count, addr) = socket.recv_from(&mut recv_buffer)?;
+            let (count, addr) = receiver_socket.recv_from(&mut recv_buffer)?;
 
             if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
                 if !header.query {
@@ -112,12 +111,12 @@ impl SimpleMdnsResponder {
             let response = build_reply(packet, &resources.read().unwrap());
 
             if let Some((unicast_response, reply_packet)) = response {
-                if unicast_response {
-                    sender_socket.send_to(&reply_packet, &addr)?;
+                let reply_addr = if unicast_response {
+                    addr
                 } else {
-                    sender_socket
-                        .send_to(&reply_packet, &SockAddr::from(*MULTICAST_IPV4_SOCKET))?;
-                }
+                    SockAddr::from(*MULTICAST_IPV4_SOCKET)
+                };
+                receiver_socket.send_to(&reply_packet, &reply_addr)?;
             }
         }
     }

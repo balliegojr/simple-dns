@@ -72,10 +72,10 @@ fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn join_multicast(addr: SocketAddr) -> io::Result<Socket> {
+fn join_multicast(addr: &SocketAddr) -> io::Result<Socket> {
     let ip_addr = addr.ip();
 
-    let socket = create_socket(&addr)?;
+    let socket = create_socket(addr)?;
 
     // depending on the IP protocol we have slightly different work
     match ip_addr {
@@ -92,13 +92,13 @@ fn join_multicast(addr: SocketAddr) -> io::Result<Socket> {
 }
 
 #[cfg(unix)]
-fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
-    socket.bind(&SockAddr::from(addr))?;
+fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
+    socket.bind(&SockAddr::from(*addr))?;
     Ok(socket)
 }
 
 #[cfg(windows)]
-fn bind_multicast(socket: Socket, addr: SocketAddr) -> io::Result<Socket> {
+fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
     let addr = match addr {
         SocketAddr::V4(addr) => {
             SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), addr.port()))

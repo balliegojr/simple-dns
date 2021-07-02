@@ -1,6 +1,6 @@
-use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
+use crate::{join_multicast, SimpleMdnsError, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
-use socket2::SockAddr;
+use socket2::{SockAddr, Socket};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     time::Duration,
@@ -14,15 +14,15 @@ use std::{
 ///     use simple_mdns::OneShotMdnsResolver;
 ///     use std::time::Duration;
 ///     
-///     let mut resolver = OneShotMdnsResolver::new();
+///     let mut resolver = OneShotMdnsResolver::new().expect("Can't create one shot resolver");
 ///     resolver.set_query_timeout(Duration::from_secs(1));
 ///     
 ///     // querying for IP Address
-///     let answer = resolver.query_service_address("_myservice._tcp.local").unwrap();
+///     let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");
 ///     println!("{:?}", answer);
 ///     // IpV4Addr or IpV6Addr, depending on what was returned
 ///    
-///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").unwrap();
+///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").expect("Failed to query service address and port");
 ///     println!("{:?}", answer);
 ///     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
 /// ```
@@ -30,15 +30,17 @@ use std::{
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     unicast_response: bool,
+    receiver_socket: Socket,
 }
 
 impl OneShotMdnsResolver {
     /// Creates a new OneShotMdnsResolver
-    pub fn new() -> Self {
-        Self {
+    pub fn new() -> Result<Self, SimpleMdnsError> {
+        Ok(Self {
             query_timeout: Duration::from_secs(3),
             unicast_response: UNICAST_RESPONSE,
-        }
+            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET)?,
+        })
     }
 
     /// Send a query packet and returns the first response
@@ -46,13 +48,11 @@ impl OneShotMdnsResolver {
         &self,
         packet: PacketBuf,
     ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
-        let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET)?;
-
         // let mut socket = create_udp_socket(self.enable_loopback)?;
         // send_packet_to_multicast_socket(&socket, &packet)?;
-        sender_socket.send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))?;
-
-        get_first_response(packet.packet_id(), self.query_timeout)
+        self.receiver_socket
+            .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))?;
+        self.get_first_response(packet.packet_id(), self.query_timeout)
     }
 
     /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
@@ -143,34 +143,26 @@ impl OneShotMdnsResolver {
     pub fn set_unicast_response(&mut self, unicast_response: bool) {
         self.unicast_response = unicast_response;
     }
-}
-
-impl Default for OneShotMdnsResolver {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-fn get_first_response(
-    packet_id: u16,
-    query_timeout: Duration,
-) -> Result<Option<PacketBuf>, SimpleMdnsError> {
-    let socket = join_multicast(*super::MULTICAST_IPV4_SOCKET)?;
-
-    let mut buf = [0u8; 4096];
-    let timeout = std::time::Instant::now();
-    loop {
-        match socket.recv_from(&mut buf[..]) {
-            Ok((count, _)) => {
-                if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
-                    if !header.query && header.id == packet_id && header.answers_count > 0 {
-                        return Ok(Some(buf[..count].into()));
+    fn get_first_response(
+        &self,
+        packet_id: u16,
+        query_timeout: Duration,
+    ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
+        let mut buf = [0u8; 4096];
+        let timeout = std::time::Instant::now();
+        loop {
+            match self.receiver_socket.recv_from(&mut buf[..]) {
+                Ok((count, _)) => {
+                    if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
+                        if !header.query && header.id == packet_id && header.answers_count > 0 {
+                            return Ok(Some(buf[..count].into()));
+                        }
                     }
                 }
-            }
-            Err(_) => {
-                if timeout.elapsed() > query_timeout {
-                    return Ok(None);
+                Err(_) => {
+                    if timeout.elapsed() > query_timeout {
+                        return Ok(None);
+                    }
                 }
             }
         }
@@ -202,7 +194,7 @@ mod tests {
         let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
         thread::sleep(Duration::from_millis(500));
 
-        let resolver = OneShotMdnsResolver::new();
+        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv._tcp.local");
 
         assert!(answer.is_ok());
@@ -222,7 +214,7 @@ mod tests {
 
     #[test]
     fn one_shot_resolver_timeout() {
-        let resolver = OneShotMdnsResolver::new();
+        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv_miss._tcp.local");
         assert!(answer.is_ok());
         let answer = answer.unwrap();

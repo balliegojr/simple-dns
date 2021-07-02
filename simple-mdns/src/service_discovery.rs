@@ -261,27 +261,26 @@ impl ServiceDiscovery {
         let known_instances = self.known_instances.clone();
         let resources = self.resource_manager.clone();
 
+        let receiver_socket = match join_multicast(&super::MULTICAST_IPV4_SOCKET) {
+            Ok(socket) => {
+                if let Err(_) = socket.set_read_timeout(None) {
+                    log::error!("Can't set socket timeout, will poll for packets");
+                }
+
+                socket
+            }
+            Err(err) => {
+                log::error!("{}", err);
+                return;
+            }
+        };
         std::thread::spawn(move || {
             let mut recv_buffer = vec![0; 4096];
-            let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).expect("merda");
-            let socket = match join_multicast(*super::MULTICAST_IPV4_SOCKET) {
-                Ok(socket) => {
-                    if let Err(_) = socket.set_read_timeout(None) {
-                        log::error!("Can't set socket timeout, will poll for packets");
-                    }
-
-                    socket
-                }
-                Err(err) => {
-                    log::error!("{}", err);
-                    return;
-                }
-            };
 
             let service_name = service_name;
 
             loop {
-                match socket.recv_from(&mut recv_buffer) {
+                match receiver_socket.recv_from(&mut recv_buffer) {
                     Ok((count, addr)) => match PacketHeader::parse(&recv_buffer[..12]) {
                         Ok(header) => {
                             if header.query {
@@ -299,7 +298,8 @@ impl ServiceDiscovery {
                                         SockAddr::from(*super::MULTICAST_IPV4_SOCKET)
                                     };
 
-                                    if let Err(err) = sender_socket.send_to(&packet, &reply_addr) {
+                                    if let Err(err) = receiver_socket.send_to(&packet, &reply_addr)
+                                    {
                                         log::error!(
                                             "There was an error sending the packet {}",
                                             err
