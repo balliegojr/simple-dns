@@ -197,12 +197,14 @@ mod tests {
         let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv._tcp.local");
 
+        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
         assert_eq!(Ipv4Addr::LOCALHOST, answer.unwrap());
 
         let answer = resolver.query_service_address_and_port("_srv._tcp.local");
+        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
@@ -216,6 +218,7 @@ mod tests {
     fn one_shot_resolver_timeout() {
         let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv_miss._tcp.local");
+        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_none());
