@@ -14,13 +14,22 @@ fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
     responder
 }
 
+fn init_log() {
+    stderrlog::new()
+        .verbosity(5)
+        .timestamp(stderrlog::Timestamp::Second)
+        .init()
+        .unwrap();
+}
+
 #[test]
 fn service_discovery_can_find_services() {
+    init_log();
     let _responder = get_oneshot_responder(Name::new_unchecked("_srv3._tcp.com"));
 
     let mut service_discovery_a = ServiceDiscovery::new("_srv3._tcp.com", 360).unwrap();
 
-    service_discovery_a.add_socket_address("192.168.1.2:8080".parse().unwrap());
+    // service_discovery_a.add_socket_address("192.168.1.2:8080".parse().unwrap());
 
     std::thread::sleep(Duration::from_secs(3));
 
