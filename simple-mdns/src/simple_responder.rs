@@ -96,6 +96,7 @@ impl SimpleMdnsResponder {
         let mut recv_buffer = vec![0; 4096];
 
         let receiver_socket = join_multicast(&MULTICAST_IPV4_SOCKET)?;
+        let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
         let _ = receiver_socket.set_read_timeout(None);
 
         loop {
@@ -116,7 +117,7 @@ impl SimpleMdnsResponder {
                 } else {
                     SockAddr::from(*MULTICAST_IPV4_SOCKET)
                 };
-                receiver_socket.send_to(&reply_packet, &reply_addr)?;
+                sender_socket.send_to(&reply_packet, &reply_addr)?;
             }
         }
     }

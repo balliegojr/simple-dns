@@ -261,6 +261,7 @@ impl ServiceDiscovery {
         let known_instances = self.known_instances.clone();
         let resources = self.resource_manager.clone();
 
+        let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
         let receiver_socket = match join_multicast(&super::MULTICAST_IPV4_SOCKET) {
             Ok(socket) => {
                 if let Err(_) = socket.set_read_timeout(None) {
@@ -298,8 +299,7 @@ impl ServiceDiscovery {
                                         SockAddr::from(*super::MULTICAST_IPV4_SOCKET)
                                     };
 
-                                    if let Err(err) = receiver_socket.send_to(&packet, &reply_addr)
-                                    {
+                                    if let Err(err) = sender_socket.send_to(&packet, &reply_addr) {
                                         log::error!(
                                             "There was an error sending the packet {}",
                                             err
