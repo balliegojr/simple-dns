@@ -5,7 +5,7 @@ Pure Rust implementation for mDNS and DNS-SD protocols
 ## ServiceDiscovery
 Advertise registered addresses and query for available instances on the same network.
 
-```rust
+```rust  
     use simple_mdns::ServiceDiscovery;
     use std::net::SocketAddr;
 
@@ -26,14 +26,14 @@ One shot resolvers or queries send a multicast DNS question to discover availabl
 Since mDNS is a well known protocol, you can register your service in any mDNS responder inside your network, and they should be able to reply the requested information about your service.
 
 Query example:
-```rust
-    let resolver = OneShotMdnsResolver::new();
+```rust  
+    let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     // querying for IP Address
-    let answer = resolver.query_service_address("_myservice._tcp.local").await.unwrap();
+    let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");
     println!("{:?}", answer);
     // IpV4Addr or IpV6Addr, depending on what was returned
     
-    let answer = resolver.query_service_address_and_port("_myservice._tcp.local").await.unwrap();
+    let answer = resolver.query_service_address_and_port("_myservice._tcp.local").expect("Failed to query service address and port");
     println!("{:?}", answer);
     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
 ```
@@ -43,7 +43,7 @@ In case you don't have a mDNS responder in your network, or for some reason don'
 
 This responder will list for any mDNS query in the network via Multicast and will reply only to the resources that were added.
 
-```rust
+```rust  
      let mut responder = SimpleMdnsResponder::new(10, true);
      let srv_name = Name::new_unchecked("_srvname._tcp.local");
 
@@ -71,4 +71,3 @@ This responder will list for any mDNS query in the network via Multicast and wil
 
 # TODOs
 - IPv6 queries
-- Support to runtimes other than Tokio
