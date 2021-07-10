@@ -1,10 +1,9 @@
 use simple_dns::{
     rdata::RData, Name, Packet, PacketBuf, PacketHeader, Question, OPCODE, QCLASS, QTYPE,
 };
-use socket2::{SockAddr, Socket};
 use std::{
     collections::HashMap,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -65,7 +64,7 @@ pub struct ServiceDiscovery {
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     known_instances: Arc<RwLock<HashMap<SocketAddr, ExpirationTimes>>>,
     resource_ttl: u32,
-    sender_socket: Socket,
+    sender_socket: UdpSocket,
 }
 
 impl ServiceDiscovery {
@@ -175,8 +174,7 @@ impl ServiceDiscovery {
                                 ))
                                 .unwrap();
 
-                            if let Err(err) = socket
-                                .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
+                            if let Err(err) = socket.send_to(&packet, *super::MULTICAST_IPV4_SOCKET)
                             {
                                 log::error!(
                                     "There was an error sending the question packet: {}",
@@ -184,7 +182,7 @@ impl ServiceDiscovery {
                                 );
                             }
                         } else {
-                            std::thread::sleep(Instant::now() - expiration.refresh_at);
+                            std::thread::sleep(expiration.refresh_at - Instant::now());
                         }
                     }
                     None => {
@@ -230,7 +228,7 @@ impl ServiceDiscovery {
             log::debug!("sending advertising packet");
             if let Err(err) = self
                 .sender_socket
-                .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
+                .send_to(&packet, *super::MULTICAST_IPV4_SOCKET)
             {
                 log::error!("Error advertising the service: {}", err);
             }
@@ -250,7 +248,7 @@ impl ServiceDiscovery {
 
         if let Err(err) = self
             .sender_socket
-            .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))
+            .send_to(&packet, *super::MULTICAST_IPV4_SOCKET)
         {
             log::error!("There was an error sending the question packet: {}", err);
         }
@@ -296,7 +294,7 @@ impl ServiceDiscovery {
                                     let reply_addr = if unicast_reply {
                                         addr
                                     } else {
-                                        SockAddr::from(*super::MULTICAST_IPV4_SOCKET)
+                                        *super::MULTICAST_IPV4_SOCKET
                                     };
 
                                     if let Err(err) = sender_socket.send_to(&packet, &reply_addr) {

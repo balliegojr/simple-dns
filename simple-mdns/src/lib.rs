@@ -13,7 +13,7 @@ extern crate lazy_static;
 
 use std::{
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     time::Duration,
 };
 
@@ -57,12 +57,12 @@ pub enum SimpleMdnsError {
 
 fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     let domain = if addr.is_ipv4() {
-        Domain::ipv4()
+        Domain::IPV4
     } else {
-        Domain::ipv6()
+        Domain::IPV6
     };
 
-    let socket = Socket::new(domain, Type::dgram(), Some(Protocol::udp()))?;
+    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_read_timeout(Some(Duration::from_millis(100)))?;
     socket.set_reuse_address(true)?;
 
@@ -72,7 +72,7 @@ fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn join_multicast(addr: &SocketAddr) -> io::Result<Socket> {
+fn join_multicast(addr: &SocketAddr) -> io::Result<UdpSocket> {
     let ip_addr = addr.ip();
 
     let socket = create_socket(addr)?;
@@ -88,7 +88,8 @@ fn join_multicast(addr: &SocketAddr) -> io::Result<Socket> {
         }
     };
 
-    bind_multicast(socket, addr)
+    let socket = bind_multicast(socket, addr)?;
+    Ok(socket.into())
 }
 
 #[cfg(unix)]
@@ -112,7 +113,7 @@ fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn sender_socket(addr: &SocketAddr) -> io::Result<Socket> {
+fn sender_socket(addr: &SocketAddr) -> io::Result<UdpSocket> {
     let socket = create_socket(addr)?;
     if addr.is_ipv4() {
         socket.bind(&SockAddr::from(SocketAddr::new(
@@ -125,5 +126,5 @@ fn sender_socket(addr: &SocketAddr) -> io::Result<Socket> {
             0,
         )))?;
     }
-    Ok(socket)
+    Ok(socket.into())
 }

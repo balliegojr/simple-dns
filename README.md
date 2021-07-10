@@ -1,4 +1,5 @@
 [![Rust](https://github.com/balliegojr/simple-dns/actions/workflows/rust.yml/badge.svg)](https://github.com/balliegojr/simple-dns/actions/workflows/rust.yml)
+[![dependency status](https://deps.rs/repo/github/balliegojr/simple-dns/status.svg)](https://deps.rs/repo/github/balliegojr/simple-dns)
 
 Pure Rust implementation to work with DNS packets 
 

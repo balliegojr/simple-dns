@@ -1,8 +1,8 @@
 use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
-use socket2::{SockAddr, Socket};
+
 use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     time::Duration,
 };
 /// Provides One Shot queries (legacy mDNS)
@@ -30,8 +30,8 @@ use std::{
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     unicast_response: bool,
-    receiver_socket: Socket,
-    sender_socket: Socket,
+    receiver_socket: UdpSocket,
+    sender_socket: UdpSocket,
 }
 
 impl OneShotMdnsResolver {
@@ -53,7 +53,7 @@ impl OneShotMdnsResolver {
         // let mut socket = create_udp_socket(self.enable_loopback)?;
         // send_packet_to_multicast_socket(&socket, &packet)?;
         self.sender_socket
-            .send_to(&packet, &SockAddr::from(*super::MULTICAST_IPV4_SOCKET))?;
+            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
         self.get_first_response(packet.packet_id(), self.query_timeout)
     }
 

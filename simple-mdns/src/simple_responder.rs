@@ -1,7 +1,6 @@
 use std::sync::{Arc, RwLock};
 
 use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, QTYPE};
-use socket2::SockAddr;
 
 use crate::{
     join_multicast, resource_record_manager::ResourceRecordManager, sender_socket, SimpleMdnsError,
@@ -115,7 +114,7 @@ impl SimpleMdnsResponder {
                 let reply_addr = if unicast_response {
                     addr
                 } else {
-                    SockAddr::from(*MULTICAST_IPV4_SOCKET)
+                    *MULTICAST_IPV4_SOCKET
                 };
                 sender_socket.send_to(&reply_packet, &reply_addr)?;
             }
