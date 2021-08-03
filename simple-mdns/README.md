@@ -9,7 +9,7 @@ Advertise registered addresses and query for available instances on the same net
     use simple_mdns::ServiceDiscovery;
     use std::net::SocketAddr;
 
-    let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60, true).expect("Invalid Service Name");
+    let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60).expect("Invalid Service Name");
     let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
     discovery.add_socket_address(my_socket_addr);
 ```
@@ -43,29 +43,35 @@ In case you don't have a mDNS responder in your network, or for some reason don'
 
 This responder will list for any mDNS query in the network via Multicast and will reply only to the resources that were added.
 
+This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate and the same must be added as a dependency
+
 ```rust  
-     let mut responder = SimpleMdnsResponder::new(10, true);
-     let srv_name = Name::new_unchecked("_srvname._tcp.local");
+    use simple_mdns::SimpleMdnsResponder;
+    use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
+    use std::net::Ipv4Addr;
 
-     responder.add_resource(ResourceRecord {
-         class: CLASS::IN,
-         name: srv_name.clone(),
-         ttl: 10,
-         rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }),
-     });
 
-     responder.add_resource(ResourceRecord {
-         class: CLASS::IN,
-         name: srv_name.clone(),
-         ttl: 10,
-         rdata: RData::SRV(Box::new(SRV {
-             port: 8080,
-             priority: 0,
-             weight: 0,
-             target: srv_name
-         }))
-     });
+    let mut responder = SimpleMdnsResponder::new(10);
+    let srv_name = Name::new_unchecked("_srvname._tcp.local");
 
+    responder.add_resource(ResourceRecord {
+        class: CLASS::IN,
+        name: srv_name.clone(),
+        ttl: 10,
+        rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }),
+    });
+
+    responder.add_resource(ResourceRecord {
+        class: CLASS::IN,
+        name: srv_name.clone(),
+        ttl: 10,
+        rdata: RData::SRV(Box::new(SRV {
+            port: 8080,
+            priority: 0,
+            weight: 0,
+            target: srv_name
+        }))
+    });
 ```
 
 
