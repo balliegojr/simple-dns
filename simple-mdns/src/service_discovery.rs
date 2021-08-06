@@ -262,7 +262,7 @@ impl ServiceDiscovery {
         let sender_socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
         let receiver_socket = match join_multicast(&super::MULTICAST_IPV4_SOCKET) {
             Ok(socket) => {
-                if let Err(_) = socket.set_read_timeout(None) {
+                if socket.set_read_timeout(None).is_err() {
                     log::error!("Can't set socket timeout, will poll for packets");
                 }
 
@@ -333,7 +333,7 @@ fn add_response_to_known_instances(
     known_instances: &RwLock<HashMap<SocketAddr, ExpirationTimes>>,
     owned_resources: &ResourceRecordManager,
 ) {
-    if let Ok(packet) = Packet::parse(&recv_buffer) {
+    if let Ok(packet) = Packet::parse(recv_buffer) {
         log::debug!("received packet");
         let mut known_instances = known_instances.write().unwrap();
         let srvs = packet

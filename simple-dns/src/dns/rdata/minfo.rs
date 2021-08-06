@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{DnsPacketContent, Name};
 
 /// MINFO recors are used to acquire mailbox or mail list information
@@ -21,9 +23,13 @@ impl<'a> DnsPacketContent<'a> for MINFO<'a> {
         Ok(Self { rmailbox, emailbox })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.rmailbox.append_to_vec(out)?;
-        self.emailbox.append_to_vec(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.rmailbox.append_to_vec(out, name_refs)?;
+        self.emailbox.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -43,7 +49,8 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(minfo.append_to_vec(&mut data).is_ok());
+        let mut name_refs = HashMap::new();
+        assert!(minfo.append_to_vec(&mut data, &mut name_refs).is_ok());
 
         let minfo = MINFO::parse(&data, 0);
         assert!(minfo.is_ok());

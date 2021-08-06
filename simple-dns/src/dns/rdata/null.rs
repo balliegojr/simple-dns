@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
 
 /// NULL resources are used to represent any kind of information.
@@ -34,7 +36,11 @@ impl<'a> DnsPacketContent<'a> for NULL<'a> {
         Self::new(&data[position..])
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
         out.extend(self.data);
         Ok(())
     }

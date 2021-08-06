@@ -32,7 +32,7 @@ impl<'a> ResourceRecordManager<'a> {
         &self,
         filter: P,
     ) -> impl Iterator<Item = &ResourceRecord> {
-        self.resources.iter().filter(filter).into_iter()
+        self.resources.iter().filter(filter)
     }
 
     pub fn has_resource(&self, resource: &ResourceRecord) -> bool {
@@ -55,7 +55,7 @@ mod tests {
             Name::new_unchecked("_srv1._tcp"),
             simple_dns::CLASS::IN,
             0,
-            RData::TXT(CharacterString::new(&"version=1".as_bytes()).unwrap()),
+            RData::TXT(CharacterString::new("version=1".as_bytes()).unwrap()),
         ));
 
         assert_eq!(1, resources.resources.len());
@@ -69,7 +69,7 @@ mod tests {
             service_name.clone(),
             simple_dns::CLASS::IN,
             0,
-            RData::TXT(CharacterString::new(&"version=1".as_bytes()).unwrap()),
+            RData::TXT(CharacterString::new("version=1".as_bytes()).unwrap()),
         ));
         resources.add_resource(ResourceRecord::new(
             service_name.clone(),

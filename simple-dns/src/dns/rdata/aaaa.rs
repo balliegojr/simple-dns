@@ -1,4 +1,4 @@
-use std::net::Ipv6Addr;
+use std::{collections::HashMap, net::Ipv6Addr};
 
 use byteorder::{BigEndian, ByteOrder};
 
@@ -20,7 +20,11 @@ impl<'a> DnsPacketContent<'a> for AAAA {
         Ok(Self { address })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
         let mut buf = [0u8; 16];
         BigEndian::write_u128(&mut buf[..], self.address);
 
@@ -54,7 +58,8 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(a.append_to_vec(&mut bytes).is_ok());
+        let mut name_refs = HashMap::new();
+        assert!(a.append_to_vec(&mut bytes, &mut name_refs).is_ok());
 
         let a = AAAA::parse(&bytes, 0);
         assert!(a.is_ok());

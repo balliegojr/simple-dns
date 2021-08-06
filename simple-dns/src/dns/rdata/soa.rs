@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{DnsPacketContent, Name};
 use byteorder::{BigEndian, ByteOrder};
 
@@ -47,9 +49,13 @@ impl<'a> DnsPacketContent<'a> for SOA<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.mname.append_to_vec(out)?;
-        self.rname.append_to_vec(out)?;
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.mname.append_to_vec(out, name_refs)?;
+        self.rname.append_to_vec(out, name_refs)?;
 
         let mut buffer = [0u8; 20];
         BigEndian::write_u32(&mut buffer[..4], self.serial);
@@ -83,7 +89,8 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(soa.append_to_vec(&mut data).is_ok());
+        let mut name_refs = HashMap::new();
+        assert!(soa.append_to_vec(&mut data, &mut name_refs).is_ok());
 
         let soa = SOA::parse(&data, 0);
         assert!(soa.is_ok());

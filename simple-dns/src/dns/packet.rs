@@ -1,4 +1,4 @@
-use std::{ops::Deref, usize};
+use std::{collections::HashMap, ops::Deref, usize};
 
 use crate::{SimpleDnsError, OPCODE};
 
@@ -9,6 +9,7 @@ use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
 /// You have to build the packet in order.  
 /// ex: It is not possible to add a question after an answer
 pub struct PacketBuf {
+    name_refs: HashMap<u64, usize>,
     inner: Vec<u8>,
 }
 
@@ -17,7 +18,8 @@ impl PacketBuf {
     pub fn new(header: PacketHeader) -> Self {
         let mut inner = vec![0; 12];
         header.write_to(&mut inner);
-        Self { inner }
+        let name_refs = HashMap::new();
+        Self { inner, name_refs }
     }
 
     /// Creates a new empty PacketBuf with a query header
@@ -33,7 +35,7 @@ impl PacketBuf {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
 
-        question.append_to_vec(&mut self.inner)?;
+        question.append_to_vec(&mut self.inner, &mut self.name_refs)?;
         let questions_count = PacketHeader::read_questions(&self.inner);
         PacketHeader::write_questions(&mut self.inner, questions_count + 1);
         Ok(())
@@ -46,7 +48,7 @@ impl PacketBuf {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
 
-        answer.append_to_vec(&mut self.inner)?;
+        answer.append_to_vec(&mut self.inner, &mut self.name_refs)?;
         let answers_count = PacketHeader::read_answers(&self.inner);
         PacketHeader::write_answers(&mut self.inner, answers_count + 1);
         Ok(())
@@ -59,7 +61,7 @@ impl PacketBuf {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
 
-        name_server.append_to_vec(&mut self.inner)?;
+        name_server.append_to_vec(&mut self.inner, &mut self.name_refs)?;
         let ns_count = PacketHeader::read_name_servers(&self.inner);
         PacketHeader::write_name_servers(&mut self.inner, ns_count + 1);
         Ok(())
@@ -70,7 +72,7 @@ impl PacketBuf {
         &mut self,
         additional_record: &ResourceRecord,
     ) -> crate::Result<()> {
-        additional_record.append_to_vec(&mut self.inner)?;
+        additional_record.append_to_vec(&mut self.inner, &mut self.name_refs)?;
         let additional_records_count = PacketHeader::read_additional_records(&self.inner);
         PacketHeader::write_additional_records(&mut self.inner, additional_records_count + 1);
         Ok(())
@@ -126,6 +128,7 @@ impl PacketBuf {
 impl From<&[u8]> for PacketBuf {
     fn from(buffer: &[u8]) -> Self {
         Self {
+            name_refs: HashMap::new(),
             inner: buffer.to_vec(),
         }
     }
@@ -162,7 +165,7 @@ where
             return None;
         }
 
-        let question = Self::Item::parse(&self.buf, self.pos).ok()?;
+        let question = Self::Item::parse(self.buf, self.pos).ok()?;
         self.curr += 1;
         self.pos += question.len();
 
@@ -253,11 +256,12 @@ impl<'a> Packet<'a> {
     /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package, ready to be sent
     pub fn build_bytes_vec(&self) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
+        let mut name_refs = HashMap::new();
 
-        Self::add_section(&mut out, &self.questions)?;
-        Self::add_section(&mut out, &self.answers)?;
-        Self::add_section(&mut out, &self.name_servers)?;
-        Self::add_section(&mut out, &self.additional_records)?;
+        Self::add_section(&mut out, &mut name_refs, &self.questions)?;
+        Self::add_section(&mut out, &mut name_refs, &self.answers)?;
+        Self::add_section(&mut out, &mut name_refs, &self.name_servers)?;
+        Self::add_section(&mut out, &mut name_refs, &self.additional_records)?;
 
         self.header.write_to(&mut out[0..12]);
         if !self.questions.is_empty() {
@@ -281,10 +285,11 @@ impl<'a> Packet<'a> {
 
     fn add_section<'b, T: DnsPacketContent<'b>>(
         out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
         section: &[T],
     ) -> crate::Result<()> {
         for item in section {
-            item.append_to_vec(out)?;
+            item.append_to_vec(out, name_refs)?;
         }
 
         Ok(())
@@ -322,6 +327,8 @@ mod tests {
 
         let parsed = parsed.unwrap();
         assert_eq!(2, parsed.questions.len());
+        assert_eq!("_srv._udp.local", parsed.questions[0].qname.to_string());
+        assert_eq!("_srv2._udp.local", parsed.questions[1].qname.to_string());
     }
 
     #[test]
@@ -472,7 +479,6 @@ mod tests {
         buf_packet.add_question(&question).unwrap();
         buf_packet.add_question(&question).unwrap();
 
-        let questions: Vec<Question> = buf_packet.questions_iter().collect();
-        assert_eq!(2, questions.len());
+        assert_eq!(2, buf_packet.questions_iter().count());
     }
 }

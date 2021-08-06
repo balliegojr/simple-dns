@@ -8,7 +8,7 @@ mod question;
 pub mod rdata;
 mod resource_record;
 
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 pub use name::Name;
 pub use packet::{Packet, PacketBuf, PacketSectionIter};
@@ -36,7 +36,11 @@ pub trait DnsPacketContent<'a> {
         Self: Sized;
 
     /// Append the bytes of this content to a given vector
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()>;
 
     /// Returns the length in bytes of this content
     fn len(&self) -> usize;

@@ -4,7 +4,7 @@ use crate::{QCLASS, QTYPE};
 
 use super::{rdata::parse_rdata, rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
 use core::fmt::Debug;
-use std::{convert::TryInto, hash::Hash};
+use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
 #[derive(Debug, Eq, PartialEq)]
@@ -76,8 +76,12 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.name.append_to_vec(out)?;
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.name.append_to_vec(out, name_refs)?;
 
         let mut buf = [0u8; 10];
         BigEndian::write_u16(&mut buf[..2], self.rdata.type_code().into());
@@ -86,7 +90,7 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         BigEndian::write_u16(&mut buf[8..10], self.rdata.len() as u16);
 
         out.extend(&buf);
-        self.rdata.append_to_vec(out)
+        self.rdata.append_to_vec(out, name_refs)
     }
 }
 
@@ -128,6 +132,7 @@ mod tests {
     #[test]
     fn test_append_to_vec() {
         let mut out = Vec::new();
+        let mut name_refs = HashMap::new();
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -137,7 +142,7 @@ mod tests {
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
         };
 
-        assert!(rr.append_to_vec(&mut out).is_ok());
+        assert!(rr.append_to_vec(&mut out, &mut name_refs).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]

@@ -46,10 +46,7 @@ impl OneShotMdnsResolver {
     }
 
     /// Send a query packet and returns the first response
-    pub fn query_packet<'a>(
-        &self,
-        packet: PacketBuf,
-    ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
+    pub fn query_packet(&self, packet: PacketBuf) -> Result<Option<PacketBuf>, SimpleMdnsError> {
         // let mut socket = create_udp_socket(self.enable_loopback)?;
         // send_packet_to_multicast_socket(&socket, &packet)?;
         self.sender_socket

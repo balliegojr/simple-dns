@@ -1,5 +1,6 @@
 use super::{CharacterString, DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
+use std::collections::HashMap;
 
 mod a;
 mod aaaa;
@@ -67,10 +68,14 @@ impl<'a> RData<'a> {
         }
     }
 
-    pub(crate) fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    pub(crate) fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
         match &self {
-            RData::A(data) => data.append_to_vec(out),
-            RData::AAAA(data) => data.append_to_vec(out),
+            RData::A(data) => data.append_to_vec(out, name_refs),
+            RData::AAAA(data) => data.append_to_vec(out, name_refs),
             RData::NS(data)
             | RData::CNAME(data)
             | RData::MB(data)
@@ -78,15 +83,15 @@ impl<'a> RData<'a> {
             | RData::MR(data)
             | RData::PTR(data)
             | RData::MF(data)
-            | RData::MD(data) => data.append_to_vec(out),
-            RData::HINFO(data) => data.append_to_vec(out),
-            RData::MINFO(data) => data.append_to_vec(out),
-            RData::MX(data) => data.append_to_vec(out),
-            RData::NULL(_, data) => data.append_to_vec(out),
-            RData::TXT(data) => data.append_to_vec(out),
-            RData::SOA(data) => data.append_to_vec(out),
-            RData::WKS(data) => data.append_to_vec(out),
-            RData::SRV(data) => data.append_to_vec(out),
+            | RData::MD(data) => data.append_to_vec(out, name_refs),
+            RData::HINFO(data) => data.append_to_vec(out, name_refs),
+            RData::MINFO(data) => data.append_to_vec(out, name_refs),
+            RData::MX(data) => data.append_to_vec(out, name_refs),
+            RData::NULL(_, data) => data.append_to_vec(out, name_refs),
+            RData::TXT(data) => data.append_to_vec(out, name_refs),
+            RData::SOA(data) => data.append_to_vec(out, name_refs),
+            RData::WKS(data) => data.append_to_vec(out, name_refs),
+            RData::SRV(data) => data.append_to_vec(out, name_refs),
         }
     }
 

@@ -13,3 +13,10 @@ categories = ["parser-implementations", "network-programming"]
 [dependencies]
 byteorder = "^1.4.2"
 thiserror = "^1.0.24"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "packet_bench"
+harness = false

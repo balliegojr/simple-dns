@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::DnsPacketContent;
 use byteorder::{BigEndian, ByteOrder};
 
@@ -25,7 +27,11 @@ impl<'a> DnsPacketContent<'a> for WKS<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
         let mut buf = [0u8; 4];
         BigEndian::write_u32(&mut buf, self.address);
 

@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ByteOrder};
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use super::{DnsPacketContent, Name, QCLASS, QTYPE};
 
@@ -30,8 +30,12 @@ impl<'a> Question<'a> {
 }
 
 impl<'a> DnsPacketContent<'a> for Question<'a> {
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.qname.append_to_vec(out)?;
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.qname.append_to_vec(out, name_refs)?;
         let mut buf = [0u8; 4];
 
         let qclass = match self.unicast_response {
@@ -81,7 +85,7 @@ mod tests {
 
         assert_eq!(QCLASS::IN, question.qclass);
         assert_eq!(QTYPE::TXT, question.qtype);
-        assert_eq!(false, question.unicast_response);
+        assert!(!question.unicast_response);
     }
 
     #[test]
@@ -93,7 +97,8 @@ mod tests {
             false,
         );
         let mut bytes = Vec::new();
-        question.append_to_vec(&mut bytes).unwrap();
+        let mut name_refs = HashMap::new();
+        question.append_to_vec(&mut bytes, &mut name_refs).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01", &bytes[..]);
         assert_eq!(bytes.len(), question.len());
@@ -102,8 +107,9 @@ mod tests {
     #[test]
     fn unicast_response() {
         let mut bytes = Vec::new();
+        let mut name_refs = HashMap::new();
         Question::new("x.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, true)
-            .append_to_vec(&mut bytes)
+            .append_to_vec(&mut bytes, &mut name_refs)
             .unwrap();
         let parsed = Question::parse(&bytes, 0).unwrap();
 

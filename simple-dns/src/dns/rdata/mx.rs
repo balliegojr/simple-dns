@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{DnsPacketContent, Name};
 use byteorder::{BigEndian, ByteOrder};
 
@@ -26,12 +28,16 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
         let mut buf = [0u8; 2];
         BigEndian::write_u16(&mut buf, self.preference);
         out.extend(&buf);
 
-        self.exchange.append_to_vec(out)
+        self.exchange.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -51,7 +57,8 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(mx.append_to_vec(&mut data).is_ok());
+        let mut name_refs = HashMap::new();
+        assert!(mx.append_to_vec(&mut data, &mut name_refs).is_ok());
 
         let mx = MX::parse(&data, 0);
         assert!(mx.is_ok());
