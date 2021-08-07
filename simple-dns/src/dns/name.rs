@@ -138,7 +138,24 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
         })
     }
 
-    fn append_to_vec(
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        for label in self.iter() {
+            out.push(label.len() as u8);
+            out.extend(label.data);
+        }
+
+        if out[out.len() - 1] != 0 {
+            out.push(0);
+        }
+
+        Ok(())
+    }
+
+    fn len(&self) -> usize {
+        self.total_size
+    }
+
+    fn compress_append_to_vec(
         &self,
         out: &mut Vec<u8>,
         name_refs: &mut HashMap<u64, usize>,
@@ -167,36 +184,6 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
 
         Ok(())
     }
-
-    fn len(&self) -> usize {
-        self.total_size
-    }
-
-    // fn append_to_vec_compressed(
-    //     &'a self,
-    //     out: &'a mut Vec<u8>,
-    //     name_refs: HashMap<&'a Label<'a>, usize>,
-    // ) -> crate::Result<()> {
-    //     for label in self.iter() {
-    //         if name_refs.contains_key(label) {
-    //             let p = name_refs[label] as u16;
-    //             let mut buf = [0u8; 2];
-    //             BigEndian::write_u16(&mut buf, p | POINTER_MASK_U16);
-    //             out.extend(buf);
-    //             return Ok(());
-    //         } else {
-    //             name_refs.insert(label, out.len());
-    //             out.push(label.len() as u8);
-    //             out.extend(label.data);
-    //         }
-    //     }
-
-    //     if out[out.len() - 1] != 0 {
-    //         out.push(0);
-    //     }
-
-    //     Ok(())
-    // }
 }
 
 impl<'a> TryFrom<&'a str> for Name<'a> {
@@ -354,17 +341,16 @@ mod tests {
     #[test]
     fn append_to_vec() {
         let mut bytes = Vec::with_capacity(30);
-        let mut name_refs = HashMap::new();
 
         Name::new_unchecked("_srv._udp.local")
-            .append_to_vec(&mut bytes, &mut name_refs)
+            .append_to_vec(&mut bytes)
             .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
 
         let mut bytes = Vec::with_capacity(30);
         Name::new_unchecked("_srv._udp.local2.")
-            .append_to_vec(&mut bytes, &mut name_refs)
+            .append_to_vec(&mut bytes)
             .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes[..]);
@@ -377,13 +363,13 @@ mod tests {
         let mut name_refs = HashMap::new();
 
         Name::new_unchecked("F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut name_refs)
+            .compress_append_to_vec(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("FOO.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut name_refs)
+            .compress_append_to_vec(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut name_refs)
+            .compress_append_to_vec(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
 
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
@@ -401,18 +387,22 @@ mod tests {
     }
 
     #[test]
-    fn len() {
+    fn len() -> crate::Result<()> {
         let mut bytes = Vec::new();
-        let mut name_refs = HashMap::new();
         let name_one = Name::new_unchecked("ex.com.");
-        name_one.append_to_vec(&mut bytes, &mut name_refs).unwrap();
-
-        let name_two = Name::parse(&bytes, 0).unwrap();
+        name_one.append_to_vec(&mut bytes)?;
 
         assert_eq!(8, bytes.len());
-        assert_eq!(8, name_one.len());
-        assert_eq!(8, name_two.len());
-        assert_eq!(8, Name::new("ex.com").unwrap().len());
+        assert_eq!(bytes.len(), name_one.len());
+        assert_eq!(8, Name::parse(&bytes, 0)?.len());
+
+        let mut name_refs = HashMap::new();
+        let mut bytes = Vec::new();
+        name_one.compress_append_to_vec(&mut bytes, &mut name_refs)?;
+        name_one.compress_append_to_vec(&mut bytes, &mut name_refs)?;
+
+        assert_eq!(10, bytes.len());
+        Ok(())
     }
 
     #[test]

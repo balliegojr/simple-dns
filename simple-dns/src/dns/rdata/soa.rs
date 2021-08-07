@@ -23,6 +23,20 @@ pub struct SOA<'a> {
     pub minimum: u32,
 }
 
+impl<'a> SOA<'a> {
+    fn append_commom(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        let mut buffer = [0u8; 20];
+        BigEndian::write_u32(&mut buffer[..4], self.serial);
+        BigEndian::write_i32(&mut buffer[4..8], self.refresh);
+        BigEndian::write_i32(&mut buffer[8..12], self.retry);
+        BigEndian::write_i32(&mut buffer[12..16], self.expire);
+        BigEndian::write_u32(&mut buffer[16..20], self.minimum);
+
+        out.extend(&buffer[..]);
+        Ok(())
+    }
+}
+
 impl<'a> DnsPacketContent<'a> for SOA<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
@@ -49,27 +63,24 @@ impl<'a> DnsPacketContent<'a> for SOA<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.mname.append_to_vec(out, name_refs)?;
-        self.rname.append_to_vec(out, name_refs)?;
-
-        let mut buffer = [0u8; 20];
-        BigEndian::write_u32(&mut buffer[..4], self.serial);
-        BigEndian::write_i32(&mut buffer[4..8], self.refresh);
-        BigEndian::write_i32(&mut buffer[8..12], self.retry);
-        BigEndian::write_i32(&mut buffer[12..16], self.expire);
-        BigEndian::write_u32(&mut buffer[16..20], self.minimum);
-
-        out.extend(&buffer[..]);
-        Ok(())
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        self.mname.append_to_vec(out)?;
+        self.rname.append_to_vec(out)?;
+        self.append_commom(out)
     }
 
     fn len(&self) -> usize {
         self.mname.len() + self.rname.len() + 20
+    }
+
+    fn compress_append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.mname.compress_append_to_vec(out, name_refs)?;
+        self.rname.compress_append_to_vec(out, name_refs)?;
+        self.append_commom(out)
     }
 }
 
@@ -89,8 +100,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        let mut name_refs = HashMap::new();
-        assert!(soa.append_to_vec(&mut data, &mut name_refs).is_ok());
+        assert!(soa.append_to_vec(&mut data).is_ok());
 
         let soa = SOA::parse(&data, 0);
         assert!(soa.is_ok());

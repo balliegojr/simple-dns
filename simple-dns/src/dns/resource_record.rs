@@ -46,13 +46,19 @@ impl<'a> ResourceRecord<'a> {
             qtype => Into::<u16>::into(type_code) == qtype as u16,
         }
     }
+
+    fn append_common(&self, out: &mut Vec<u8>) {
+        let mut buf = [0u8; 10];
+        BigEndian::write_u16(&mut buf[..2], self.rdata.type_code().into());
+        BigEndian::write_u16(&mut buf[2..4], self.class as u16);
+        BigEndian::write_u32(&mut buf[4..8], self.ttl);
+        BigEndian::write_u16(&mut buf[8..10], self.rdata.len() as u16);
+
+        out.extend(&buf);
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
-    fn len(&self) -> usize {
-        self.name.len() + self.rdata.len() + 10
-    }
-
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -76,21 +82,24 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         })
     }
 
-    fn append_to_vec(
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        self.name.append_to_vec(out)?;
+        self.append_common(out);
+        self.rdata.append_to_vec(out)
+    }
+
+    fn compress_append_to_vec(
         &self,
         out: &mut Vec<u8>,
         name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.name.append_to_vec(out, name_refs)?;
+        self.name.compress_append_to_vec(out, name_refs)?;
+        self.append_common(out);
+        self.rdata.compress_append_to_vec(out, name_refs)
+    }
 
-        let mut buf = [0u8; 10];
-        BigEndian::write_u16(&mut buf[..2], self.rdata.type_code().into());
-        BigEndian::write_u16(&mut buf[2..4], self.class as u16);
-        BigEndian::write_u32(&mut buf[4..8], self.ttl);
-        BigEndian::write_u16(&mut buf[8..10], self.rdata.len() as u16);
-
-        out.extend(&buf);
-        self.rdata.append_to_vec(out, name_refs)
+    fn len(&self) -> usize {
+        self.name.len() + self.rdata.len() + 10
     }
 }
 
@@ -132,7 +141,6 @@ mod tests {
     #[test]
     fn test_append_to_vec() {
         let mut out = Vec::new();
-        let mut name_refs = HashMap::new();
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -142,7 +150,7 @@ mod tests {
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
         };
 
-        assert!(rr.append_to_vec(&mut out, &mut name_refs).is_ok());
+        assert!(rr.append_to_vec(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]

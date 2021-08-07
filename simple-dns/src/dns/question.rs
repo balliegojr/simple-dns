@@ -27,15 +27,8 @@ impl<'a> Question<'a> {
             unicast_response,
         }
     }
-}
 
-impl<'a> DnsPacketContent<'a> for Question<'a> {
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.qname.append_to_vec(out, name_refs)?;
+    fn append_common(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         let mut buf = [0u8; 4];
 
         let qclass = match self.unicast_response {
@@ -50,7 +43,9 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
 
         Ok(())
     }
+}
 
+impl<'a> DnsPacketContent<'a> for Question<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
         let offset = position + qname.len();
@@ -63,6 +58,20 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
             qclass: QCLASS::try_from(qclass & 0x7FFF)?,
             unicast_response: qclass & 0x8000 == 0x8000,
         })
+    }
+
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        self.qname.append_to_vec(out)?;
+        self.append_common(out)
+    }
+
+    fn compress_append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.qname.compress_append_to_vec(out, name_refs)?;
+        self.append_common(out)
     }
 
     fn len(&self) -> usize {
@@ -97,8 +106,7 @@ mod tests {
             false,
         );
         let mut bytes = Vec::new();
-        let mut name_refs = HashMap::new();
-        question.append_to_vec(&mut bytes, &mut name_refs).unwrap();
+        question.append_to_vec(&mut bytes).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01", &bytes[..]);
         assert_eq!(bytes.len(), question.len());
@@ -107,9 +115,8 @@ mod tests {
     #[test]
     fn unicast_response() {
         let mut bytes = Vec::new();
-        let mut name_refs = HashMap::new();
         Question::new("x.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, true)
-            .append_to_vec(&mut bytes, &mut name_refs)
+            .append_to_vec(&mut bytes)
             .unwrap();
         let parsed = Question::parse(&bytes, 0).unwrap();
 

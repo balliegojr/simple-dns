@@ -44,8 +44,65 @@ pub enum RData<'a> {
     NULL(u16, NULL<'a>),
 }
 
-impl<'a> RData<'a> {
-    pub(crate) fn len(&self) -> usize {
+impl<'a> DnsPacketContent<'a> for RData<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        match &self {
+            RData::A(data) => data.append_to_vec(out),
+            RData::AAAA(data) => data.append_to_vec(out),
+            RData::NS(data)
+            | RData::CNAME(data)
+            | RData::MB(data)
+            | RData::MG(data)
+            | RData::MR(data)
+            | RData::PTR(data)
+            | RData::MF(data)
+            | RData::MD(data) => data.append_to_vec(out),
+            RData::HINFO(data) => data.append_to_vec(out),
+            RData::MINFO(data) => data.append_to_vec(out),
+            RData::MX(data) => data.append_to_vec(out),
+            RData::NULL(_, data) => data.append_to_vec(out),
+            RData::TXT(data) => data.append_to_vec(out),
+            RData::SOA(data) => data.append_to_vec(out),
+            RData::WKS(data) => data.append_to_vec(out),
+            RData::SRV(data) => data.append_to_vec(out),
+        }
+    }
+
+    fn compress_append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        match &self {
+            RData::A(data) => data.compress_append_to_vec(out, name_refs),
+            RData::AAAA(data) => data.compress_append_to_vec(out, name_refs),
+            RData::NS(data)
+            | RData::CNAME(data)
+            | RData::MB(data)
+            | RData::MG(data)
+            | RData::MR(data)
+            | RData::PTR(data)
+            | RData::MF(data)
+            | RData::MD(data) => data.compress_append_to_vec(out, name_refs),
+            RData::HINFO(data) => data.compress_append_to_vec(out, name_refs),
+            RData::MINFO(data) => data.compress_append_to_vec(out, name_refs),
+            RData::MX(data) => data.compress_append_to_vec(out, name_refs),
+            RData::NULL(_, data) => data.compress_append_to_vec(out, name_refs),
+            RData::TXT(data) => data.compress_append_to_vec(out, name_refs),
+            RData::SOA(data) => data.compress_append_to_vec(out, name_refs),
+            RData::WKS(data) => data.compress_append_to_vec(out, name_refs),
+            RData::SRV(data) => data.compress_append_to_vec(out, name_refs),
+        }
+    }
+
+    fn len(&self) -> usize {
         match &self {
             RData::A(data) => data.len(),
             RData::AAAA(data) => data.len(),
@@ -67,34 +124,9 @@ impl<'a> RData<'a> {
             RData::SRV(data) => data.len(),
         }
     }
+}
 
-    pub(crate) fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        match &self {
-            RData::A(data) => data.append_to_vec(out, name_refs),
-            RData::AAAA(data) => data.append_to_vec(out, name_refs),
-            RData::NS(data)
-            | RData::CNAME(data)
-            | RData::MB(data)
-            | RData::MG(data)
-            | RData::MR(data)
-            | RData::PTR(data)
-            | RData::MF(data)
-            | RData::MD(data) => data.append_to_vec(out, name_refs),
-            RData::HINFO(data) => data.append_to_vec(out, name_refs),
-            RData::MINFO(data) => data.append_to_vec(out, name_refs),
-            RData::MX(data) => data.append_to_vec(out, name_refs),
-            RData::NULL(_, data) => data.append_to_vec(out, name_refs),
-            RData::TXT(data) => data.append_to_vec(out, name_refs),
-            RData::SOA(data) => data.append_to_vec(out, name_refs),
-            RData::WKS(data) => data.append_to_vec(out, name_refs),
-            RData::SRV(data) => data.append_to_vec(out, name_refs),
-        }
-    }
-
+impl<'a> RData<'a> {
     pub fn type_code(&self) -> TYPE {
         match self {
             RData::A(_) => TYPE::A,

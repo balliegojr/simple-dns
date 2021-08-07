@@ -22,6 +22,17 @@ pub struct SRV<'a> {
     pub target: Name<'a>,
 }
 
+impl<'a> SRV<'a> {
+    fn append_common(&self, out: &mut Vec<u8>) {
+        let mut buf = [0u8; 6];
+        BigEndian::write_u16(&mut buf[0..2], self.priority);
+        BigEndian::write_u16(&mut buf[2..4], self.weight);
+        BigEndian::write_u16(&mut buf[4..6], self.port);
+
+        out.extend(buf);
+    }
+}
+
 impl<'a> DnsPacketContent<'a> for SRV<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
@@ -40,22 +51,22 @@ impl<'a> DnsPacketContent<'a> for SRV<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        let mut buf = [0u8; 6];
-        BigEndian::write_u16(&mut buf[0..2], self.priority);
-        BigEndian::write_u16(&mut buf[2..4], self.weight);
-        BigEndian::write_u16(&mut buf[4..6], self.port);
-
-        out.extend(&buf);
-        self.target.append_to_vec(out, name_refs)
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        self.append_common(out);
+        self.target.append_to_vec(out)
     }
 
     fn len(&self) -> usize {
         self.target.len() + 6
+    }
+
+    fn compress_append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.append_common(out);
+        self.target.compress_append_to_vec(out, name_refs)
     }
 }
 
@@ -73,8 +84,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        let mut name_refs = HashMap::new();
-        assert!(srv.append_to_vec(&mut bytes, &mut name_refs).is_ok());
+        assert!(srv.append_to_vec(&mut bytes).is_ok());
 
         let srv = SRV::parse(&bytes, 0);
         assert!(srv.is_ok());
