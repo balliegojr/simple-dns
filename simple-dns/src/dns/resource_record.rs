@@ -2,7 +2,7 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::{QCLASS, QTYPE};
 
-use super::{rdata::parse_rdata, rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
+use super::{rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
@@ -66,13 +66,10 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
-        let rdatatype = BigEndian::read_u16(&data[offset..offset + 2]).into();
         let class = BigEndian::read_u16(&data[offset + 2..offset + 4]).try_into()?;
         let ttl = BigEndian::read_u32(&data[offset + 4..offset + 8]);
-        let rdatalen = BigEndian::read_u16(&data[offset + 8..offset + 10]) as usize;
 
-        let position = offset + 10;
-        let rdata = parse_rdata(&data[..position + rdatalen], position, rdatatype)?;
+        let rdata = RData::parse(data, offset)?;
 
         Ok(Self {
             name,

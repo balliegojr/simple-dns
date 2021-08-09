@@ -11,7 +11,7 @@ mod resource_record;
 use std::{collections::HashMap, convert::TryFrom};
 
 pub use name::Name;
-pub use packet::{Packet, PacketBuf, PacketSectionIter};
+pub use packet::{Packet, PacketBuf, QuestionsIter};
 pub use packet_header::PacketHeader;
 pub use question::Question;
 pub use resource_record::ResourceRecord;
@@ -28,7 +28,7 @@ const MAX_NULL_LENGTH: usize = 65535;
 // const MAX_PACKET_SIZE: usize = 9000 - 68;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
-pub trait DnsPacketContent<'a> {
+pub(crate) trait DnsPacketContent<'a> {
     /// Parse the contents of the data buffer begining in the given position
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>

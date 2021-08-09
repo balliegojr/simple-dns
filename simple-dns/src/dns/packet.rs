@@ -27,10 +27,10 @@ impl PacketBuf {
         }
     }
 
-    /// Creates a new empty PacketBuf with a query header, with compression enabled
-    pub fn new_query() -> Self {
+    /// Creates a new empty PacketBuf with a query header
+    pub fn new_query(compression: bool) -> Self {
         let header = PacketHeader::new_query(0, false);
-        Self::new(header, true)
+        Self::new(header, compression)
     }
 
     /// Add a [`Question`] to this packet.  
@@ -131,12 +131,11 @@ impl PacketBuf {
     }
 
     /// Returns an Iterator over questions of this packet
-    pub fn questions_iter(&self) -> PacketSectionIter<Question> {
+    pub fn questions_iter(&self) -> QuestionsIter {
         let total = PacketHeader::read_questions(&self.inner);
         let pos = 12;
 
-        PacketSectionIter {
-            _marker: std::marker::PhantomData::default(),
+        QuestionsIter {
             buf: self,
             total,
             pos,
@@ -167,21 +166,14 @@ impl Deref for PacketBuf {
 
 /// Iterate over the questions of a [`PacketBuf`]
 /// If a question is not valid, the iterator will stop
-pub struct PacketSectionIter<'a, T>
-where
-    T: DnsPacketContent<'a>,
-{
-    _marker: std::marker::PhantomData<&'a T>,
+pub struct QuestionsIter<'a> {
     buf: &'a PacketBuf,
     curr: u16,
     total: u16,
     pos: usize,
 }
-impl<'a, T> Iterator for PacketSectionIter<'a, T>
-where
-    T: DnsPacketContent<'a>,
-{
-    type Item = T;
+impl<'a> Iterator for QuestionsIter<'a> {
+    type Item = Question<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.curr >= self.total {
@@ -288,6 +280,8 @@ impl<'a> Packet<'a> {
 
         Ok(out)
     }
+
+    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package with [Name](`Name`) compression
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
         let mut name_refs = HashMap::new();

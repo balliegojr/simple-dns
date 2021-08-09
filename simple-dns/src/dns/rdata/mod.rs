@@ -14,6 +14,7 @@ mod wks;
 
 pub use a::A;
 pub use aaaa::AAAA;
+use byteorder::{BigEndian, ByteOrder};
 pub use hinfo::HINFO;
 pub use minfo::MINFO;
 pub use mx::MX;
@@ -22,6 +23,7 @@ pub use soa::SOA;
 pub use srv::SRV;
 pub use wks::WKS;
 
+/// Represents the RData of each [`TYPE`]
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum RData<'a> {
     A(A),
@@ -49,7 +51,10 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
     where
         Self: Sized,
     {
-        todo!()
+        let rdatatype = BigEndian::read_u16(&data[position..position + 2]).into();
+        let rdatalen = BigEndian::read_u16(&data[position + 8..position + 10]) as usize;
+
+        parse_rdata(&data[position + 10..position + 10 + rdatalen], 0, rdatatype)
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -127,6 +132,7 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
 }
 
 impl<'a> RData<'a> {
+    /// Returns the [`TYPE`] of this RData
     pub fn type_code(&self) -> TYPE {
         match self {
             RData::A(_) => TYPE::A,
@@ -151,7 +157,7 @@ impl<'a> RData<'a> {
     }
 }
 
-pub(crate) fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
+fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
     let rdata = match rdatatype {
         TYPE::A => RData::A(A::parse(data, position)?),
         TYPE::AAAA => RData::AAAA(AAAA::parse(data, position)?),

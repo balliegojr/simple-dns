@@ -17,29 +17,21 @@ const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 /// ex: `google.com` consists of two labels `google` and `com`
 #[derive(Eq)]
 pub struct Name<'a> {
-    first_label: Label<'a>,
+    labels: Vec<Label<'a>>,
     total_size: usize,
 }
 
 impl<'a> Name<'a> {
     /// Creates a new validated Name
     pub fn new(name: &'a str) -> crate::Result<Self> {
-        let mut prev_label = None;
+        let mut labels = Vec::new();
         let mut total_size = 1;
-        for data in name.rsplit('.').filter(|d| !d.is_empty()) {
-            let mut label = Label::new(data.as_bytes())?;
-            label.next = prev_label.map(Box::new);
-            total_size += label.len() + 1;
-
-            prev_label = Some(label);
+        for data in name.split('.').filter(|d| !d.is_empty()) {
+            total_size += data.len() + 1;
+            labels.push(Label::new(data.as_bytes())?);
         }
 
-        let first_label = prev_label.unwrap();
-
-        let name = Self {
-            first_label,
-            total_size,
-        };
+        let name = Self { labels, total_size };
 
         if name.total_size > MAX_NAME_LENGTH {
             Err(crate::SimpleDnsError::InvalidServiceName)
@@ -51,22 +43,16 @@ impl<'a> Name<'a> {
     /// Create a new Name without checking for size limits
     pub fn new_unchecked(name: &'a str) -> Self {
         let mut total_size = 1;
-        let first_label = name
-            .rsplit('.')
+        let labels = name
+            .split('.')
             .filter(|d| !d.is_empty())
-            .fold(None, |prev_label, data| {
-                let mut label = Label::new_unchecked(data.as_bytes());
-                label.next = prev_label.map(Box::new);
-                total_size += label.len() + 1;
-
-                Some(label)
+            .map(|data| {
+                total_size += data.len() + 1;
+                Label::new_unchecked(data.as_bytes())
             })
-            .unwrap();
+            .collect();
 
-        Self {
-            first_label,
-            total_size,
-        }
+        Self { labels, total_size }
     }
 
     /// Verify if name ends with .local.
@@ -77,10 +63,9 @@ impl<'a> Name<'a> {
         }
     }
 
-    pub fn iter(&self) -> NameIter {
-        NameIter {
-            next_label: Some(&self.first_label),
-        }
+    /// Returns an Iter of this Name Labels
+    pub fn iter(&'a self) -> std::slice::Iter<Label<'a>> {
+        self.labels.iter()
     }
 }
 
@@ -124,18 +109,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
 
         total_size += 1;
 
-        let first_label = labels
-            .into_iter()
-            .rfold(None, |prev_label, mut label| {
-                label.next = prev_label;
-                Some(Box::new(label))
-            })
-            .unwrap();
-
-        Ok(Self {
-            first_label: *first_label,
-            total_size,
-        })
+        Ok(Self { labels, total_size })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -216,40 +190,22 @@ impl<'a> std::fmt::Debug for Name<'a> {
 
 impl<'a> PartialEq for Name<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.iter().zip(other.iter()).all(|(a, b)| a == b)
+        self.labels == other.labels
     }
 }
 
 impl<'a> Hash for Name<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.total_size.hash(state);
-        self.first_label.hash(state);
+        self.labels.hash(state);
     }
 }
 
 impl<'a> Clone for Name<'a> {
     fn clone(&self) -> Self {
         Self {
-            first_label: self.first_label.clone(),
+            labels: self.labels.clone(),
             total_size: self.total_size,
-        }
-    }
-}
-
-pub struct NameIter<'a> {
-    next_label: Option<&'a Label<'a>>,
-}
-
-impl<'a> Iterator for NameIter<'a> {
-    type Item = &'a Label<'a>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.next_label {
-            Some(label) => {
-                self.next_label = label.next.as_deref();
-                Some(label)
-            }
-            None => None,
         }
     }
 }
@@ -257,7 +213,6 @@ impl<'a> Iterator for NameIter<'a> {
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Label<'a> {
     data: &'a [u8],
-    next: Option<Box<Label<'a>>>,
 }
 
 impl<'a> Label<'a> {
@@ -271,7 +226,7 @@ impl<'a> Label<'a> {
     }
 
     pub fn new_unchecked(data: &'a [u8]) -> Self {
-        Self { data, next: None }
+        Self { data }
     }
 
     pub fn len(&self) -> usize {

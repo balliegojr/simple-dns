@@ -1,16 +1,16 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use simple_dns::{Name, Packet, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 
+const DOMAINS: [&str; 4] = [
+    "domain.local",
+    "sub.domain.local",
+    "another.domain.local",
+    "sub.another.domain.local",
+];
 fn packet_questions() -> Vec<u8> {
     let mut query = Packet::new_query(1, false);
-    let domains = [
-        "domain.local",
-        "sub.domain.local",
-        "another.domain.local",
-        "sub.another.domain.local",
-    ];
 
-    for domain in domains {
+    for domain in DOMAINS {
         query.questions.push(Question::new(
             Name::new(domain).unwrap(),
             QTYPE::TXT,
@@ -21,16 +21,34 @@ fn packet_questions() -> Vec<u8> {
 
     query.build_bytes_vec().unwrap()
 }
+fn packet_questions_compressed() -> Vec<u8> {
+    let mut query = Packet::new_query(1, false);
+
+    for domain in DOMAINS {
+        query.questions.push(Question::new(
+            Name::new(domain).unwrap(),
+            QTYPE::TXT,
+            QCLASS::IN,
+            false,
+        ));
+    }
+
+    query.build_bytes_vec_compressed().unwrap()
+}
 
 fn packetbuf_questions() -> Vec<u8> {
-    let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false));
-    let domains = [
-        "domain.local",
-        "sub.domain.local",
-        "another.domain.local",
-        "sub.another.domain.local",
-    ];
-    for domain in domains {
+    let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
+    for domain in DOMAINS {
+        let question = Question::new(Name::new(domain).unwrap(), QTYPE::TXT, QCLASS::IN, false);
+        buf_packet.add_question(&question).unwrap();
+    }
+
+    buf_packet.to_vec()
+}
+
+fn packetbuf_questions_compressed() -> Vec<u8> {
+    let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+    for domain in DOMAINS {
         let question = Question::new(Name::new(domain).unwrap(), QTYPE::TXT, QCLASS::IN, false);
         buf_packet.add_question(&question).unwrap();
     }
@@ -53,6 +71,12 @@ fn packet_parse() {
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("packet_questions", |b| b.iter(packet_questions));
     c.bench_function("packetbuf_questions", |b| b.iter(packetbuf_questions));
+    c.bench_function("packet_questions_compressed", |b| {
+        b.iter(packet_questions_compressed)
+    });
+    c.bench_function("packetbuf_questions_compressed", |b| {
+        b.iter(packetbuf_questions_compressed)
+    });
     c.bench_function("packet_parse", |b| b.iter(packet_parse));
 }
 
