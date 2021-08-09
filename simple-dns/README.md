@@ -8,8 +8,8 @@ Packet holds references for the original data and it is more suitable for situat
 you need to manipulate the packet before generating the final bytes buffer
 
 ```rust
-# use simple_dns::*;
-# use simple_dns::rdata::*;
+use simple_dns::*;
+use simple_dns::rdata::*;
 let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
 let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 
@@ -28,7 +28,7 @@ It doesn't matter what order the resources are added, the packet will be built o
 
 To parse the contents of a buffer into a packet, you need call call [Packet::parse]
 ```rust
-# use simple_dns::Packet;
+use simple_dns::Packet;
 
 let bytes = b"\x00\x03\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x06\x67\x6f\x6f\x67\x6c\x65\x03\x63\x6f\x6d\x00\x00\x01\x00\x01";
 let packet = Packet::parse(&bytes[..]);
