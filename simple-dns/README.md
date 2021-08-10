@@ -1,7 +1,7 @@
 # Simple DNS
 Pure Rust implementation to work with DNS packets
 
-You can parse or write a DNS packet by using [`Packet`] or [`PacketBuf`] structs
+You can parse or write a DNS packet by using [Packet](`Packet`) or [PacketBuf](`PacketBuf`) structs
 
 ## Packet
 Packet holds references for the original data and it is more suitable for situations where
@@ -40,8 +40,8 @@ PacketBuf holds an internal buffer that is populated right when a resource is ad
 It DOES matter the order in which the resources are added
 
 ```rust
-# use simple_dns::*;
-# use simple_dns::rdata::*;
+use simple_dns::*;
+use simple_dns::rdata::*;
 let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
 let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 
@@ -50,7 +50,7 @@ assert!(packet.add_answer(&resource).is_ok());
 assert!(packet.add_question(&question).is_err()); //This will fail, since an answer is already added
 ```
 
-It is possible to create a `PacketBuf` from a buffer by calling [`PacketBuf::from`], but be aware that this will clone the contents from the buffer
+It is possible to create a [PacketBuf](`PacketBuf`) from a buffer by calling [PacketBuf::from](`PacketBuf::from`), but be aware that this will clone the contents from the buffer
 
 ## DNS Packet Parser/Builder
 The *Packet* structure provides parsing e building of a DNS packet, it aims to be fully compliant with the RFCs bellow:
