@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use byteorder::{BigEndian, ByteOrder};
 
 use crate::dns::DnsPacketContent;
