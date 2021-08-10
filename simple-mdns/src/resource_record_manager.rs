@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use simple_dns::ResourceRecord;
 
+#[derive(Debug)]
 pub struct ResourceRecordManager<'a> {
     resources: HashSet<ResourceRecord<'a>>,
 }

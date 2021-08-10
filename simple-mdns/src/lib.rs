@@ -1,12 +1,4 @@
-/*!
-Pure Rust implementation for mDNS and DNS-SD protocols
-
-For IpAddress and/or Port querying just one single time, see [`OneShotMdnsResolver`]
-
-For Dns Responder, see [`SimpleMdnsResponder`]
-
-For Service discovery, see [`ServiceDiscovery`]
-*/
+#![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
 #[macro_use]
 extern crate lazy_static;

@@ -24,7 +24,7 @@ fn init_log() {
 
 #[test]
 fn service_discovery_can_find_services() {
-    init_log();
+    // init_log();
     let _responder = get_oneshot_responder(Name::new_unchecked("_srv3._tcp.com"));
 
     std::thread::sleep(Duration::from_secs(1));

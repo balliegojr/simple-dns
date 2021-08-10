@@ -164,7 +164,8 @@ impl ServiceDiscovery {
                 match next_expiration {
                     Some(expiration) => {
                         if expiration.refresh_at < now {
-                            let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
+                            let mut packet =
+                                PacketBuf::new(PacketHeader::new_query(0, false), true);
                             packet
                                 .add_question(&Question::new(
                                     service_name.clone(),
@@ -195,7 +196,7 @@ impl ServiceDiscovery {
 
     fn advertise_service(&self) {
         log::info!("Advertising service");
-        let mut packet = PacketBuf::new(PacketHeader::new_reply(0, OPCODE::StandardQuery));
+        let mut packet = PacketBuf::new(PacketHeader::new_reply(0, OPCODE::StandardQuery), true);
         {
             let resource_manager = self.resource_manager.read().unwrap();
 
@@ -241,7 +242,7 @@ impl ServiceDiscovery {
         let service_name = self.service_name.clone();
 
         log::info!("probing service instances");
-        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
         packet
             .add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))
             .unwrap();

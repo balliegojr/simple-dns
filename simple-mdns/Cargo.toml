@@ -1,6 +1,6 @@
 [package]
 name = "simple-mdns"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2018"
 description = "Rust implementation of mDNS for service discovering (DNS-SD)"
@@ -12,7 +12,7 @@ categories = ["network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-simple-dns = "^0.1"
+simple-dns = "^0.2"
 socket2 = { version="^0.4", features=["all"] }
 rand = "0.8.0"
 log = "^0.4"

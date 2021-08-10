@@ -138,7 +138,7 @@ pub(crate) fn build_reply<'b>(
     resources: &'b ResourceRecordManager<'b>,
 ) -> Option<(bool, PacketBuf)> {
     let header = PacketHeader::parse(&packet).ok()?;
-    let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode));
+    let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode), true);
 
     let mut unicast_response = false;
     let mut additional_records = Vec::new();
@@ -227,7 +227,7 @@ mod tests {
     fn test_build_reply_with_no_questions() {
         let resources = get_resources();
 
-        let packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        let packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
         assert!(build_reply(packet, &resources).is_none());
     }
 
@@ -235,7 +235,7 @@ mod tests {
     fn test_build_reply_without_valid_answers() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
         packet
             .add_question(&Question::new(
                 "_res3._tcp.com".try_into().unwrap(),
@@ -252,7 +252,7 @@ mod tests {
     fn test_build_reply_with_valid_answer() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
         packet
             .add_question(&Question::new(
                 "_res1._tcp.com".try_into().unwrap(),
@@ -274,7 +274,7 @@ mod tests {
     fn test_build_reply_for_srv() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
         packet
             .add_question(&Question::new(
                 "_res1._tcp.com".try_into().unwrap(),

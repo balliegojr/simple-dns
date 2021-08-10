@@ -27,6 +27,7 @@ Since mDNS is a well known protocol, you can register your service in any mDNS r
 
 Query example:
 ```rust  
+    use simple_mdns::OneShotMdnsResolver;
     let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     // querying for IP Address
     let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");

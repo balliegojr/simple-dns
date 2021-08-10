@@ -59,7 +59,7 @@ impl OneShotMdnsResolver {
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::IpAddr>, SimpleMdnsError> {
-        let mut packet = PacketBuf::new(PacketHeader::new_query(rand::random(), false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(rand::random(), false), true);
         let service_name = Name::new(service_name)?;
         packet.add_question(&Question::new(
             service_name.clone(),
@@ -91,7 +91,7 @@ impl OneShotMdnsResolver {
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::SocketAddr>, SimpleMdnsError> {
-        let mut packet = PacketBuf::new(PacketHeader::new_query(rand::random(), false));
+        let mut packet = PacketBuf::new(PacketHeader::new_query(rand::random(), false), true);
         let parsed_name_service = Name::new(service_name)?;
         packet.add_question(&Question::new(
             parsed_name_service.clone(),
