@@ -1,4 +1,7 @@
 # Simple MDNS
+## 0.2.2
+
+Increase simple-dns version
 
 ## 0.2.1
 
