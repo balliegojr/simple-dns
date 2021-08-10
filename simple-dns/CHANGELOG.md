@@ -1,5 +1,9 @@
 # Simple DNS
 
+## 0.2.1
+- Fix Name hash function
+- Fix SRV compression
+
 ## 0.2.0
 
 - Add Name compression

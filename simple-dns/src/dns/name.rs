@@ -196,7 +196,6 @@ impl<'a> PartialEq for Name<'a> {
 
 impl<'a> Hash for Name<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.total_size.hash(state);
         self.labels.hash(state);
     }
 }
@@ -338,6 +337,9 @@ mod tests {
         assert_ne!(Name::new("example.co")?, Name::new("example.com")?);
         assert_ne!(Name::new("example.com.org")?, Name::new("example.com")?);
 
+        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
+        assert_eq!(Name::new("F.ISI.ARPA")?, Name::parse(data, 3)?);
+        assert_eq!(Name::new("FOO.F.ISI.ARPA")?, Name::parse(data, 15)?);
         Ok(())
     }
 
@@ -361,16 +363,20 @@ mod tests {
     }
 
     #[test]
-    fn eq() {
-        let a = Name::new_unchecked("domain.com");
-        let b = Name::new_unchecked("domain.com");
-        let c = Name::new_unchecked("domain.xom");
+    fn hash() -> crate::Result<()> {
+        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
 
-        assert_eq!(a, b);
-        assert_ne!(a, c);
+        assert_eq!(
+            get_hash(&Name::new("F.ISI.ARPA")?),
+            get_hash(&Name::parse(data, 3)?)
+        );
 
-        assert_eq!(get_hash(&a), get_hash(&b));
-        assert_ne!(get_hash(&a), get_hash(&c));
+        assert_eq!(
+            get_hash(&Name::new("FOO.F.ISI.ARPA")?),
+            get_hash(&Name::parse(data, 15)?)
+        );
+
+        Ok(())
     }
 
     fn get_hash(name: &Name) -> u64 {
