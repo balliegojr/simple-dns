@@ -1,5 +1,6 @@
+use std::convert::TryInto;
+
 use crate::dns::DnsPacketContent;
-use byteorder::{BigEndian, ByteOrder};
 
 /// The WKS record is used to describe the well known services supported by a particular protocol on a particular internet address.
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -17,7 +18,7 @@ impl<'a> DnsPacketContent<'a> for WKS<'a> {
     where
         Self: Sized,
     {
-        let address = BigEndian::read_u32(&data[position..position + 4]);
+        let address = u32::from_be_bytes(data[position..position + 4].try_into()?);
         Ok(Self {
             address,
             protocol: data[position + 4],
@@ -26,10 +27,7 @@ impl<'a> DnsPacketContent<'a> for WKS<'a> {
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 4];
-        BigEndian::write_u32(&mut buf, self.address);
-
-        out.extend(&buf);
+        out.extend(self.address.to_be_bytes());
         out.push(self.protocol);
         out.extend(self.bit_map);
 

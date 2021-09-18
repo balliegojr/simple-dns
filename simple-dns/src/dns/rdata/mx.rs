@@ -1,7 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 use crate::dns::{DnsPacketContent, Name};
-use byteorder::{BigEndian, ByteOrder};
 
 /// MX is used to acquire mail exchange information
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -19,7 +18,7 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
     where
         Self: Sized,
     {
-        let preference = BigEndian::read_u16(&data[position..position + 2]);
+        let preference = u16::from_be_bytes(data[position..position + 2].try_into()?);
         let exchange = Name::parse(data, position + 2)?;
 
         Ok(Self {
@@ -29,10 +28,7 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 2];
-        BigEndian::write_u16(&mut buf, self.preference);
-        out.extend(&buf);
-
+        out.extend(self.preference.to_be_bytes());
         self.exchange.append_to_vec(out)
     }
 
@@ -45,10 +41,7 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
         out: &mut Vec<u8>,
         name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        let mut buf = [0u8; 2];
-        BigEndian::write_u16(&mut buf, self.preference);
-        out.extend(&buf);
-
+        out.extend(self.preference.to_be_bytes());
         self.exchange.compress_append_to_vec(out, name_refs)
     }
 }

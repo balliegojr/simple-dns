@@ -1,7 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 use crate::dns::{DnsPacketContent, Name};
-use byteorder::{BigEndian, ByteOrder};
 
 /// SOA records are used to mark the start of a zone of authority
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -25,14 +24,11 @@ pub struct SOA<'a> {
 
 impl<'a> SOA<'a> {
     fn append_commom(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buffer = [0u8; 20];
-        BigEndian::write_u32(&mut buffer[..4], self.serial);
-        BigEndian::write_i32(&mut buffer[4..8], self.refresh);
-        BigEndian::write_i32(&mut buffer[8..12], self.retry);
-        BigEndian::write_i32(&mut buffer[12..16], self.expire);
-        BigEndian::write_u32(&mut buffer[16..20], self.minimum);
-
-        out.extend(&buffer[..]);
+        out.extend(self.serial.to_be_bytes());
+        out.extend(self.refresh.to_be_bytes());
+        out.extend(self.retry.to_be_bytes());
+        out.extend(self.expire.to_be_bytes());
+        out.extend(self.minimum.to_be_bytes());
         Ok(())
     }
 }
@@ -46,11 +42,11 @@ impl<'a> DnsPacketContent<'a> for SOA<'a> {
         let rname = Name::parse(data, position + mname.len())?;
         let offset = mname.len() + rname.len();
 
-        let serial = BigEndian::read_u32(&data[offset..offset + 4]);
-        let refresh = BigEndian::read_i32(&data[offset + 4..offset + 8]);
-        let retry = BigEndian::read_i32(&data[offset + 8..offset + 12]);
-        let expire = BigEndian::read_i32(&data[offset + 12..offset + 16]);
-        let minimum = BigEndian::read_u32(&data[offset + 16..offset + 20]);
+        let serial = u32::from_be_bytes(data[offset..offset + 4].try_into()?);
+        let refresh = i32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
+        let retry = i32::from_be_bytes(data[offset + 8..offset + 12].try_into()?);
+        let expire = i32::from_be_bytes(data[offset + 12..offset + 16].try_into()?);
+        let minimum = u32::from_be_bytes(data[offset + 16..offset + 20].try_into()?);
 
         Ok(Self {
             mname,

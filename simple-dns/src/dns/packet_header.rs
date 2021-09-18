@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder};
+use std::convert::TryInto;
 
 use super::{OPCODE, RCODE};
 
@@ -98,13 +98,13 @@ impl PacketHeader {
             return Err(crate::SimpleDnsError::InvalidHeaderData);
         }
 
-        let flags = BigEndian::read_u16(&data[2..4]);
+        let flags = u16::from_be_bytes(data[2..4].try_into()?);
         if flags & flag::RESERVED_MASK != 0 {
             return Err(crate::SimpleDnsError::InvalidHeaderData);
         }
 
         let header = Self {
-            id: BigEndian::read_u16(&data[..2]),
+            id: u16::from_be_bytes(data[..2].try_into()?),
             query: flags & flag::QUERY == 0,
             opcode: ((flags & flag::OPCODE_MASK) >> flag::OPCODE_MASK.trailing_zeros()).into(),
             authoritative_answer: flags & flag::AUTHORITATIVE != 0,
@@ -114,10 +114,10 @@ impl PacketHeader {
             authentic_data: flags & flag::AUTHENTIC_DATA != 0,
             checking_disabled: flags & flag::CHECKING_DISABLED != 0,
             response_code: (flags & flag::RESPONSE_CODE_MASK).into(),
-            questions_count: BigEndian::read_u16(&data[4..6]),
-            answers_count: BigEndian::read_u16(&data[6..8]),
-            name_servers_count: BigEndian::read_u16(&data[8..10]),
-            additional_records_count: BigEndian::read_u16(&data[10..12]),
+            questions_count: u16::from_be_bytes(data[4..6].try_into()?),
+            answers_count: u16::from_be_bytes(data[6..8].try_into()?),
+            name_servers_count: u16::from_be_bytes(data[8..10].try_into()?),
+            additional_records_count: u16::from_be_bytes(data[10..12].try_into()?),
         };
         Ok(header)
     }
@@ -126,13 +126,13 @@ impl PacketHeader {
     pub fn write_to(&self, buffer: &mut [u8]) {
         assert_eq!(12, buffer.len(), "Header buffer must have length of 12");
 
-        BigEndian::write_u16(&mut buffer[0..2], self.id);
-        BigEndian::write_u16(&mut buffer[2..4], self.get_flags());
+        buffer[0..2].copy_from_slice(&self.id.to_be_bytes());
+        buffer[2..4].copy_from_slice(&self.get_flags().to_be_bytes());
 
-        BigEndian::write_u16(&mut buffer[4..6], self.questions_count);
-        BigEndian::write_u16(&mut buffer[6..8], self.answers_count);
-        BigEndian::write_u16(&mut buffer[8..10], self.name_servers_count);
-        BigEndian::write_u16(&mut buffer[10..12], self.additional_records_count);
+        buffer[4..6].copy_from_slice(&self.questions_count.to_be_bytes());
+        buffer[6..8].copy_from_slice(&self.answers_count.to_be_bytes());
+        buffer[8..10].copy_from_slice(&self.name_servers_count.to_be_bytes());
+        buffer[10..12].copy_from_slice(&self.additional_records_count.to_be_bytes());
     }
 
     fn get_flags(&self) -> u16 {
@@ -160,47 +160,47 @@ impl PacketHeader {
 
     /// Returns the packet id from the header buffer
     pub fn id(buffer: &[u8]) -> u16 {
-        BigEndian::read_u16(&buffer[..2])
+        u16::from_be_bytes(buffer[..2].try_into().expect("Invalid header"))
     }
 
     /// Returns the questions count from the header buffer
     pub fn read_questions(buffer: &[u8]) -> u16 {
-        BigEndian::read_u16(&buffer[4..6])
+        u16::from_be_bytes(buffer[4..6].try_into().expect("Invalid header"))
     }
 
     /// Writes the questions count in the header buffer
     pub fn write_questions(buffer: &mut [u8], question_count: u16) {
-        BigEndian::write_u16(&mut buffer[4..6], question_count);
+        buffer[4..6].copy_from_slice(&question_count.to_be_bytes());
     }
 
     /// Returns the answers count from the header buffer
     pub fn read_answers(buffer: &[u8]) -> u16 {
-        BigEndian::read_u16(&buffer[6..8])
+        u16::from_be_bytes(buffer[6..8].try_into().expect("Invalid header"))
     }
 
     /// Writes the answers count in the header buffer
     pub fn write_answers(buffer: &mut [u8], answers_count: u16) {
-        BigEndian::write_u16(&mut buffer[6..8], answers_count);
+        buffer[6..8].copy_from_slice(&answers_count.to_be_bytes());
     }
 
     /// Returns the name servers count from the header buffer
     pub fn read_name_servers(buffer: &[u8]) -> u16 {
-        BigEndian::read_u16(&buffer[8..10])
+        u16::from_be_bytes(buffer[8..10].try_into().expect("Invalid header"))
     }
 
     /// Writes the name servers count in the header buffer
     pub fn write_name_servers(buffer: &mut [u8], name_servers_count: u16) {
-        BigEndian::write_u16(&mut buffer[8..10], name_servers_count);
+        buffer[8..10].copy_from_slice(&name_servers_count.to_be_bytes());
     }
 
     /// Returns the additional records from the header buffer
     pub fn read_additional_records(buffer: &[u8]) -> u16 {
-        BigEndian::read_u16(&buffer[10..12])
+        u16::from_be_bytes(buffer[10..12].try_into().expect("Invalid header"))
     }
 
     /// Writes the additional records count in the header buffer
     pub fn write_additional_records(buffer: &mut [u8], additional_records_count: u16) {
-        BigEndian::write_u16(&mut buffer[10..12], additional_records_count);
+        buffer[10..12].copy_from_slice(&additional_records_count.to_be_bytes());
     }
 }
 
@@ -239,12 +239,12 @@ mod tests {
             PacketHeader::parse(b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02").unwrap();
 
         assert_eq!(core::u16::MAX, header.id);
-        assert_eq!(true, header.query);
+        assert!(header.query);
         assert_eq!(OPCODE::StandardQuery, header.opcode);
-        assert_eq!(false, header.authoritative_answer);
-        assert_eq!(true, header.truncated);
-        assert_eq!(true, header.recursion_desired);
-        assert_eq!(false, header.recursion_available);
+        assert!(!header.authoritative_answer);
+        assert!(header.truncated);
+        assert!(header.recursion_desired);
+        assert!(!header.recursion_available);
         assert_eq!(RCODE::NoError, header.response_code);
         assert_eq!(2, header.additional_records_count);
         assert_eq!(2, header.answers_count);

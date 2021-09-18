@@ -1,11 +1,9 @@
 use std::{
     collections::HashMap,
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     fmt::Display,
     hash::{BuildHasher, Hash, Hasher},
 };
-
-use byteorder::{BigEndian, ByteOrder};
 
 use super::{DnsPacketContent, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
@@ -87,7 +85,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                     //compression
                     total_size += 1;
 
-                    position = (BigEndian::read_u16(&data[position..position + 2])
+                    position = (u16::from_be_bytes(data[position..position + 2].try_into()?)
                         & !POINTER_MASK_U16) as usize;
                 }
                 len => {
@@ -145,9 +143,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                 out.extend(label.data);
             } else {
                 let p = name_refs[&key] as u16;
-                let mut buf = [0u8; 2];
-                BigEndian::write_u16(&mut buf, p | POINTER_MASK_U16);
-                out.extend(buf);
+                out.extend((p | POINTER_MASK_U16).to_be_bytes());
                 return Ok(());
             }
         }

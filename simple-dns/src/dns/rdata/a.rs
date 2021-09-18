@@ -1,8 +1,5 @@
-use std::net::Ipv4Addr;
-
-use byteorder::{BigEndian, ByteOrder};
-
 use crate::dns::DnsPacketContent;
+use std::{convert::TryInto, net::Ipv4Addr};
 
 /// Represents a Resource Address (IPv4)
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -16,16 +13,12 @@ impl<'a> DnsPacketContent<'a> for A {
     where
         Self: Sized,
     {
-        let address = BigEndian::read_u32(&data[position..position + 4]);
+        let address = u32::from_be_bytes(data[position..position + 4].try_into()?);
         Ok(Self { address })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 4];
-        BigEndian::write_u32(&mut buf[..], self.address);
-
-        out.extend(&buf);
-
+        out.extend(self.address.to_be_bytes());
         Ok(())
     }
 

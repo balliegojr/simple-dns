@@ -1,5 +1,7 @@
-use byteorder::{BigEndian, ByteOrder};
-use std::{collections::HashMap, convert::TryFrom};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
 
 use super::{DnsPacketContent, Name, QCLASS, QTYPE};
 
@@ -29,17 +31,13 @@ impl<'a> Question<'a> {
     }
 
     fn append_common(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 4];
-
         let qclass = match self.unicast_response {
             true => self.qclass as u16 | 0x8000,
             false => self.qclass as u16,
         };
 
-        BigEndian::write_u16(&mut buf[..2], self.qtype as u16);
-        BigEndian::write_u16(&mut buf[2..], qclass);
-
-        out.extend(&buf);
+        out.extend((self.qtype as u16).to_be_bytes());
+        out.extend(qclass.to_be_bytes());
 
         Ok(())
     }
@@ -50,11 +48,11 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
         let qname = Name::parse(data, position)?;
         let offset = position + qname.len();
 
-        let qclass = BigEndian::read_u16(&data[offset + 2..offset + 4]);
+        let qclass = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
 
         Ok(Self {
             qname,
-            qtype: QTYPE::try_from(BigEndian::read_u16(&data[offset..offset + 2]))?,
+            qtype: QTYPE::try_from(u16::from_be_bytes(data[offset..offset + 2].try_into()?))?,
             qclass: QCLASS::try_from(qclass & 0x7FFF)?,
             unicast_response: qclass & 0x8000 == 0x8000,
         })

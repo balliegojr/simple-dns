@@ -1,8 +1,5 @@
-use std::net::Ipv6Addr;
-
-use byteorder::{BigEndian, ByteOrder};
-
 use crate::dns::DnsPacketContent;
+use std::{convert::TryInto, net::Ipv6Addr};
 
 /// Represents a Resource Address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -16,16 +13,12 @@ impl<'a> DnsPacketContent<'a> for AAAA {
     where
         Self: Sized,
     {
-        let address = BigEndian::read_u128(&data[position..position + 16]);
+        let address = u128::from_be_bytes(data[position..position + 16].try_into()?);
         Ok(Self { address })
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 16];
-        BigEndian::write_u128(&mut buf[..], self.address);
-
-        out.extend(&buf);
-
+        out.extend(self.address.to_be_bytes());
         Ok(())
     }
 

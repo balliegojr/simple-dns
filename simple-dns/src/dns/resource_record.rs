@@ -1,5 +1,3 @@
-use byteorder::{BigEndian, ByteOrder};
-
 use crate::{QCLASS, QTYPE};
 
 use super::{rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
@@ -48,13 +46,10 @@ impl<'a> ResourceRecord<'a> {
     }
 
     fn append_common(&self, out: &mut Vec<u8>) {
-        let mut buf = [0u8; 10];
-        BigEndian::write_u16(&mut buf[..2], self.rdata.type_code().into());
-        BigEndian::write_u16(&mut buf[2..4], self.class as u16);
-        BigEndian::write_u32(&mut buf[4..8], self.ttl);
-        BigEndian::write_u16(&mut buf[8..10], self.rdata.len() as u16);
-
-        out.extend(&buf);
+        out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
+        out.extend((self.class as u16).to_be_bytes());
+        out.extend(self.ttl.to_be_bytes());
+        out.extend((self.rdata.len() as u16).to_be_bytes());
     }
 }
 
@@ -66,8 +61,8 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
-        let class = BigEndian::read_u16(&data[offset + 2..offset + 4]).try_into()?;
-        let ttl = BigEndian::read_u32(&data[offset + 4..offset + 8]);
+        let class = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?).try_into()?;
+        let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
 
         let rdata = RData::parse(data, offset)?;
 

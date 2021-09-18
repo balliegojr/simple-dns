@@ -1,6 +1,6 @@
 use super::{DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 mod a;
 mod aaaa;
@@ -15,7 +15,6 @@ mod wks;
 
 pub use a::A;
 pub use aaaa::AAAA;
-use byteorder::{BigEndian, ByteOrder};
 pub use hinfo::HINFO;
 pub use minfo::MINFO;
 pub use mx::MX;
@@ -53,8 +52,8 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
     where
         Self: Sized,
     {
-        let rdatatype = BigEndian::read_u16(&data[position..position + 2]).into();
-        let rdatalen = BigEndian::read_u16(&data[position + 8..position + 10]) as usize;
+        let rdatatype = u16::from_be_bytes(data[position..position + 2].try_into()?).into();
+        let rdatalen = u16::from_be_bytes(data[position + 8..position + 10].try_into()?) as usize;
 
         parse_rdata(&data[position + 10..position + 10 + rdatalen], 0, rdatatype)
     }

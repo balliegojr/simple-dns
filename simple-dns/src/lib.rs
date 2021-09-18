@@ -3,6 +3,8 @@
 
 mod dns;
 
+use std::array::TryFromSliceError;
+
 pub use dns::*;
 use thiserror::Error;
 
@@ -36,4 +38,13 @@ pub enum SimpleDnsError {
     /// Provided data is not valid for a DNS Packet
     #[error("Provided information is not a valid DNS packet")]
     InvalidDnsPacket,
+    /// Attempted to perform an invalid operation
+    #[error("Attempted to perform an invalid operation")]
+    AttemptedInvalidOperation,
+}
+
+impl From<TryFromSliceError> for SimpleDnsError {
+    fn from(_: TryFromSliceError) -> Self {
+        Self::InvalidDnsPacket
+    }
 }

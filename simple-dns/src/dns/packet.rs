@@ -37,7 +37,7 @@ impl PacketBuf {
     /// This function will fail if the packet already has any answer, name server or additional records
     pub fn add_question(&mut self, question: &Question) -> crate::Result<()> {
         if self.has_answers() || self.has_name_servers() || self.has_additional_records() {
-            return Err(SimpleDnsError::InvalidDnsPacket);
+            return Err(SimpleDnsError::AttemptedInvalidOperation);
         }
         if self.compression {
             question.compress_append_to_vec(&mut self.inner, &mut self.name_refs)?;
@@ -53,7 +53,7 @@ impl PacketBuf {
     /// This function will fail if the packet already has any name server or additional records
     pub fn add_answer(&mut self, answer: &ResourceRecord) -> crate::Result<()> {
         if self.has_name_servers() || self.has_additional_records() {
-            return Err(SimpleDnsError::InvalidDnsPacket);
+            return Err(SimpleDnsError::AttemptedInvalidOperation);
         }
 
         if self.compression {
@@ -71,7 +71,7 @@ impl PacketBuf {
     /// This function will fail if the packet already has any additional records
     pub fn add_name_server(&mut self, name_server: &ResourceRecord) -> crate::Result<()> {
         if self.has_additional_records() {
-            return Err(SimpleDnsError::InvalidDnsPacket);
+            return Err(SimpleDnsError::AttemptedInvalidOperation);
         }
 
         if self.compression {

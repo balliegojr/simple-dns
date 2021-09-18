@@ -1,4 +1,4 @@
-use byteorder::{BigEndian, ByteOrder};
+use std::convert::TryInto;
 
 use crate::dns::DnsPacketContent;
 use crate::Name;
@@ -25,9 +25,9 @@ impl<'a> DnsPacketContent<'a> for SRV<'a> {
     where
         Self: Sized,
     {
-        let priority = BigEndian::read_u16(&data[position..position + 2]);
-        let weight = BigEndian::read_u16(&data[position + 2..position + 4]);
-        let port = BigEndian::read_u16(&data[position + 4..position + 6]);
+        let priority = u16::from_be_bytes(data[position..position + 2].try_into()?);
+        let weight = u16::from_be_bytes(data[position + 2..position + 4].try_into()?);
+        let port = u16::from_be_bytes(data[position + 4..position + 6].try_into()?);
         let target = Name::parse(data, position + 6)?;
 
         Ok(Self {
@@ -39,12 +39,10 @@ impl<'a> DnsPacketContent<'a> for SRV<'a> {
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let mut buf = [0u8; 6];
-        BigEndian::write_u16(&mut buf[0..2], self.priority);
-        BigEndian::write_u16(&mut buf[2..4], self.weight);
-        BigEndian::write_u16(&mut buf[4..6], self.port);
+        out.extend(self.priority.to_be_bytes());
+        out.extend(self.weight.to_be_bytes());
+        out.extend(self.port.to_be_bytes());
 
-        out.extend(buf);
         self.target.append_to_vec(out)
     }
 
