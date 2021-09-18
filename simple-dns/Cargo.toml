@@ -17,6 +17,9 @@ thiserror = "^1.0.24"
 [dev-dependencies]
 criterion = "0.3"
 
+[lib]
+bench = false
+
 [[bench]]
 name = "packet_bench"
 harness = false
