@@ -115,8 +115,7 @@ mod tests {
         hash::{Hash, Hasher},
     };
 
-    use crate::dns::rdata::NULL;
-    use crate::dns::CharacterString;
+    use crate::{dns::rdata::NULL, rdata::TXT};
 
     use super::*;
 
@@ -207,13 +206,13 @@ mod tests {
             Name::new_unchecked("_srv.local"),
             CLASS::IN,
             10,
-            RData::TXT(CharacterString::new(b"text").unwrap()),
+            RData::TXT(TXT::new().with_string("text").unwrap()),
         );
         let b = ResourceRecord::new(
             Name::new_unchecked("_srv.local"),
             CLASS::IN,
             10,
-            RData::TXT(CharacterString::new(b"text").unwrap()),
+            RData::TXT(TXT::new().with_string("text").unwrap()),
         );
 
         assert_eq!(a, b);
@@ -226,13 +225,13 @@ mod tests {
             Name::new_unchecked("_srv.local"),
             CLASS::IN,
             10,
-            RData::TXT(CharacterString::new(b"text").unwrap()),
+            RData::TXT(TXT::new().with_string("text").unwrap()),
         );
         let mut b = ResourceRecord::new(
             Name::new_unchecked("_srv.local"),
             CLASS::IN,
             10,
-            RData::TXT(CharacterString::new(b"text").unwrap()),
+            RData::TXT(TXT::new().with_string("text").unwrap()),
         );
 
         assert_eq!(get_hash(&a), get_hash(&b));

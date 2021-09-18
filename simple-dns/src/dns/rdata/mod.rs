@@ -1,4 +1,4 @@
-use super::{CharacterString, DnsPacketContent, Name, TYPE};
+use super::{DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
 use std::collections::HashMap;
 
@@ -10,6 +10,7 @@ mod mx;
 mod null;
 mod soa;
 mod srv;
+mod txt;
 mod wks;
 
 pub use a::A;
@@ -21,6 +22,7 @@ pub use mx::MX;
 pub use null::NULL;
 pub use soa::SOA;
 pub use srv::SRV;
+pub use txt::TXT;
 pub use wks::WKS;
 
 /// Represents the RData of each [`TYPE`]
@@ -39,7 +41,7 @@ pub enum RData<'a> {
     HINFO(HINFO<'a>),
     MINFO(MINFO<'a>),
     MX(MX<'a>),
-    TXT(CharacterString<'a>),
+    TXT(TXT<'a>),
     SOA(Box<SOA<'a>>),
     WKS(WKS<'a>),
     SRV(Box<SRV<'a>>),
@@ -174,7 +176,7 @@ fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<R
         TYPE::HINFO => RData::HINFO(HINFO::parse(data, position)?),
         TYPE::MINFO => RData::MINFO(MINFO::parse(data, position)?),
         TYPE::MX => RData::MX(MX::parse(data, position)?),
-        TYPE::TXT => RData::TXT(CharacterString::parse(data, position)?),
+        TYPE::TXT => RData::TXT(TXT::parse(data, position)?),
         TYPE::SRV => RData::SRV(Box::new(SRV::parse(data, position)?)),
         rdatatype => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
     };

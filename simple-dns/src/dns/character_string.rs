@@ -12,7 +12,7 @@ use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 /// which must be quoted using \ (back slash).
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CharacterString<'a> {
-    data: &'a [u8],
+    pub(crate) data: &'a [u8],
 }
 
 impl<'a> CharacterString<'a> {
