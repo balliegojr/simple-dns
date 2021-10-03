@@ -45,7 +45,7 @@ impl<'a> ResourceRecordManager<'a> {
 mod tests {
     use std::net::Ipv4Addr;
 
-    use simple_dns::{rdata::RData, rdata::A, CharacterString, Name, QCLASS, QTYPE};
+    use simple_dns::{rdata::RData, rdata::A, rdata::TXT, Name, QCLASS, QTYPE};
 
     use super::*;
 
@@ -56,7 +56,7 @@ mod tests {
             Name::new_unchecked("_srv1._tcp"),
             simple_dns::CLASS::IN,
             0,
-            RData::TXT(CharacterString::new("version=1".as_bytes()).unwrap()),
+            RData::TXT(TXT::new().with_string("version=1").unwrap()),
         ));
 
         assert_eq!(1, resources.resources.len());
@@ -70,7 +70,7 @@ mod tests {
             service_name.clone(),
             simple_dns::CLASS::IN,
             0,
-            RData::TXT(CharacterString::new("version=1".as_bytes()).unwrap()),
+            RData::TXT(TXT::new().with_string("version=1").unwrap()),
         ));
         resources.add_resource(ResourceRecord::new(
             service_name.clone(),
