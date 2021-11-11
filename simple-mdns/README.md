@@ -3,15 +3,16 @@
 Pure Rust implementation for mDNS and DNS-SD protocols
 
 ## ServiceDiscovery
-Advertise registered addresses and query for available instances on the same network.
+Advertise registered addresses and query for available instances on the same network.  
+It is necessary to provide instance and service name
 
 ```rust  
     use simple_mdns::ServiceDiscovery;
     use std::net::SocketAddr;
+    use std::str::FromStr;
 
-    let mut discovery = ServiceDiscovery::new("_mysrv._tcp.local", 60).expect("Invalid Service Name");
-    let my_socket_addr = "192.168.1.22:8090".parse().unwrap();
-    discovery.add_socket_address(my_socket_addr);
+    let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
+    discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
 ```
 
 
@@ -66,12 +67,12 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
         class: CLASS::IN,
         name: srv_name.clone(),
         ttl: 10,
-        rdata: RData::SRV(Box::new(SRV {
+        rdata: RData::SRV(SRV {
             port: 8080,
             priority: 0,
             weight: 0,
             target: srv_name
-        }))
+        })
     });
 ```
 

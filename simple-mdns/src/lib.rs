@@ -14,6 +14,7 @@ use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use thiserror::Error;
 
 pub mod conversion_utils;
+mod dns_packet_receiver;
 mod oneshot_resolver;
 mod resource_record_manager;
 mod service_discovery;

@@ -1,4 +1,12 @@
 # Simple MDNS
+## 0.3
+
+- Increase simple-dns version
+- Add attributes information (TXT records) and instance name to service discovery
+- Changes resource manager internal structure to a Trie
+- Replaces specific functions to add information to service discovery in flavor of a more generic one
+
+
 ## 0.2.2
 
 Increase simple-dns version

@@ -12,12 +12,12 @@ categories = ["network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-simple-dns = "^0.3"
+simple-dns = "^0.4"
 socket2 = { version="^0.4", features=["all"] }
-rand = "0.8.0"
 log = "^0.4"
 thiserror = "^1.0.24"
 lazy_static = "^1.4.0"
+radix_trie = "^0.2.1"
 
 [dev-dependencies]
 stderrlog = "^0.5"

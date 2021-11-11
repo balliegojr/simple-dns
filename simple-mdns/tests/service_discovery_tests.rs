@@ -1,65 +1,66 @@
-use simple_dns::Name;
-use simple_mdns::{
-    conversion_utils::socket_addr_to_srv_and_address, ServiceDiscovery, SimpleMdnsResponder,
-};
-use std::{net::SocketAddr, time::Duration};
+use simple_mdns::ServiceDiscovery;
+use std::{error::Error, net::SocketAddr, str::FromStr, time::Duration};
 
-fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
-    let mut responder = SimpleMdnsResponder::default();
-    let (r1, r2) =
-        socket_addr_to_srv_and_address(&srv_name, "192.168.1.4:8080".parse().unwrap(), 360);
-    responder.add_resource(r1);
-    responder.add_resource(r2);
-
-    responder
-}
-
-fn init_log() {
-    stderrlog::new()
-        .verbosity(5)
-        .timestamp(stderrlog::Timestamp::Second)
-        .init()
-        .unwrap();
-}
+// fn init_log() {
+//     stderrlog::new()
+//         .verbosity(5)
+//         .timestamp(stderrlog::Timestamp::Second)
+//         .init()
+//         .unwrap();
+// }
 
 #[test]
-fn service_discovery_can_find_services() {
+fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
     // init_log();
-    let _responder = get_oneshot_responder(Name::new_unchecked("_srv3._tcp.com"));
 
     std::thread::sleep(Duration::from_secs(1));
 
-    let mut service_discovery_a = ServiceDiscovery::new("_srv3._tcp.com", 10).unwrap();
-    let mut service_discovery_b = ServiceDiscovery::new("_srv3._tcp.com", 10).unwrap();
+    let mut service_discovery_a = ServiceDiscovery::new("a", "_srv3._tcp.local", 60)?;
+    let mut service_discovery_b = ServiceDiscovery::new("b", "_srv3._tcp.local", 60)?;
+    let mut service_discovery_c = ServiceDiscovery::new("c", "_srv3._tcp.local", 60)?;
 
-    service_discovery_a.add_socket_address("192.168.1.2:8080".parse().unwrap());
-    service_discovery_b.add_socket_address("192.168.1.3:8080".parse().unwrap());
+    service_discovery_a.add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into());
+    service_discovery_b.add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into());
+    service_discovery_c.add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into());
 
-    std::thread::sleep(Duration::from_secs(15));
+    std::thread::sleep(Duration::from_secs(2));
 
-    let mut services_a = service_discovery_a.get_known_services();
-    let mut services_b = service_discovery_b.get_known_services();
+    let mut from_a: Vec<SocketAddr> = service_discovery_a
+        .get_known_services()
+        .iter()
+        .map(|x| x.combined_addresses())
+        .flatten()
+        .collect();
 
-    services_a.sort();
-    services_b.sort();
+    let mut from_b: Vec<SocketAddr> = service_discovery_b
+        .get_known_services()
+        .iter()
+        .map(|x| x.combined_addresses())
+        .flatten()
+        .collect();
 
-    assert_eq!(2, services_a.len());
-    assert_eq!(2, services_b.len());
+    let mut from_c: Vec<SocketAddr> = service_discovery_c
+        .get_known_services()
+        .iter()
+        .map(|x| x.combined_addresses())
+        .flatten()
+        .collect();
 
-    assert_eq!(
-        &("192.168.1.3:8080".parse::<SocketAddr>().unwrap()),
-        &services_a[0]
-    );
-    assert_eq!(
-        &("192.168.1.4:8080".parse::<SocketAddr>().unwrap()),
-        &services_a[1]
-    );
-    assert_eq!(
-        &("192.168.1.2:8080".parse::<SocketAddr>().unwrap()),
-        &services_b[0]
-    );
-    assert_eq!(
-        &("192.168.1.4:8080".parse::<SocketAddr>().unwrap()),
-        &services_b[1]
-    );
+    from_a.sort();
+    from_b.sort();
+    from_c.sort();
+
+    assert_eq!(2, from_a.len());
+    assert_eq!(2, from_b.len());
+    assert_eq!(2, from_c.len());
+
+    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_a[0]);
+    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_a[1]);
+
+    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_b[0]);
+    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_b[1]);
+
+    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_c[0]);
+    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_c[1]);
+    Ok(())
 }

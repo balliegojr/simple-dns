@@ -1,10 +1,14 @@
-use std::sync::{Arc, RwLock};
+use std::{
+    collections::HashSet,
+    net::{SocketAddr, UdpSocket},
+    sync::{Arc, RwLock},
+};
 
 use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, QTYPE};
 
 use crate::{
-    join_multicast, resource_record_manager::ResourceRecordManager, sender_socket, SimpleMdnsError,
-    MULTICAST_IPV4_SOCKET,
+    dns_packet_receiver::DnsPacketReceiver, resource_record_manager::ResourceRecordManager,
+    sender_socket, SimpleMdnsError, MULTICAST_IPV4_SOCKET,
 };
 
 const FIVE_MINUTES: u32 = 60 * 5;
@@ -34,12 +38,12 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///         class: CLASS::IN,
 ///         name: srv_name.clone(),
 ///         ttl: 10,
-///         rdata: RData::SRV(Box::new(SRV {
+///         rdata: RData::SRV(SRV {
 ///             port: 8080,
 ///             priority: 0,
 ///             weight: 0,
 ///             target: srv_name
-///         }))
+///         })
 ///     });
 /// ```
 ///
@@ -57,20 +61,25 @@ impl SimpleMdnsResponder {
             rr_ttl,
         };
 
-        responder.listen();
+        let resources = responder.resources.clone();
+        std::thread::spawn(move || {
+            if let Err(err) = Self::reply_dns_queries(resources) {
+                log::error!("Dns Responder failed: {}", err);
+            }
+        });
         responder
     }
 
     /// Register a Resource Record
     pub fn add_resource(&mut self, resource: ResourceRecord<'static>) {
         let mut resources = self.resources.write().unwrap();
-        resources.add_resource(resource);
+        resources.add_owned_resource(resource);
     }
 
     /// Remove a resource record
-    pub fn remove_resource_record(&mut self, resource: &ResourceRecord<'static>) {
+    pub fn remove_resource_record(&mut self, resource: ResourceRecord<'static>) {
         let mut resources = self.resources.write().unwrap();
-        resources.remove_resource_record(resource);
+        resources.remove_resource_record(&resource);
     }
 
     /// Remove all resource records
@@ -79,45 +88,23 @@ impl SimpleMdnsResponder {
         resources.clear();
     }
 
-    /// Start listening to requests
-    fn listen(&self) {
-        let resources = self.resources.clone();
-        std::thread::spawn(move || {
-            if let Err(err) = Self::create_socket_and_wait_messages(resources) {
-                log::error!("Dns Responder failed: {}", err);
-            }
-        });
-    }
-
-    fn create_socket_and_wait_messages(
+    fn reply_dns_queries(
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
     ) -> Result<(), SimpleMdnsError> {
-        let mut recv_buffer = vec![0; 4096];
-
-        let receiver_socket = join_multicast(&MULTICAST_IPV4_SOCKET)?;
+        let mut receiver = DnsPacketReceiver::new()?;
         let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
-        let _ = receiver_socket.set_read_timeout(None);
 
         loop {
-            let (count, addr) = receiver_socket.recv_from(&mut recv_buffer)?;
-
-            if let Ok(header) = PacketHeader::parse(&recv_buffer[..12]) {
-                if !header.query {
-                    continue;
+            match receiver.recv_packet() {
+                Ok((header, packet, addr)) => {
+                    if header.query {
+                        send_reply(packet, &resources.read().unwrap(), &sender_socket, addr)?;
+                    }
                 }
-            }
-
-            let packet = PacketBuf::from(&recv_buffer[..count]);
-            let response = build_reply(packet, &resources.read().unwrap());
-
-            if let Some((unicast_response, reply_packet)) = response {
-                let reply_addr = if unicast_response {
-                    addr
-                } else {
-                    *MULTICAST_IPV4_SOCKET
-                };
-                sender_socket.send_to(&reply_packet, &reply_addr)?;
-            }
+                Err(_) => {
+                    log::error!("Received Invalid packet")
+                }
+            };
         }
     }
 
@@ -133,15 +120,29 @@ impl Default for SimpleMdnsResponder {
     }
 }
 
+pub(crate) fn send_reply<'a>(
+    packet: PacketBuf,
+    resources: &'a ResourceRecordManager<'a>,
+    socket: &UdpSocket,
+    addr: SocketAddr,
+) -> Result<(), SimpleMdnsError> {
+    if let Some((reply_packet, reply_addr)) = build_reply(packet, addr, resources) {
+        socket.send_to(&reply_packet, &reply_addr)?;
+    }
+
+    Ok(())
+}
+
 pub(crate) fn build_reply<'b>(
     packet: PacketBuf,
+    from_addr: SocketAddr,
     resources: &'b ResourceRecordManager<'b>,
-) -> Option<(bool, PacketBuf)> {
+) -> Option<(PacketBuf, SocketAddr)> {
     let header = PacketHeader::parse(&packet).ok()?;
     let mut reply_packet = PacketBuf::new(PacketHeader::new_reply(header.id, header.opcode), true);
 
     let mut unicast_response = false;
-    let mut additional_records = Vec::new();
+    let mut additional_records = HashSet::new();
 
     // TODO: fill the questions for the response
     // TODO: filter out questions with known answers
@@ -150,19 +151,20 @@ pub(crate) fn build_reply<'b>(
             unicast_response = question.unicast_response
         }
 
-        for answer in resources.find_matching_resources(|r| {
-            r.name == question.qname
-                && r.match_qtype(question.qtype)
-                && r.match_qclass(question.qclass)
-        }) {
-            reply_packet.add_answer(answer).ok()?;
+        for d_resources in resources.get_domain_resources(&question.qname, true, true) {
+            for answer in d_resources
+                .filter(|r| r.match_qclass(question.qclass) && r.match_qtype(question.qtype))
+            {
+                reply_packet.add_answer(answer).ok()?;
 
-            if let RData::SRV(srv) = &answer.rdata {
-                additional_records.extend(resources.find_matching_resources(|r| {
-                    r.name == srv.target
-                        && r.match_qtype(QTYPE::A)
-                        && r.match_qclass(question.qclass)
-                }));
+                if let RData::SRV(srv) = &answer.rdata {
+                    let target = resources
+                        .get_domain_resources(&srv.target, false, true)
+                        .flatten()
+                        .filter(|r| r.match_qtype(QTYPE::A) && r.match_qclass(question.qclass));
+
+                    additional_records.extend(target);
+                }
             }
         }
     }
@@ -171,8 +173,14 @@ pub(crate) fn build_reply<'b>(
         reply_packet.add_additional_record(additional_record).ok()?;
     }
 
+    let reply_addr = if unicast_response {
+        from_addr
+    } else {
+        *MULTICAST_IPV4_SOCKET
+    };
+
     if reply_packet.has_answers() {
-        Some((unicast_response, reply_packet))
+        Some((reply_packet, reply_addr))
     } else {
         None
     }
@@ -184,6 +192,7 @@ mod tests {
     use std::{
         convert::TryInto,
         net::{Ipv4Addr, Ipv6Addr},
+        str::FromStr,
     };
 
     use simple_dns::Question;
@@ -194,28 +203,28 @@ mod tests {
 
     fn get_resources() -> ResourceRecordManager<'static> {
         let mut resources = ResourceRecordManager::new();
-        resources.add_resource(port_to_srv_record(
+        resources.add_owned_resource(port_to_srv_record(
             &Name::new_unchecked("_res1._tcp.com"),
             8080,
             0,
         ));
-        resources.add_resource(ip_addr_to_resource_record(
+        resources.add_owned_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
             Ipv4Addr::LOCALHOST.into(),
             0,
         ));
-        resources.add_resource(ip_addr_to_resource_record(
+        resources.add_owned_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
             Ipv6Addr::LOCALHOST.into(),
             0,
         ));
 
-        resources.add_resource(port_to_srv_record(
+        resources.add_owned_resource(port_to_srv_record(
             &Name::new_unchecked("_res2._tcp.com"),
             8080,
             0,
         ));
-        resources.add_resource(ip_addr_to_resource_record(
+        resources.add_owned_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res2._tcp.com"),
             Ipv4Addr::LOCALHOST.into(),
             0,
@@ -228,7 +237,12 @@ mod tests {
         let resources = get_resources();
 
         let packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
-        assert!(build_reply(packet, &resources).is_none());
+        assert!(build_reply(
+            packet,
+            SocketAddr::from_str("127.0.0.1:80").unwrap(),
+            &resources
+        )
+        .is_none());
     }
 
     #[test]
@@ -245,7 +259,12 @@ mod tests {
             ))
             .unwrap();
 
-        assert!(build_reply(packet, &resources).is_none());
+        assert!(build_reply(
+            packet,
+            SocketAddr::from_str("127.0.0.1:80").unwrap(),
+            &resources
+        )
+        .is_none());
     }
 
     #[test]
@@ -258,14 +277,19 @@ mod tests {
                 "_res1._tcp.com".try_into().unwrap(),
                 simple_dns::QTYPE::A,
                 simple_dns::QCLASS::ANY,
-                false,
+                true,
             ))
             .unwrap();
 
-        let (unicast_response, reply) = build_reply(packet, &resources).unwrap();
+        let (reply, addr) = build_reply(
+            packet,
+            SocketAddr::from_str("127.0.0.1:80").unwrap(),
+            &resources,
+        )
+        .unwrap();
         let reply = reply.to_packet().unwrap();
 
-        assert!(!unicast_response);
+        assert_eq!(addr, SocketAddr::from_str("127.0.0.1:80").unwrap());
         assert_eq!(2, reply.answers.len());
         assert_eq!(0, reply.additional_records.len());
     }
@@ -284,10 +308,15 @@ mod tests {
             ))
             .unwrap();
 
-        let (unicast_response, reply) = build_reply(packet, &resources).unwrap();
+        let (reply, addr) = build_reply(
+            packet,
+            SocketAddr::from_str("127.0.0.1:80").unwrap(),
+            &resources,
+        )
+        .unwrap();
         let reply = reply.to_packet().unwrap();
 
-        assert!(!unicast_response);
+        assert_eq!(addr, *crate::MULTICAST_IPV4_SOCKET);
         assert_eq!(1, reply.answers.len());
         assert_eq!(2, reply.additional_records.len());
     }
