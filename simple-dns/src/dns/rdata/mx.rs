@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 use crate::dns::{DnsPacketContent, Name};
 
 /// MX is used to acquire mail exchange information
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct MX<'a> {
     /// A 16 bit integer which specifies the preference given to this RR among others at the same owner.  
     /// Lower values are preferred.
@@ -11,6 +11,16 @@ pub struct MX<'a> {
 
     /// A [Name](`Name`) which specifies a host willing to act as a mail exchange for the owner name.
     pub exchange: Name<'a>,
+}
+
+impl<'a> MX<'a> {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> MX<'b> {
+        MX {
+            preference: self.preference,
+            exchange: self.exchange.into_owned(),
+        }
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for MX<'a> {
@@ -32,10 +42,6 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
         self.exchange.append_to_vec(out)
     }
 
-    fn len(&self) -> usize {
-        self.exchange.len() + 2
-    }
-
     fn compress_append_to_vec(
         &self,
         out: &mut Vec<u8>,
@@ -43,6 +49,10 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
     ) -> crate::Result<()> {
         out.extend(self.preference.to_be_bytes());
         self.exchange.compress_append_to_vec(out, name_refs)
+    }
+
+    fn len(&self) -> usize {
+        self.exchange.len() + 2
     }
 }
 

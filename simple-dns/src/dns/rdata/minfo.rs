@@ -3,13 +3,23 @@ use std::collections::HashMap;
 use crate::dns::{DnsPacketContent, Name};
 
 /// MINFO recors are used to acquire mailbox or mail list information
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct MINFO<'a> {
     /// A [Name](`Name`) which specifies a mailbox which is responsible for the mailing list or mailbox.  
     pub rmailbox: Name<'a>,
     /// A [Name](`Name`) which specifies a mailbox which is to receive error messages related to  
     /// the mailing list or mailbox specified by the owner of the MINFO RR
     pub emailbox: Name<'a>,
+}
+
+impl<'a> MINFO<'a> {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> MINFO<'b> {
+        MINFO {
+            rmailbox: self.rmailbox.into_owned(),
+            emailbox: self.emailbox.into_owned(),
+        }
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for MINFO<'a> {

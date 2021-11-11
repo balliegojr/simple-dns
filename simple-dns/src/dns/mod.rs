@@ -10,13 +10,12 @@ mod resource_record;
 
 use std::{collections::HashMap, convert::TryFrom};
 
+pub use character_string::CharacterString;
 pub use name::Name;
 pub use packet::{Packet, PacketBuf, QuestionsIter};
 pub use packet_header::PacketHeader;
 pub use question::Question;
 pub use resource_record::ResourceRecord;
-// pub use rdata::RData;
-pub use character_string::CharacterString;
 
 const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;

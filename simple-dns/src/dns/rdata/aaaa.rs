@@ -2,7 +2,7 @@ use crate::dns::DnsPacketContent;
 use std::{convert::TryInto, net::Ipv6Addr};
 
 /// Represents a Resource Address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct AAAA {
     /// a 128 bit ip address
     pub address: u128,

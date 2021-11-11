@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+};
 
 use crate::{dns::DnsPacketContent, CharacterString};
 
 /// Represents a TXT Resource Record
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TXT<'a> {
     strings: Vec<CharacterString<'a>>,
     size: usize,
@@ -26,9 +29,7 @@ impl<'a> TXT<'a> {
 
     /// Add `char_string` to this TXT record as a validated [`CharacterString`](`CharacterString`)
     pub fn add_string(&mut self, char_string: &'a str) -> crate::Result<()> {
-        let char_string = CharacterString::new(char_string.as_bytes())?;
-        self.size += char_string.len();
-        self.strings.push(char_string);
+        self.add_char_string(char_string.try_into()?);
         Ok(())
     }
 
@@ -40,7 +41,7 @@ impl<'a> TXT<'a> {
 
     /// Add `char_string` to this TXT record as a validated [`CharacterString`](`CharacterString`), consuming and returning Self
     pub fn with_string(mut self, char_string: &'a str) -> crate::Result<Self> {
-        self.add_string(char_string)?;
+        self.add_char_string(char_string.try_into()?);
         Ok(self)
     }
 
@@ -82,6 +83,31 @@ impl<'a> TXT<'a> {
         }
 
         attributes
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> TXT<'b> {
+        TXT {
+            strings: self.strings.into_iter().map(|s| s.into_owned()).collect(),
+            size: self.size,
+        }
+    }
+}
+
+impl<'a> TryFrom<HashMap<String, Option<String>>> for TXT<'a> {
+    type Error = crate::SimpleDnsError;
+
+    fn try_from(value: HashMap<String, Option<String>>) -> Result<Self, Self::Error> {
+        let mut txt = TXT::new();
+        for (key, value) in value {
+            match value {
+                Some(value) => {
+                    txt.add_char_string(format!("{}={}", &key, &value).try_into()?);
+                }
+                None => txt.add_char_string(key.try_into()?),
+            }
+        }
+        Ok(txt)
     }
 }
 
@@ -129,6 +155,7 @@ impl<'a> DnsPacketContent<'a> for TXT<'a> {
 #[cfg(test)]
 mod tests {
     use crate::Result;
+    use std::convert::TryInto;
 
     use super::*;
 
@@ -136,8 +163,8 @@ mod tests {
     pub fn parse_and_write_txt() -> Result<()> {
         let mut out = vec![];
         let txt = TXT::new()
-            .with_string("version=0.1")?
-            .with_string("proto=123")?;
+            .with_char_string("version=0.1".try_into()?)
+            .with_char_string("proto=123".try_into()?);
 
         txt.append_to_vec(&mut out)?;
         assert_eq!(out.len(), txt.len());

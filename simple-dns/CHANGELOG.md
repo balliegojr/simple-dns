@@ -1,4 +1,10 @@
 # Simple DNS
+## 0.4.0
+- Change internal data references to use Cow
+- Add **into_owned** function to every resource
+- Add **is_subdomain_of** for Name comparison
+- Change RData::SRV to not use a Box anymore 
+
 ## 0.3.0
 - Fix TXT Resource Record implementation
 - Drop byteorder crate dependency

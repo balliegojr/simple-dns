@@ -3,7 +3,7 @@ use std::{collections::HashMap, convert::TryInto};
 use crate::dns::{DnsPacketContent, Name};
 
 /// SOA records are used to mark the start of a zone of authority
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SOA<'a> {
     /// The [Name](`Name`) of the name server that was the original or primary source of data for this zone.
     pub mname: Name<'a>,
@@ -30,6 +30,19 @@ impl<'a> SOA<'a> {
         out.extend(self.expire.to_be_bytes());
         out.extend(self.minimum.to_be_bytes());
         Ok(())
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> SOA<'b> {
+        SOA {
+            mname: self.mname.into_owned(),
+            rname: self.rname.into_owned(),
+            serial: self.serial,
+            refresh: self.refresh,
+            retry: self.retry,
+            expire: self.expire,
+            minimum: self.minimum,
+        }
     }
 }
 

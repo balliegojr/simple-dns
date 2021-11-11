@@ -1,3 +1,5 @@
+//! Contains RData implementations
+
 use super::{DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto};
@@ -25,7 +27,8 @@ pub use txt::TXT;
 pub use wks::WKS;
 
 /// Represents the RData of each [`TYPE`]
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+#[allow(missing_docs)]
 pub enum RData<'a> {
     A(A),
     AAAA(AAAA),
@@ -43,7 +46,7 @@ pub enum RData<'a> {
     TXT(TXT<'a>),
     SOA(Box<SOA<'a>>),
     WKS(WKS<'a>),
-    SRV(Box<SRV<'a>>),
+    SRV(SRV<'a>),
     NULL(u16, NULL<'a>),
 }
 
@@ -156,6 +159,30 @@ impl<'a> RData<'a> {
             RData::NULL(type_code, _) => TYPE::Unknown(*type_code),
         }
     }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> RData<'b> {
+        match self {
+            RData::A(data) => RData::A(data),
+            RData::AAAA(data) => RData::AAAA(data),
+            RData::NS(data) => RData::NS(data.into_owned()),
+            RData::MD(data) => RData::MD(data.into_owned()),
+            RData::CNAME(data) => RData::CNAME(data.into_owned()),
+            RData::MB(data) => RData::MB(data.into_owned()),
+            RData::MG(data) => RData::MG(data.into_owned()),
+            RData::MR(data) => RData::MR(data.into_owned()),
+            RData::PTR(data) => RData::PTR(data.into_owned()),
+            RData::MF(data) => RData::MF(data.into_owned()),
+            RData::HINFO(data) => RData::HINFO(data.into_owned()),
+            RData::MINFO(data) => RData::MINFO(data.into_owned()),
+            RData::MX(data) => RData::MX(data.into_owned()),
+            RData::TXT(data) => RData::TXT(data.into_owned()),
+            RData::SOA(data) => RData::SOA(Box::new(data.into_owned())),
+            RData::WKS(data) => RData::WKS(data.into_owned()),
+            RData::SRV(data) => RData::SRV(data.into_owned()),
+            RData::NULL(rdatatype, data) => RData::NULL(rdatatype, data.into_owned()),
+        }
+    }
 }
 
 fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
@@ -176,7 +203,7 @@ fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<R
         TYPE::MINFO => RData::MINFO(MINFO::parse(data, position)?),
         TYPE::MX => RData::MX(MX::parse(data, position)?),
         TYPE::TXT => RData::TXT(TXT::parse(data, position)?),
-        TYPE::SRV => RData::SRV(Box::new(SRV::parse(data, position)?)),
+        TYPE::SRV => RData::SRV(SRV::parse(data, position)?),
         rdatatype => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
     };
 

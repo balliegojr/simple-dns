@@ -1,10 +1,12 @@
+use std::borrow::Cow;
+
 use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
 
 /// NULL resources are used to represent any kind of information.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NULL<'a> {
     length: u16,
-    data: &'a [u8],
+    data: Cow<'a, [u8]>,
 }
 
 impl<'a> NULL<'a> {
@@ -16,13 +18,21 @@ impl<'a> NULL<'a> {
 
         Ok(Self {
             length: data.len() as u16,
-            data,
+            data: Cow::Borrowed(data),
         })
     }
 
     /// get a read only reference to internal data
-    pub fn get_data(&self) -> &'a [u8] {
-        self.data
+    pub fn get_data(&'_ self) -> &'_ [u8] {
+        &self.data
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> NULL<'b> {
+        NULL {
+            length: self.length,
+            data: self.data.into_owned().into(),
+        }
     }
 }
 
@@ -35,7 +45,7 @@ impl<'a> DnsPacketContent<'a> for NULL<'a> {
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        out.extend(self.data);
+        out.extend(self.data.iter());
         Ok(())
     }
 

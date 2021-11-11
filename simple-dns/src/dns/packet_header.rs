@@ -16,7 +16,7 @@ mod flag {
 }
 
 /// Contains general information about the packet
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PacketHeader {
     /// The identification of the packet, must be defined when querying
     pub id: u16,

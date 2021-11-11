@@ -8,6 +8,7 @@ use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
 /// This struct fills the internal buffer on the fly, because of this, it imposes some constraints.  
 /// You have to build the packet in order.  
 /// ex: It is not possible to add a question after an answer
+#[derive(Debug, Clone)]
 pub struct PacketBuf {
     name_refs: HashMap<u64, usize>,
     inner: Vec<u8>,
@@ -189,7 +190,7 @@ impl<'a> Iterator for QuestionsIter<'a> {
 }
 
 /// Represents a DNS message packet
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Packet<'a> {
     /// Packet header
     pub header: PacketHeader,

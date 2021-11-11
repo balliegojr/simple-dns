@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, fmt::Display};
+use std::{borrow::Cow, convert::TryFrom, fmt::Display};
 
 use crate::SimpleDnsError;
 
@@ -10,22 +10,26 @@ use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 ///
 /// Inside a " delimited string any character can occur, except for a " itself,  
 /// which must be quoted using \ (back slash).
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CharacterString<'a> {
-    pub(crate) data: &'a [u8],
+    pub(crate) data: Cow<'a, [u8]>,
 }
 
 impl<'a> CharacterString<'a> {
     /// Creates a new validated CharacterString
     pub fn new(data: &'a [u8]) -> crate::Result<Self> {
-        if data.len() > MAX_CHARACTER_STRING_LENGTH || !CharacterString::is_valid(data) {
+        Self::internal_new(Cow::Borrowed(data))
+    }
+
+    fn internal_new(data: Cow<'a, [u8]>) -> crate::Result<Self> {
+        if data.len() > MAX_CHARACTER_STRING_LENGTH || !Self::is_valid(&data) {
             return Err(SimpleDnsError::InvalidCharacterString);
         }
 
         Ok(Self { data })
     }
 
-    fn is_valid(data: &'a [u8]) -> bool {
+    fn is_valid(data: &'_ [u8]) -> bool {
         if data[0] == b'"' {
             if data[data.len() - 1] != b'"' {
                 return false;
@@ -42,6 +46,13 @@ impl<'a> CharacterString<'a> {
 
         return data.iter().all(|c| *c != b' ');
     }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> CharacterString<'b> {
+        CharacterString {
+            data: self.data.into_owned().into(),
+        }
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
@@ -53,7 +64,7 @@ impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
 
         if Self::is_valid(&data[position + 1..position + 1 + length]) {
             Ok(Self {
-                data: &data[position + 1..position + 1 + length],
+                data: Cow::Borrowed(&data[position + 1..position + 1 + length]),
             })
         } else {
             Err(SimpleDnsError::InvalidCharacterString)
@@ -62,7 +73,7 @@ impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         out.push(self.data.len() as u8);
-        out.extend(self.data);
+        out.extend(self.data.iter());
 
         Ok(())
     }
@@ -76,13 +87,21 @@ impl<'a> TryFrom<&'a str> for CharacterString<'a> {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        CharacterString::new(value.as_bytes())
+        CharacterString::internal_new(Cow::Borrowed(value.as_bytes()))
+    }
+}
+
+impl<'a> TryFrom<String> for CharacterString<'a> {
+    type Error = crate::SimpleDnsError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        CharacterString::internal_new(Cow::Owned(value.as_bytes().into()))
     }
 }
 
 impl<'a> Display for CharacterString<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = std::str::from_utf8(self.data).unwrap();
+        let s = std::str::from_utf8(&self.data).unwrap();
         f.write_str(s)
     }
 }

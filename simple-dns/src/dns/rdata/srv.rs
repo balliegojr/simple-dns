@@ -4,7 +4,7 @@ use crate::dns::DnsPacketContent;
 use crate::Name;
 
 /// SRV records specifies the location of the server(s) for a specific protocol and domain.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct SRV<'a> {
     /// The priority of this target host.  
     /// A client MUST attempt to contact the target host with the lowest-numbered priority it can
@@ -18,6 +18,18 @@ pub struct SRV<'a> {
     pub port: u16,
     /// The domain name of the target host
     pub target: Name<'a>,
+}
+
+impl<'a> SRV<'a> {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> SRV<'b> {
+        SRV {
+            priority: self.priority,
+            weight: self.weight,
+            port: self.port,
+            target: self.target.into_owned(),
+        }
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for SRV<'a> {

@@ -2,7 +2,7 @@ use crate::dns::DnsPacketContent;
 use std::{convert::TryInto, net::Ipv4Addr};
 
 /// Represents a Resource Address (IPv4)
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct A {
     /// a 32 bit ip address
     pub address: u32,

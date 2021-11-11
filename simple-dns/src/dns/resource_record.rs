@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ResourceRecord<'a> {
     /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
@@ -50,6 +50,16 @@ impl<'a> ResourceRecord<'a> {
         out.extend((self.class as u16).to_be_bytes());
         out.extend(self.ttl.to_be_bytes());
         out.extend((self.rdata.len() as u16).to_be_bytes());
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> ResourceRecord<'b> {
+        ResourceRecord {
+            name: self.name.into_owned(),
+            class: self.class,
+            ttl: self.ttl,
+            rdata: self.rdata.into_owned(),
+        }
     }
 }
 

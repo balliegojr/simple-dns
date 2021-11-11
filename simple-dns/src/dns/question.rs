@@ -6,7 +6,7 @@ use std::{
 use super::{DnsPacketContent, Name, QCLASS, QTYPE};
 
 /// Question represents a query in the DNS Packet
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Question<'a> {
     /// a [Name](`Name`)  to query for
     pub qname: Name<'a>,
@@ -40,6 +40,16 @@ impl<'a> Question<'a> {
         out.extend(qclass.to_be_bytes());
 
         Ok(())
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> Question<'b> {
+        Question {
+            qname: self.qname.into_owned(),
+            qtype: self.qtype,
+            qclass: self.qclass,
+            unicast_response: self.unicast_response,
+        }
     }
 }
 

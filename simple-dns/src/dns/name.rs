@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Display,
@@ -13,7 +14,7 @@ const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 /// A Name represents a domain-name, which consists of character strings separated by dots.  
 /// Each section of a name is called label  
 /// ex: `google.com` consists of two labels `google` and `com`
-#[derive(Eq)]
+#[derive(Eq, Clone)]
 pub struct Name<'a> {
     labels: Vec<Label<'a>>,
     total_size: usize,
@@ -56,7 +57,7 @@ impl<'a> Name<'a> {
     /// Verify if name ends with .local.
     pub fn is_link_local(&self) -> bool {
         match self.iter().last() {
-            Some(label) => b"local".eq_ignore_ascii_case(label.data),
+            Some(label) => b"local".eq_ignore_ascii_case(&label.data),
             None => false,
         }
     }
@@ -64,6 +65,28 @@ impl<'a> Name<'a> {
     /// Returns an Iter of this Name Labels
     pub fn iter(&'a self) -> std::slice::Iter<Label<'a>> {
         self.labels.iter()
+    }
+
+    /// Returns true if self is a subdomain of other
+    pub fn is_subdomain_of(&self, other: &Name) -> bool {
+        other
+            .iter()
+            .rev()
+            .zip(self.iter().rev())
+            .all(|(o, s)| *o == *s)
+    }
+
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> Name<'b> {
+        Name {
+            labels: self.labels.into_iter().map(|l| l.into_owned()).collect(),
+            total_size: self.total_size,
+        }
+    }
+
+    /// Get the labels that compose this name
+    pub fn get_labels(&'_ self) -> &'_ [Label<'_>] {
+        &self.labels[..]
     }
 }
 
@@ -113,7 +136,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
         for label in self.iter() {
             out.push(label.len() as u8);
-            out.extend(label.data);
+            out.extend(label.data.iter());
         }
 
         if out[out.len() - 1] != 0 {
@@ -140,7 +163,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
             if let std::collections::hash_map::Entry::Vacant(e) = name_refs.entry(key) {
                 e.insert(out.len());
                 out.push(label.len() as u8);
-                out.extend(label.data);
+                out.extend(label.data.iter());
             } else {
                 let p = name_refs[&key] as u16;
                 out.extend((p | POINTER_MASK_U16).to_be_bytes());
@@ -196,22 +219,13 @@ impl<'a> Hash for Name<'a> {
     }
 }
 
-impl<'a> Clone for Name<'a> {
-    fn clone(&self) -> Self {
-        Self {
-            labels: self.labels.clone(),
-            total_size: self.total_size,
-        }
-    }
-}
-
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Label<'a> {
-    data: &'a [u8],
+    data: Cow<'a, [u8]>,
 }
 
 impl<'a> Label<'a> {
-    pub fn new(data: &'a [u8]) -> crate::Result<Self> {
+    pub fn new<T: Into<Cow<'a, [u8]>>>(data: T) -> crate::Result<Self> {
         let label = Self::new_unchecked(data);
         if label.len() > MAX_LABEL_LENGTH {
             Err(crate::SimpleDnsError::InvalidServiceLabel)
@@ -220,18 +234,24 @@ impl<'a> Label<'a> {
         }
     }
 
-    pub fn new_unchecked(data: &'a [u8]) -> Self {
-        Self { data }
+    pub fn new_unchecked<T: Into<Cow<'a, [u8]>>>(data: T) -> Self {
+        Self { data: data.into() }
     }
 
     pub fn len(&self) -> usize {
         self.data.len()
     }
+
+    pub fn into_owned<'b>(self) -> Label<'b> {
+        Label {
+            data: self.data.into_owned().into(),
+        }
+    }
 }
 
 impl<'a> Display for Label<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match std::str::from_utf8(self.data) {
+        match std::str::from_utf8(&self.data) {
             Ok(s) => f.write_str(s),
             Err(_) => Err(std::fmt::Error),
         }
@@ -379,5 +399,22 @@ mod tests {
         let mut hasher = DefaultHasher::default();
         name.hash(&mut hasher);
         hasher.finish()
+    }
+
+    #[test]
+    fn is_subdomain_of() {
+        assert!(
+            Name::new_unchecked("example.com").is_subdomain_of(&Name::new_unchecked("example.com"))
+        );
+        assert!(Name::new_unchecked("sub.example.com")
+            .is_subdomain_of(&Name::new_unchecked("example.com")));
+        assert!(Name::new_unchecked("foo.sub.example.com")
+            .is_subdomain_of(&Name::new_unchecked("example.com")));
+        assert!(!Name::new_unchecked("example.com")
+            .is_subdomain_of(&Name::new_unchecked("example.xom")));
+        assert!(!Name::new_unchecked("domain.com")
+            .is_subdomain_of(&Name::new_unchecked("other.domain")));
+        assert!(!Name::new_unchecked("domain.com")
+            .is_subdomain_of(&Name::new_unchecked("domain.com.br")));
     }
 }
