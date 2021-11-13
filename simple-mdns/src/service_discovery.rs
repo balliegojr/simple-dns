@@ -268,7 +268,14 @@ fn add_response_to_resources(
     full_name: &Name<'_>,
     owned_resources: &mut ResourceRecordManager,
 ) {
-    let packet = packet.to_packet().unwrap();
+    let packet = match packet.to_packet() {
+        Ok(packet) => packet,
+        Err(err) => {
+            log::error!("Received Invalid packet: {}", err);
+            log::debug!("{:?}", packet);
+            return;
+        }
+    };
 
     let resources = packet
         .answers
