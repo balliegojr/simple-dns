@@ -28,21 +28,21 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
     let mut from_a: Vec<SocketAddr> = service_discovery_a
         .get_known_services()
         .iter()
-        .map(|x| x.combined_addresses())
+        .map(|x| x.get_socket_addresses())
         .flatten()
         .collect();
 
     let mut from_b: Vec<SocketAddr> = service_discovery_b
         .get_known_services()
         .iter()
-        .map(|x| x.combined_addresses())
+        .map(|x| x.get_socket_addresses())
         .flatten()
         .collect();
 
     let mut from_c: Vec<SocketAddr> = service_discovery_c
         .get_known_services()
         .iter()
-        .map(|x| x.combined_addresses())
+        .map(|x| x.get_socket_addresses())
         .flatten()
         .collect();
 

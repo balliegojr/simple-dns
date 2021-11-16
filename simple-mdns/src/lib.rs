@@ -21,7 +21,7 @@ mod service_discovery;
 mod simple_responder;
 
 pub use oneshot_resolver::OneShotMdnsResolver;
-pub use service_discovery::ServiceDiscovery;
+pub use service_discovery::{InstanceInformation, ServiceDiscovery};
 pub use simple_responder::SimpleMdnsResponder;
 
 const UNICAST_RESPONSE: bool = cfg!(not(test));

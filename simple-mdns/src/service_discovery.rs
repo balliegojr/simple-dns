@@ -90,7 +90,7 @@ impl ServiceDiscovery {
     }
 
     /// Add the  service info to discovery and immediately advertise the service
-    pub fn add_service_info(&mut self, service_info: ServiceInfo) {
+    pub fn add_service_info(&mut self, service_info: InstanceInformation) {
         {
             let mut resource_manager = self.resource_manager.write().unwrap();
             for resource in service_info
@@ -110,7 +110,7 @@ impl ServiceDiscovery {
     }
 
     /// Return the addresses of all known services
-    pub fn get_known_services(&self) -> Vec<ServiceInfo> {
+    pub fn get_known_services(&self) -> Vec<InstanceInformation> {
         self.resource_manager
             .read()
             .unwrap()
@@ -134,7 +134,7 @@ impl ServiceDiscovery {
                     }
                 }
 
-                ServiceInfo {
+                InstanceInformation {
                     ip_addresses,
                     ports,
                     attributes,
@@ -295,20 +295,26 @@ fn add_response_to_resources(
     }
 }
 
+/// Represents a single instance of the service.
+/// Notice that it is not possible to associate a port to a single ip address, due to limitations of the DNS protocol
 #[derive(Debug)]
-pub struct ServiceInfo {
-    ip_addresses: Vec<IpAddr>,
-    ports: Vec<u16>,
-    attributes: HashMap<String, Option<String>>,
+pub struct InstanceInformation {
+    /// Ips for this instance
+    pub ip_addresses: Vec<IpAddr>,
+    /// Ports for this instance
+    pub ports: Vec<u16>,
+    /// Attributes for this instance
+    pub attributes: HashMap<String, Option<String>>,
 }
 
-impl Default for ServiceInfo {
+impl Default for InstanceInformation {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ServiceInfo {
+impl InstanceInformation {
+    /// Creates an empty InstanceInformation
     pub fn new() -> Self {
         Self {
             ip_addresses: Vec::new(),
@@ -316,6 +322,8 @@ impl ServiceInfo {
             attributes: HashMap::new(),
         }
     }
+
+    /// Transform into a [Vec<ResourceRecord>](`Vec<ResourceRecord>`)
     pub fn into_records<'a>(
         self,
         service_name: &Name<'a>,
@@ -336,7 +344,8 @@ impl ServiceInfo {
         Ok(records)
     }
 
-    pub fn combined_addresses(&'_ self) -> impl Iterator<Item = SocketAddr> + '_ {
+    /// Creates a Iterator of [`SocketAddr`](`std::net::SocketAddr`) for each ip address and port combination
+    pub fn get_socket_addresses(&'_ self) -> impl Iterator<Item = SocketAddr> + '_ {
         self.ip_addresses
             .iter()
             .copied()
@@ -348,21 +357,16 @@ impl ServiceInfo {
             })
             .flatten()
     }
-
-    /// Get a reference to the service info's attributes.
-    pub fn attributes(&self) -> &HashMap<String, Option<String>> {
-        &self.attributes
-    }
 }
 
-impl std::hash::Hash for ServiceInfo {
+impl std::hash::Hash for InstanceInformation {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.ip_addresses.hash(state);
         self.ports.hash(state);
     }
 }
 
-impl From<SocketAddr> for ServiceInfo {
+impl From<SocketAddr> for InstanceInformation {
     fn from(addr: SocketAddr) -> Self {
         let ip_address = addr.ip();
         let port = addr.port();
