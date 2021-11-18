@@ -1,10 +1,7 @@
 use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 
-use std::{
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
-    time::Duration,
-};
+use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket}, time::{Duration, Instant}};
 /// Provides One Shot queries (legacy mDNS)
 ///
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
@@ -51,7 +48,8 @@ impl OneShotMdnsResolver {
         // send_packet_to_multicast_socket(&socket, &packet)?;
         self.sender_socket
             .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
-        self.get_first_response(packet.packet_id(), self.query_timeout)
+        let deadline = Instant::now() + self.query_timeout;
+        self.get_next_response(packet.packet_id(), deadline)
     }
 
     /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
@@ -68,8 +66,18 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ))?;
 
-        if let Some(response) = self.query_packet(packet)? {
-            let response = response.to_packet()?;
+        self.sender_socket
+            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
+
+        let deadline = Instant::now() + self.query_timeout;
+        while let Some(response) = self.get_next_response(packet.packet_id(), deadline)? {
+            let response = match response.to_packet() {
+                Ok(packet) => packet,
+                Err(err) => {
+                    log::error!("Received invalid packet: {}", err);
+                    continue;
+                },
+            };
             for anwser in response.answers {
                 if anwser.name != service_name {
                     continue;
@@ -100,8 +108,20 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ))?;
 
-        if let Some(response) = self.query_packet(packet)? {
-            let response = response.to_packet()?;
+
+        self.sender_socket
+            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
+
+        let deadline = Instant::now() + self.query_timeout;
+        while let Some(response) = self.get_next_response(packet.packet_id(), deadline)? {
+            let response = match response.to_packet() {
+                Ok(packet) => packet,
+                Err(err) => {
+                    log::error!("Received invalid packet: {}", err);
+                    continue;
+                },
+            };
+
             let port = response
                 .answers
                 .iter()
@@ -142,13 +162,12 @@ impl OneShotMdnsResolver {
     pub fn set_unicast_response(&mut self, unicast_response: bool) {
         self.unicast_response = unicast_response;
     }
-    fn get_first_response(
+    fn get_next_response(
         &self,
         packet_id: u16,
-        query_timeout: Duration,
+        query_deadline: std::time::Instant,
     ) -> Result<Option<PacketBuf>, SimpleMdnsError> {
         let mut buf = [0u8; 4096];
-        let timeout = std::time::Instant::now();
         loop {
             match self.receiver_socket.recv_from(&mut buf[..]) {
                 Ok((count, _)) => {
@@ -159,7 +178,7 @@ impl OneShotMdnsResolver {
                     }
                 }
                 Err(_) => {
-                    if timeout.elapsed() > query_timeout {
+                    if query_deadline > std::time::Instant::now()   {
                         return Ok(None);
                     }
                 }
