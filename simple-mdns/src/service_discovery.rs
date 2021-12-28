@@ -54,13 +54,13 @@ impl ServiceDiscovery {
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
     pub fn new(
-        instance_name: &'static str,
-        service_name: &'static str,
+        instance_name: &str,
+        service_name: &str,
         resource_ttl: u32,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
         let full_name = Name::new(&full_name)?.into_owned();
-        let service_name = Name::new(service_name)?;
+        let service_name = Name::new(service_name)?.into_owned();
 
         let mut resource_manager = ResourceRecordManager::new();
         resource_manager.add_owned_resource(ResourceRecord::new(
