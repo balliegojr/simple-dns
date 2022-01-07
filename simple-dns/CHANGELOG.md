@@ -1,4 +1,7 @@
 # Simple DNS
+## 0.4.1
+- Fix a panic when parsing TXT records of length 0
+
 ## 0.4.0
 - Change internal data references to use Cow
 - Add **into_owned** function to every resource
