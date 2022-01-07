@@ -1,4 +1,7 @@
 # Simple MDNS
+## 0.4
+- Add TXT records to service queries
+
 ## 0.3
 
 - Increase simple-dns version

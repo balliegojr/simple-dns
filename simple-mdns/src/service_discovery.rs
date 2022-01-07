@@ -183,6 +183,13 @@ impl ServiceDiscovery {
             true,
         ));
 
+        let _ = packet.add_question(&Question::new(
+            self.full_name.clone(),
+            QTYPE::TXT,
+            QCLASS::IN,
+            true,
+        ));
+
         if build_reply(
             packet,
             *super::MULTICAST_IPV4_SOCKET,
@@ -243,7 +250,15 @@ fn query_service_instances(service_name: Name, packet_sender: &Sender<(PacketBuf
     log::info!("probing service instances");
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
     packet
-        .add_question(&Question::new(service_name, QTYPE::SRV, QCLASS::IN, false))
+        .add_question(&Question::new(
+            service_name.clone(),
+            QTYPE::SRV,
+            QCLASS::IN,
+            false,
+        ))
+        .unwrap();
+    packet
+        .add_question(&Question::new(service_name, QTYPE::TXT, QCLASS::IN, false))
         .unwrap();
 
     if let Err(err) = packet_sender.send((packet, *super::MULTICAST_IPV4_SOCKET)) {

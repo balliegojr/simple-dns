@@ -1,5 +1,5 @@
-use simple_mdns::ServiceDiscovery;
-use std::{error::Error, net::SocketAddr, str::FromStr, time::Duration};
+use simple_mdns::{InstanceInformation, ServiceDiscovery};
+use std::{collections::HashMap, error::Error, net::SocketAddr, str::FromStr, time::Duration};
 
 // fn init_log() {
 //     stderrlog::new()
@@ -62,5 +62,51 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_c[0]);
     assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_c[1]);
+    Ok(())
+}
+
+#[test]
+fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
+    // init_log();
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let mut service_discovery_d = ServiceDiscovery::new("d", "_srv4._tcp.local", 60)?;
+    let mut service_discovery_e = ServiceDiscovery::new("e", "_srv4._tcp.local", 60)?;
+
+    let mut service_info: InstanceInformation = SocketAddr::from_str("192.168.1.2:8080")?.into();
+    service_info
+        .attributes
+        .insert("id".to_string(), Some("id_d".to_string()));
+
+    service_discovery_d.add_service_info(service_info);
+    let mut service_info: InstanceInformation = SocketAddr::from_str("192.168.1.3:8080")?.into();
+    service_info
+        .attributes
+        .insert("id".to_string(), Some("id_e".to_string()));
+    service_discovery_e.add_service_info(service_info);
+
+    std::thread::sleep(Duration::from_secs(2));
+
+    let d_attr: HashMap<String, Option<String>> = service_discovery_d
+        .get_known_services()
+        .into_iter()
+        .map(|x| x.attributes)
+        .flatten()
+        .collect();
+
+    let e_attr: HashMap<String, Option<String>> = service_discovery_e
+        .get_known_services()
+        .into_iter()
+        .map(|x| x.attributes)
+        .flatten()
+        .collect();
+
+    assert_eq!(1, d_attr.len());
+    assert_eq!(1, e_attr.len());
+
+    assert_eq!("id_e", d_attr.get("id").as_ref().unwrap().as_ref().unwrap());
+    assert_eq!("id_d", e_attr.get("id").as_ref().unwrap().as_ref().unwrap());
+
     Ok(())
 }
