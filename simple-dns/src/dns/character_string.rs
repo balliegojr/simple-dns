@@ -62,7 +62,7 @@ impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
     {
         let length = data[position] as usize;
 
-        if Self::is_valid(&data[position + 1..position + 1 + length]) {
+        if length == 0 || Self::is_valid(&data[position + 1..position + 1 + length]) {
             Ok(Self {
                 data: Cow::Borrowed(&data[position + 1..position + 1 + length]),
             })
