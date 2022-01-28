@@ -10,7 +10,7 @@ use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
 ///
 /// Inside a " delimited string any character can occur, except for a " itself,  
 /// which must be quoted using \ (back slash).
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone)]
 pub struct CharacterString<'a> {
     pub(crate) data: Cow<'a, [u8]>,
 }
@@ -103,6 +103,14 @@ impl<'a> Display for CharacterString<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = std::str::from_utf8(&self.data).unwrap();
         f.write_str(s)
+    }
+}
+
+impl<'a> std::fmt::Debug for CharacterString<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CharacterString")
+            .field("data", &self.to_string())
+            .finish()
     }
 }
 

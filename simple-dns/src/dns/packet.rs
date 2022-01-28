@@ -521,4 +521,31 @@ mod tests {
 
         assert_eq!(2, buf_packet.questions_iter().count());
     }
+
+    #[test]
+    fn compression_multiple_names() {
+        let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+
+        buf_packet.add_answer(&ResourceRecord::new(
+            Name::new_unchecked("a._tcp.local"),
+            CLASS::IN,
+            10,
+            RData::A(A { address: 10 }),
+        ));
+        buf_packet.add_answer(&ResourceRecord::new(
+            Name::new_unchecked("b._tcp.local"),
+            CLASS::IN,
+            10,
+            RData::A(A { address: 10 }),
+        ));
+
+        buf_packet.add_answer(&ResourceRecord::new(
+            Name::new_unchecked("b._tcp.local"),
+            CLASS::IN,
+            10,
+            RData::A(A { address: 10 }),
+        ));
+
+        assert!(Packet::parse(&buf_packet).is_ok());
+    }
 }

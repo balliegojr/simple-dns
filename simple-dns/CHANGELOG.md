@@ -1,4 +1,7 @@
 # Simple DNS
+## 0.4.2
+- Fix Name compression when using multiple pointers
+
 ## 0.4.1
 - Fix a panic when parsing TXT records of length 0
 

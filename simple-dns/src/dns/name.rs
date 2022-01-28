@@ -95,7 +95,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
     where
         Self: Sized,
     {
-        let mut total_size = 0;
+        let mut total_size = 1;
         let mut is_compressed = false;
         let mut labels = Vec::new();
 
@@ -104,9 +104,11 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
         while data[position] != 0 {
             match data[position] {
                 len if len & POINTER_MASK == POINTER_MASK => {
-                    is_compressed = true;
                     //compression
-                    total_size += 1;
+                    if !is_compressed {
+                        total_size += 1;
+                    }
+                    is_compressed = true;
 
                     position = (u16::from_be_bytes(data[position..position + 2].try_into()?)
                         & !POINTER_MASK_U16) as usize;
@@ -127,8 +129,6 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
         }
-
-        total_size += 1;
 
         Ok(Self { labels, total_size })
     }
@@ -167,6 +167,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
             } else {
                 let p = name_refs[&key] as u16;
                 out.extend((p | POINTER_MASK_U16).to_be_bytes());
+
                 return Ok(());
             }
         }
@@ -203,7 +204,10 @@ impl<'a> Display for Name<'a> {
 
 impl<'a> std::fmt::Debug for Name<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Name").field(&format!("{}", self)).finish()
+        f.debug_tuple("Name")
+            .field(&format!("{}", self))
+            .field(&format!("{}", self.total_size))
+            .finish()
     }
 }
 
@@ -255,6 +259,14 @@ impl<'a> Display for Label<'a> {
             Ok(s) => f.write_str(s),
             Err(_) => Err(std::fmt::Error),
         }
+    }
+}
+
+impl<'a> std::fmt::Debug for Label<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Label")
+            .field("data", &self.to_string())
+            .finish()
     }
 }
 
@@ -344,6 +356,37 @@ mod tests {
 
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
         assert_eq!(data[..], buf[..]);
+    }
+
+    #[test]
+    fn append_to_vec_with_compression_mult_names() {
+        let mut buf = vec![];
+        let mut name_refs = HashMap::new();
+
+        Name::new_unchecked("ISI.ARPA")
+            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .expect("failed to add ISI.ARPA");
+        Name::new_unchecked("F.ISI.ARPA")
+            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .expect("failed to add F.ISI.ARPA");
+        Name::new_unchecked("FOO.F.ISI.ARPA")
+            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .expect("failed to add F.ISI.ARPA");
+        Name::new_unchecked("BAR.F.ISI.ARPA")
+            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .expect("failed to add F.ISI.ARPA");
+
+        let expected = b"\x03ISI\x04ARPA\x00\x01F\xc0\x00\x03FOO\xc0\x0a\x03BAR\xc0\x0a";
+        assert_eq!(expected[..], buf[..]);
+
+        let first = Name::parse(&buf, 0).unwrap();
+        assert_eq!("ISI.ARPA", first.to_string());
+        let second = Name::parse(&buf, first.len()).unwrap();
+        assert_eq!("F.ISI.ARPA", second.to_string());
+        let third = Name::parse(&buf, first.len() + second.len()).unwrap();
+        assert_eq!("FOO.F.ISI.ARPA", third.to_string());
+        let fourth = Name::parse(&buf, first.len() + second.len() + third.len()).unwrap();
+        assert_eq!("BAR.F.ISI.ARPA", fourth.to_string());
     }
 
     #[test]
