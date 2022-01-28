@@ -1,5 +1,8 @@
 # Simple MDNS
-## 0.4
+## 0.3.5
+- Update dependencies
+
+## 0.3.4
 - Add TXT records to service queries
 
 ## 0.3

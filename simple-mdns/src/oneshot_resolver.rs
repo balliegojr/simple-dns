@@ -1,7 +1,10 @@
 use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
 
-use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket}, time::{Duration, Instant}};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    time::{Duration, Instant},
+};
 /// Provides One Shot queries (legacy mDNS)
 ///
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
@@ -76,7 +79,7 @@ impl OneShotMdnsResolver {
                 Err(err) => {
                     log::error!("Received invalid packet: {}", err);
                     continue;
-                },
+                }
             };
             for anwser in response.answers {
                 if anwser.name != service_name {
@@ -108,7 +111,6 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ))?;
 
-
         self.sender_socket
             .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
 
@@ -119,7 +121,7 @@ impl OneShotMdnsResolver {
                 Err(err) => {
                     log::error!("Received invalid packet: {}", err);
                     continue;
-                },
+                }
             };
 
             let port = response
@@ -178,7 +180,7 @@ impl OneShotMdnsResolver {
                     }
                 }
                 Err(_) => {
-                    if query_deadline > std::time::Instant::now()   {
+                    if query_deadline > std::time::Instant::now() {
                         return Ok(None);
                     }
                 }
@@ -215,14 +217,12 @@ mod tests {
         let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv._tcp.local");
 
-        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
         assert_eq!(Ipv4Addr::LOCALHOST, answer.unwrap());
 
         let answer = resolver.query_service_address_and_port("_srv._tcp.local");
-        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_some());
@@ -236,7 +236,6 @@ mod tests {
     fn one_shot_resolver_timeout() {
         let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv_miss._tcp.local");
-        dbg!(&answer);
         assert!(answer.is_ok());
         let answer = answer.unwrap();
         assert!(answer.is_none());
