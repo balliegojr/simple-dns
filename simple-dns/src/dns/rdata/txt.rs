@@ -127,7 +127,7 @@ impl<'a> DnsPacketContent<'a> for TXT<'a> {
 
         Ok(Self {
             strings,
-            size: data.len(),
+            size: data.len() - position,
         })
     }
 

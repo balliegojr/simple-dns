@@ -1,4 +1,7 @@
 # Simple DNS
+## 0.4.5
+- Fix TXT records length
+
 ## 0.4.4
 - Fix PTR parsing with compression
 
