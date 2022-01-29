@@ -1,4 +1,7 @@
 # Simple MDNS
+## Unreleased
+- Fix timeout condition
+
 ## 0.3.6
 - Update dependencies
 
