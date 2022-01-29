@@ -1,4 +1,7 @@
 # Simple MDNS
+## 0.3.6
+- Update dependencies
+
 ## 0.3.5
 - Update dependencies
 
