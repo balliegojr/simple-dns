@@ -117,6 +117,10 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                     let p = position + 1;
                     let e = p + len as usize;
 
+                    if e > data.len() {
+                        return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                    }
+
                     labels.push(Label::new(&data[p..e])?);
                     if !is_compressed {
                         total_size += 1 + len as usize;
