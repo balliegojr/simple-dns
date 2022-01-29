@@ -1,5 +1,5 @@
 # Simple MDNS
-## Unreleased
+## 0.3.7
 - Fix timeout condition
 
 ## 0.3.6
