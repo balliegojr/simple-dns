@@ -19,9 +19,15 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
     let mut service_discovery_b = ServiceDiscovery::new("b", "_srv3._tcp.local", 60)?;
     let mut service_discovery_c = ServiceDiscovery::new("c", "_srv3._tcp.local", 60)?;
 
-    service_discovery_a.add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into());
-    service_discovery_b.add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into());
-    service_discovery_c.add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into());
+    service_discovery_a
+        .add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_b
+        .add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_c
+        .add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into())
+        .expect("Failed to add service info");
 
     std::thread::sleep(Duration::from_secs(2));
 
@@ -79,12 +85,16 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
         .attributes
         .insert("id".to_string(), Some("id_d".to_string()));
 
-    service_discovery_d.add_service_info(service_info);
+    service_discovery_d
+        .add_service_info(service_info)
+        .expect("Failed to add service info");
     let mut service_info: InstanceInformation = SocketAddr::from_str("192.168.1.3:8080")?.into();
     service_info
         .attributes
         .insert("id".to_string(), Some("id_e".to_string()));
-    service_discovery_e.add_service_info(service_info);
+    service_discovery_e
+        .add_service_info(service_info)
+        .expect("Failed to add service info");
 
     std::thread::sleep(Duration::from_secs(2));
 

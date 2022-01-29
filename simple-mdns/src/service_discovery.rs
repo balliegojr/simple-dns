@@ -4,6 +4,7 @@ use simple_dns::{
 
 use std::{
     collections::HashMap,
+    error::Error,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::{
         mpsc::{channel, Receiver, Sender},
@@ -84,24 +85,27 @@ impl ServiceDiscovery {
         service_discovery.receive_packets_loop(tx.clone())?;
         service_discovery.refresh_known_instances(tx.clone());
 
-        query_service_instances(service_discovery.service_name.clone(), &tx);
+        if let Err(err) = query_service_instances(service_discovery.service_name.clone(), &tx) {
+            log::error!("There was an error queruing service instances: {err}");
+        }
 
         Ok(service_discovery)
     }
 
     /// Add the  service info to discovery and immediately advertise the service
-    pub fn add_service_info(&mut self, service_info: InstanceInformation) {
+    pub fn add_service_info(
+        &mut self,
+        service_info: InstanceInformation,
+    ) -> Result<(), Box<dyn Error>> {
         {
             let mut resource_manager = self.resource_manager.write().unwrap();
-            for resource in service_info
-                .into_records(&self.full_name.clone(), self.resource_ttl)
-                .unwrap()
-            {
+            for resource in service_info.into_records(&self.full_name.clone(), self.resource_ttl)? {
                 resource_manager.add_owned_resource(resource);
             }
         }
 
         self.advertise_service(&self.packets_sender);
+        Ok(())
     }
 
     /// Remove all addresses from service discovery
@@ -155,11 +159,15 @@ impl ServiceDiscovery {
 
                 let next_expiration = resource_manager.read().unwrap().get_next_expiration();
 
-                log::debug!("next expiration: {:?}", next_expiration);
+                log::trace!("next expiration: {:?}", next_expiration);
                 match next_expiration {
                     Some(expiration) => {
                         if expiration <= now {
-                            query_service_instances(service_name.clone(), &packet_sender);
+                            if let Err(err) =
+                                query_service_instances(service_name.clone(), &packet_sender)
+                            {
+                                log::error!("There was an error querying service instances. {err}");
+                            }
                             std::thread::sleep(Duration::from_secs(5));
                         } else {
                             std::thread::sleep(expiration - now);
@@ -246,24 +254,22 @@ impl ServiceDiscovery {
     }
 }
 
-fn query_service_instances(service_name: Name, packet_sender: &Sender<(PacketBuf, SocketAddr)>) {
-    log::info!("probing service instances");
+fn query_service_instances(
+    service_name: Name,
+    packet_sender: &Sender<(PacketBuf, SocketAddr)>,
+) -> Result<(), Box<dyn Error>> {
+    log::trace!("probing service instances");
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
-    packet
-        .add_question(&Question::new(
-            service_name.clone(),
-            QTYPE::SRV,
-            QCLASS::IN,
-            false,
-        ))
-        .unwrap();
-    packet
-        .add_question(&Question::new(service_name, QTYPE::TXT, QCLASS::IN, false))
-        .unwrap();
+    packet.add_question(&Question::new(
+        service_name.clone(),
+        QTYPE::SRV,
+        QCLASS::IN,
+        false,
+    ))?;
+    packet.add_question(&Question::new(service_name, QTYPE::TXT, QCLASS::IN, false))?;
 
-    if let Err(err) = packet_sender.send((packet, *super::MULTICAST_IPV4_SOCKET)) {
-        log::error!("There was an error sending the question packet: {}", err);
-    }
+    packet_sender.send((packet, *super::MULTICAST_IPV4_SOCKET))?;
+    Ok(())
 }
 
 fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>) {
