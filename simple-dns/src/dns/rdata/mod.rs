@@ -58,7 +58,7 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
         let rdatatype = u16::from_be_bytes(data[position..position + 2].try_into()?).into();
         let rdatalen = u16::from_be_bytes(data[position + 8..position + 10].try_into()?) as usize;
 
-        parse_rdata(&data[position + 10..position + 10 + rdatalen], 0, rdatatype)
+        parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {

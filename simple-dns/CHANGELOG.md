@@ -1,4 +1,7 @@
 # Simple DNS
+## 0.4.4
+- Fix PTR parsing with compression
+
 ## 0.4.3
 - Improve error handling
 
