@@ -180,7 +180,7 @@ impl OneShotMdnsResolver {
                     }
                 }
                 Err(_) => {
-                    if query_deadline > std::time::Instant::now() {
+                    if std::time::Instant::now() > query_deadline {
                         return Ok(None);
                     }
                 }
