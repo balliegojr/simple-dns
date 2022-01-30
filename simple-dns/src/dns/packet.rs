@@ -526,31 +526,37 @@ mod tests {
     fn compression_multiple_names() {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
 
-        buf_packet.add_answer(&ResourceRecord::new(
-            Name::new_unchecked("a._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ));
-        buf_packet.add_answer(&ResourceRecord::new(
-            Name::new_unchecked("b._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ));
+        buf_packet
+            .add_answer(&ResourceRecord::new(
+                Name::new_unchecked("a._tcp.local"),
+                CLASS::IN,
+                10,
+                RData::A(A { address: 10 }),
+            ))
+            .unwrap();
+        buf_packet
+            .add_answer(&ResourceRecord::new(
+                Name::new_unchecked("b._tcp.local"),
+                CLASS::IN,
+                10,
+                RData::A(A { address: 10 }),
+            ))
+            .unwrap();
 
-        buf_packet.add_answer(&ResourceRecord::new(
-            Name::new_unchecked("b._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ));
+        buf_packet
+            .add_answer(&ResourceRecord::new(
+                Name::new_unchecked("b._tcp.local"),
+                CLASS::IN,
+                10,
+                RData::A(A { address: 10 }),
+            ))
+            .unwrap();
 
         assert!(Packet::parse(&buf_packet).is_ok());
     }
 
     #[test]
-    fn bad_response() {
+    fn parse_ptr_with_compression() {
         let data: &[u8] = &[
             0x00, 0x00, 0x84, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x09, 0x5f,
             0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65, 0x73, 0x07, 0x5f, 0x64, 0x6e, 0x73, 0x2d,
