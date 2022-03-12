@@ -4,6 +4,9 @@ use super::{rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
+mod flag {
+    pub const CACHE_FLUSH: u16 = 0b1000_0000_0000_0000;
+}
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ResourceRecord<'a> {
@@ -16,6 +19,9 @@ pub struct ResourceRecord<'a> {
     pub ttl: u32,
     /// A [`RData`] with the contents of this resource record
     pub rdata: RData<'a>,
+
+    /// Indicates if this RR is a cache flush
+    pub cache_flush: bool,
 }
 
 impl<'a> ResourceRecord<'a> {
@@ -26,7 +32,19 @@ impl<'a> ResourceRecord<'a> {
             class,
             ttl,
             rdata,
+            cache_flush: false,
         }
+    }
+
+    /// Consume self and change the cache_flush bit
+    pub fn with_cache_flush(mut self, cache_flush: bool) -> Self {
+        self.cache_flush = cache_flush;
+        self
+    }
+
+    /// Returns a cloned self with cache_flush = true
+    pub fn to_cache_flush_record(&self) -> Self {
+        self.clone().with_cache_flush(true)
     }
 
     /// Return true if current resource match given query class
@@ -46,8 +64,14 @@ impl<'a> ResourceRecord<'a> {
     }
 
     fn append_common(&self, out: &mut Vec<u8>) {
+        let class = if self.cache_flush {
+            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
+        } else {
+            (self.class as u16).to_be_bytes()
+        };
+
         out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
-        out.extend((self.class as u16).to_be_bytes());
+        out.extend(class);
         out.extend(self.ttl.to_be_bytes());
         out.extend((self.rdata.len() as u16).to_be_bytes());
     }
@@ -59,6 +83,7 @@ impl<'a> ResourceRecord<'a> {
             class: self.class,
             ttl: self.ttl,
             rdata: self.rdata.into_owned(),
+            cache_flush: self.cache_flush,
         }
     }
 }
@@ -71,7 +96,10 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
-        let class = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?).try_into()?;
+        let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
+        let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
+        let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
+
         let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
 
         let rdata = RData::parse(data, offset)?;
@@ -81,6 +109,7 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
             class,
             ttl,
             rdata,
+            cache_flush,
         })
     }
 
@@ -133,10 +162,21 @@ mod tests {
         assert_eq!(CLASS::IN, rr.class);
         assert_eq!(10, rr.ttl);
         assert_eq!(4, rr.rdata.len());
+        assert!(!rr.cache_flush);
+
         match rr.rdata {
             RData::A(a) => assert_eq!(4294967295, a.address),
             _ => panic!("invalid rdata"),
         }
+    }
+
+    #[test]
+    fn test_cache_flush_parse() {
+        let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
+        let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
+
+        assert_eq!(CLASS::IN, rr.class);
+        assert!(rr.cache_flush);
     }
 
     #[test]
@@ -149,11 +189,33 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
+            cache_flush: false,
         };
 
         assert!(rr.append_to_vec(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
+            &out[..]
+        );
+        assert_eq!(out.len(), rr.len());
+    }
+
+    #[test]
+    fn test_append_to_vec_cache_flush() {
+        let mut out = Vec::new();
+        let rdata = [255u8; 4];
+
+        let rr = ResourceRecord {
+            class: CLASS::IN,
+            name: "_srv._udp.local".try_into().unwrap(),
+            ttl: 10,
+            rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
+            cache_flush: true,
+        };
+
+        assert!(rr.append_to_vec(&mut out).is_ok());
+        assert_eq!(
+            b"\x04_srv\x04_udp\x05local\x00\x00\x00\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]
         );
         assert_eq!(out.len(), rr.len());
@@ -166,6 +228,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&[255u8; 4]).unwrap()),
+            cache_flush: false,
         };
 
         assert!(rr.match_qclass(QCLASS::ANY));
@@ -180,6 +243,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
+            cache_flush: false,
         };
 
         assert!(rr.match_qtype(QTYPE::ANY));
@@ -194,6 +258,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
+            cache_flush: false,
         };
 
         assert!(rr.match_qtype(QTYPE::A));

@@ -1,4 +1,7 @@
 # Simple DNS
+## 0.4.6
+- Add cache flush bit parsing to resource records
+
 ## 0.4.5
 - Fix TXT records length
 
