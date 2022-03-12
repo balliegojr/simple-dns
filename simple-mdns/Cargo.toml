@@ -1,19 +1,19 @@
 [package]
 name = "simple-mdns"
-version = "0.3.8"
+version = "0.3.9"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2021"
 description = "Rust implementation of mDNS for service discovering (DNS-SD)"
 repository = "https://github.com/balliegojr/simple-dns"
-license= "MIT"
+license = "MIT"
 keywords = ["dns", "dns-sd", "mdns", "service-discovery", "zeroconf"]
 categories = ["network-programming"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-simple-dns = { path="../simple-dns", version="~0.4.4" }
-socket2 = { version="^0.4", features=["all"] }
+simple-dns = { path = "../simple-dns", version = "0.4" }
+socket2 = { version = "^0.4", features = ["all"] }
 log = "^0.4"
 thiserror = "^1.0.24"
 lazy_static = "^1.4.0"

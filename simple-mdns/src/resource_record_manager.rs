@@ -37,7 +37,14 @@ impl<'a> ResourceRecordManager<'a> {
     pub fn add_expirable_resource(&mut self, resource: ResourceRecord<'a>) {
         log::debug!("adding expirable resouce");
         let key = get_key(&resource.name);
-        let exp_info = ExpirationInfo::new(resource.ttl);
+
+        let ttl = if resource.cache_flush {
+            1
+        } else {
+            resource.ttl
+        };
+
+        let exp_info = ExpirationInfo::new(ttl);
         match self.resources.get_mut(&key) {
             Some(resources) => {
                 resources.insert(resource, ResourceRecordType::Expirable(exp_info));
@@ -66,7 +73,7 @@ impl<'a> ResourceRecordManager<'a> {
     pub fn get_next_expiration(&self) -> Option<Instant> {
         self.resources
             .iter()
-            .map(|(_, resources)| {
+            .flat_map(|(_, resources)| {
                 resources.values().filter_map(|resource_type| {
                     if resource_type.should_refresh() {
                         return None;
@@ -77,7 +84,6 @@ impl<'a> ResourceRecordManager<'a> {
                     }
                 })
             })
-            .flatten()
             .min_by(|a, b| a.cmp(b))
     }
 
@@ -133,8 +139,7 @@ fn get_key(name: &Name) -> Vec<u8> {
     name.get_labels()
         .iter()
         .rev()
-        .map(|label| label.to_string().into_bytes())
-        .flatten()
+        .flat_map(|label| label.to_string().into_bytes())
         .collect()
 }
 

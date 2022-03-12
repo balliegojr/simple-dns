@@ -147,8 +147,8 @@ impl OneShotMdnsResolver {
                 address = self.query_service_address(service_name)?;
             }
 
-            if port.is_some() && address.is_some() {
-                return Ok(Some(SocketAddr::new(address.unwrap(), port.unwrap())));
+            if let (Some(port), Some(address)) = (port, address) {
+                return Ok(Some(SocketAddr::new(address, port)));
             }
         }
 

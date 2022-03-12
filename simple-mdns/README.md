@@ -56,24 +56,24 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
     let mut responder = SimpleMdnsResponder::new(10);
     let srv_name = Name::new_unchecked("_srvname._tcp.local");
 
-    responder.add_resource(ResourceRecord {
-        class: CLASS::IN,
-        name: srv_name.clone(),
-        ttl: 10,
-        rdata: RData::A(A { address: Ipv4Addr::LOCALHOST.into() }),
-    });
+    responder.add_resource(ResourceRecord::new(
+        srv_name.clone(),
+        CLASS::IN,
+        10,
+        RData::A(A { address: Ipv4Addr::LOCALHOST.into() }),
+    ));
 
-    responder.add_resource(ResourceRecord {
-        class: CLASS::IN,
-        name: srv_name.clone(),
-        ttl: 10,
-        rdata: RData::SRV(SRV {
+    responder.add_resource(ResourceRecord::new(
+        srv_name.clone(),
+        CLASS::IN,
+        10,
+        RData::SRV(SRV {
             port: 8080,
             priority: 0,
             weight: 0,
             target: srv_name
         })
-    });
+    ));
 ```
 
 

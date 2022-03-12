@@ -3,7 +3,7 @@ use simple_dns::{
 };
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     error::Error,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     sync::{
@@ -104,12 +104,13 @@ impl ServiceDiscovery {
             }
         }
 
-        self.advertise_service(&self.packets_sender);
+        self.advertise_service(&self.packets_sender, false);
         Ok(())
     }
 
     /// Remove all addresses from service discovery
     pub fn remove_service_from_discovery(&mut self) {
+        self.advertise_service(&self.packets_sender, true);
         self.resource_manager.write().unwrap().clear();
     }
 
@@ -181,30 +182,72 @@ impl ServiceDiscovery {
         });
     }
 
-    fn advertise_service(&self, packet_sender: &Sender<(PacketBuf, SocketAddr)>) {
+    fn advertise_service(
+        &self,
+        packet_sender: &Sender<(PacketBuf, SocketAddr)>,
+        cache_flush: bool,
+    ) {
         log::info!("Advertising service");
-        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
-        let _ = packet.add_question(&Question::new(
-            self.full_name.clone(),
-            QTYPE::SRV,
-            QCLASS::IN,
+        let mut packet = PacketBuf::new(
+            PacketHeader::new_reply(1, simple_dns::OPCODE::StandardQuery),
             true,
-        ));
+        );
+        let resource_manager = self.resource_manager.read().unwrap();
+        let mut additional_records = HashSet::new();
+        let mut success = true;
 
-        let _ = packet.add_question(&Question::new(
-            self.full_name.clone(),
-            QTYPE::TXT,
-            QCLASS::IN,
-            true,
-        ));
+        for d_resources in
+            resource_manager.get_domain_resources(&self.full_name.clone(), true, true)
+        {
+            success = success
+                && if cache_flush {
+                    d_resources
+                        .filter(|r| r.match_qclass(QCLASS::IN))
+                        .map(|r| packet.add_answer(&r.to_cache_flush_record()))
+                        .all(|r| r.is_ok())
+                } else {
+                    d_resources
+                        .filter(|r| {
+                            r.match_qclass(QCLASS::IN)
+                                && (r.match_qtype(QTYPE::SRV) || r.match_qtype(QTYPE::TXT))
+                        })
+                        .map(|resource| {
+                            if packet.add_answer(resource).is_err() {
+                                return false;
+                            }
 
-        if build_reply(
-            packet,
-            *super::MULTICAST_IPV4_SOCKET,
-            &self.resource_manager.read().unwrap(),
-        )
-        .and_then(|response| packet_sender.send(response).ok())
-        .is_none()
+                            if let RData::SRV(srv) = &resource.rdata {
+                                let target = resource_manager
+                                    .get_domain_resources(&srv.target, false, true)
+                                    .flatten()
+                                    .filter(|r| {
+                                        r.match_qtype(QTYPE::A) && r.match_qclass(QCLASS::IN)
+                                    });
+
+                                additional_records.extend(target);
+                            }
+
+                            true
+                        })
+                        .all(|r| r)
+                };
+        }
+
+        for additional_record in additional_records {
+            if packet.add_additional_record(additional_record).is_err() {
+                success = false;
+            }
+        }
+
+        if !success {
+            log::info!("Failed to advertise service");
+            return;
+        }
+
+        if packet.has_answers()
+            && packet_sender
+                .send((packet, *super::MULTICAST_IPV4_SOCKET))
+                .is_err()
         {
             log::info!("Failed to advertise service");
         }
@@ -367,16 +410,12 @@ impl InstanceInformation {
 
     /// Creates a Iterator of [`SocketAddr`](`std::net::SocketAddr`) for each ip address and port combination
     pub fn get_socket_addresses(&'_ self) -> impl Iterator<Item = SocketAddr> + '_ {
-        self.ip_addresses
-            .iter()
-            .copied()
-            .map(move |addr| {
-                self.ports
-                    .iter()
-                    .copied()
-                    .map(move |port| SocketAddr::new(addr, port))
-            })
-            .flatten()
+        self.ip_addresses.iter().copied().flat_map(move |addr| {
+            self.ports
+                .iter()
+                .copied()
+                .map(move |port| SocketAddr::new(addr, port))
+        })
     }
 }
 
