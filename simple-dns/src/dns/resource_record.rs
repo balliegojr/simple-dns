@@ -4,6 +4,7 @@ use super::{rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
+#[cfg(feature = "mdns")]
 mod flag {
     pub const CACHE_FLUSH: u16 = 0b1000_0000_0000_0000;
 }
@@ -20,6 +21,7 @@ pub struct ResourceRecord<'a> {
     /// A [`RData`] with the contents of this resource record
     pub rdata: RData<'a>,
 
+    #[cfg(feature = "mdns")]
     /// Indicates if this RR is a cache flush
     pub cache_flush: bool,
 }
@@ -32,16 +34,20 @@ impl<'a> ResourceRecord<'a> {
             class,
             ttl,
             rdata,
+
+            #[cfg(feature = "mdns")]
             cache_flush: false,
         }
     }
 
+    #[cfg(feature = "mdns")]
     /// Consume self and change the cache_flush bit
     pub fn with_cache_flush(mut self, cache_flush: bool) -> Self {
         self.cache_flush = cache_flush;
         self
     }
 
+    #[cfg(feature = "mdns")]
     /// Returns a cloned self with cache_flush = true
     pub fn to_cache_flush_record(&self) -> Self {
         self.clone().with_cache_flush(true)
@@ -64,16 +70,24 @@ impl<'a> ResourceRecord<'a> {
     }
 
     fn append_common(&self, out: &mut Vec<u8>) {
-        let class = if self.cache_flush {
-            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
-        } else {
-            (self.class as u16).to_be_bytes()
-        };
-
         out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
-        out.extend(class);
+        out.extend(self.get_class().to_be_bytes());
         out.extend(self.ttl.to_be_bytes());
         out.extend((self.rdata.len() as u16).to_be_bytes());
+    }
+
+    #[cfg(feature = "mdns")]
+    fn get_class(&self) -> u16 {
+        if self.cache_flush {
+            (self.class as u16) | flag::CACHE_FLUSH
+        } else {
+            self.class as u16
+        }
+    }
+
+    #[cfg(not(feature = "mdns"))]
+    fn get_class(&self) -> u16 {
+        self.class as u16
     }
 
     /// Transforms the inner data into it's owned type
@@ -83,6 +97,7 @@ impl<'a> ResourceRecord<'a> {
             class: self.class,
             ttl: self.ttl,
             rdata: self.rdata.into_owned(),
+            #[cfg(feature = "mdns")]
             cache_flush: self.cache_flush,
         }
     }
@@ -96,21 +111,33 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
-        let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
-        let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
-        let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
-
         let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
-
         let rdata = RData::parse(data, offset)?;
 
-        Ok(Self {
-            name,
-            class,
-            ttl,
-            rdata,
-            cache_flush,
-        })
+        #[cfg(feature = "mdns")]
+        {
+            let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
+            let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
+            let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
+            Ok(Self {
+                name,
+                class,
+                ttl,
+                rdata,
+                cache_flush,
+            })
+        }
+
+        #[cfg(not(feature = "mdns"))]
+        {
+            let class = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?).try_into()?;
+            Ok(Self {
+                name,
+                class,
+                ttl,
+                rdata,
+            })
+        }
     }
 
     fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
@@ -162,6 +189,7 @@ mod tests {
         assert_eq!(CLASS::IN, rr.class);
         assert_eq!(10, rr.ttl);
         assert_eq!(4, rr.rdata.len());
+        #[cfg(feature = "mdns")]
         assert!(!rr.cache_flush);
 
         match rr.rdata {
@@ -171,6 +199,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "mdns")]
     fn test_cache_flush_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
         let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
@@ -189,6 +218,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
+            #[cfg(feature = "mdns")]
             cache_flush: false,
         };
 
@@ -201,6 +231,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "mdns")]
     fn test_append_to_vec_cache_flush() {
         let mut out = Vec::new();
         let rdata = [255u8; 4];
@@ -228,6 +259,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&[255u8; 4]).unwrap()),
+            #[cfg(feature = "mdns")]
             cache_flush: false,
         };
 
@@ -243,6 +275,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
+            #[cfg(feature = "mdns")]
             cache_flush: false,
         };
 
@@ -258,6 +291,7 @@ mod tests {
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
+            #[cfg(feature = "mdns")]
             cache_flush: false,
         };
 

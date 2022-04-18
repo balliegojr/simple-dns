@@ -10,6 +10,10 @@ keywords = ["dns", "parser"]
 categories = ["parser-implementations", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["mdns"]
+mdns = []
+
 [dependencies]
 thiserror = "^1.0.24"
 
