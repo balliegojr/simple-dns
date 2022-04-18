@@ -6,6 +6,7 @@ use std::{collections::HashMap, convert::TryInto};
 
 mod a;
 mod aaaa;
+mod afsdb;
 mod hinfo;
 mod minfo;
 mod mx;
@@ -18,6 +19,7 @@ mod wks;
 
 pub use a::A;
 pub use aaaa::AAAA;
+pub use afsdb::AFSDB;
 pub use hinfo::HINFO;
 pub use minfo::MINFO;
 pub use mx::MX;
@@ -51,6 +53,7 @@ pub enum RData<'a> {
     SRV(SRV<'a>),
     NULL(u16, NULL<'a>),
     RP(RP<'a>),
+    AFSDB(AFSDB<'a>),
 }
 
 impl<'a> DnsPacketContent<'a> for RData<'a> {
@@ -85,6 +88,7 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::WKS(data) => data.append_to_vec(out),
             RData::SRV(data) => data.append_to_vec(out),
             RData::RP(data) => data.append_to_vec(out),
+            RData::AFSDB(data) => data.append_to_vec(out),
         }
     }
 
@@ -113,6 +117,7 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::WKS(data) => data.compress_append_to_vec(out, name_refs),
             RData::SRV(data) => data.compress_append_to_vec(out, name_refs),
             RData::RP(data) => data.compress_append_to_vec(out, name_refs),
+            RData::AFSDB(data) => data.compress_append_to_vec(out, name_refs),
         }
     }
 
@@ -137,6 +142,7 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::WKS(data) => data.len(),
             RData::SRV(data) => data.len(),
             RData::RP(data) => data.len(),
+            RData::AFSDB(data) => data.len(),
         }
     }
 }
@@ -163,6 +169,7 @@ impl<'a> RData<'a> {
             RData::WKS(_) => TYPE::WKS,
             RData::SRV(_) => TYPE::SRV,
             RData::RP(_) => TYPE::RP,
+            RData::AFSDB(_) => TYPE::AFSDB,
             RData::NULL(type_code, _) => TYPE::Unknown(*type_code),
         }
     }
@@ -189,6 +196,7 @@ impl<'a> RData<'a> {
             RData::SRV(data) => RData::SRV(data.into_owned()),
             RData::NULL(rdatatype, data) => RData::NULL(rdatatype, data.into_owned()),
             RData::RP(data) => RData::RP(data.into_owned()),
+            RData::AFSDB(data) => RData::AFSDB(data.into_owned()),
         }
     }
 }
@@ -212,6 +220,7 @@ fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<R
         TYPE::MX => RData::MX(MX::parse(data, position)?),
         TYPE::TXT => RData::TXT(TXT::parse(data, position)?),
         TYPE::SRV => RData::SRV(SRV::parse(data, position)?),
+        TYPE::AFSDB => RData::AFSDB(AFSDB::parse(data, position)?),
         rdatatype => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
     };
 

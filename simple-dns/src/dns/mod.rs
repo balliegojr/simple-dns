@@ -90,6 +90,8 @@ pub enum TYPE {
     TXT,
     /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
     RP,
+    /// AFS locator, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-1)
+    AFSDB,
     /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
     SRV,
     /// Unknown value, for future (or unimplemented RFC) compatibility
@@ -117,6 +119,7 @@ impl From<TYPE> for u16 {
             TYPE::MX => 15,
             TYPE::TXT => 16,
             TYPE::RP => 17,
+            TYPE::AFSDB => 18,
             TYPE::SRV => 33,
             TYPE::Unknown(x) => x,
         }
@@ -145,6 +148,7 @@ impl From<u16> for TYPE {
             15 => MX,
             16 => TXT,
             17 => RP,
+            18 => AFSDB,
             28 => AAAA,
             33 => SRV,
             v => TYPE::Unknown(v),
@@ -192,6 +196,8 @@ pub enum QTYPE {
     TXT = 16,
     /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
     RP = 17,
+    /// AFS locator, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-1)
+    AFSDB = 18,
     /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
     SRV = 33,
     /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -228,6 +234,7 @@ impl TryFrom<u16> for QTYPE {
             15 => Ok(MX),
             16 => Ok(TXT),
             17 => Ok(RP),
+            18 => Ok(AFSDB),
             28 => Ok(AAAA),
             33 => Ok(SRV),
             252 => Ok(AXFR),
