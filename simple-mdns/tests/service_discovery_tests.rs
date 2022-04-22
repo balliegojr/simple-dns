@@ -34,22 +34,19 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
     let mut from_a: Vec<SocketAddr> = service_discovery_a
         .get_known_services()
         .iter()
-        .map(|x| x.get_socket_addresses())
-        .flatten()
+        .flat_map(|x| x.get_socket_addresses())
         .collect();
 
     let mut from_b: Vec<SocketAddr> = service_discovery_b
         .get_known_services()
         .iter()
-        .map(|x| x.get_socket_addresses())
-        .flatten()
+        .flat_map(|x| x.get_socket_addresses())
         .collect();
 
     let mut from_c: Vec<SocketAddr> = service_discovery_c
         .get_known_services()
         .iter()
-        .map(|x| x.get_socket_addresses())
-        .flatten()
+        .flat_map(|x| x.get_socket_addresses())
         .collect();
 
     from_a.sort();
@@ -101,15 +98,13 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
     let d_attr: HashMap<String, Option<String>> = service_discovery_d
         .get_known_services()
         .into_iter()
-        .map(|x| x.attributes)
-        .flatten()
+        .flat_map(|x| x.attributes)
         .collect();
 
     let e_attr: HashMap<String, Option<String>> = service_discovery_e
         .get_known_services()
         .into_iter()
-        .map(|x| x.attributes)
-        .flatten()
+        .flat_map(|x| x.attributes)
         .collect();
 
     assert_eq!(1, d_attr.len());

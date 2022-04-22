@@ -1,15 +1,21 @@
 //! Contains RData implementations
 
+use crate::CharacterString;
+
 use super::{DnsPacketContent, Name, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto};
 
 mod a;
 mod aaaa;
+mod afsdb;
 mod hinfo;
+mod isdn;
 mod minfo;
 mod mx;
 mod null;
+mod route_through;
+mod rp;
 mod soa;
 mod srv;
 mod txt;
@@ -17,10 +23,14 @@ mod wks;
 
 pub use a::A;
 pub use aaaa::AAAA;
+pub use afsdb::AFSDB;
 pub use hinfo::HINFO;
+pub use isdn::ISDN;
 pub use minfo::MINFO;
 pub use mx::MX;
 pub use null::NULL;
+pub use route_through::RouteThrough;
+pub use rp::RP;
 pub use soa::SOA;
 pub use srv::SRV;
 pub use txt::TXT;
@@ -48,6 +58,11 @@ pub enum RData<'a> {
     WKS(WKS<'a>),
     SRV(SRV<'a>),
     NULL(u16, NULL<'a>),
+    RP(RP<'a>),
+    AFSDB(AFSDB<'a>),
+    X25(CharacterString<'a>),
+    ISDN(ISDN<'a>),
+    RouteThrough(RouteThrough<'a>),
 }
 
 impl<'a> DnsPacketContent<'a> for RData<'a> {
@@ -81,6 +96,11 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::SOA(data) => data.append_to_vec(out),
             RData::WKS(data) => data.append_to_vec(out),
             RData::SRV(data) => data.append_to_vec(out),
+            RData::RP(data) => data.append_to_vec(out),
+            RData::AFSDB(data) => data.append_to_vec(out),
+            RData::X25(data) => data.append_to_vec(out),
+            RData::ISDN(data) => data.append_to_vec(out),
+            RData::RouteThrough(data) => data.append_to_vec(out),
         }
     }
 
@@ -108,6 +128,11 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::SOA(data) => data.compress_append_to_vec(out, name_refs),
             RData::WKS(data) => data.compress_append_to_vec(out, name_refs),
             RData::SRV(data) => data.compress_append_to_vec(out, name_refs),
+            RData::RP(data) => data.compress_append_to_vec(out, name_refs),
+            RData::AFSDB(data) => data.compress_append_to_vec(out, name_refs),
+            RData::X25(data) => data.compress_append_to_vec(out, name_refs),
+            RData::ISDN(data) => data.compress_append_to_vec(out, name_refs),
+            RData::RouteThrough(data) => data.compress_append_to_vec(out, name_refs),
         }
     }
 
@@ -131,6 +156,11 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             RData::SOA(data) => data.len(),
             RData::WKS(data) => data.len(),
             RData::SRV(data) => data.len(),
+            RData::RP(data) => data.len(),
+            RData::AFSDB(data) => data.len(),
+            RData::X25(data) => data.len(),
+            RData::ISDN(data) => data.len(),
+            RData::RouteThrough(data) => data.len(),
         }
     }
 }
@@ -156,6 +186,11 @@ impl<'a> RData<'a> {
             RData::SOA(_) => TYPE::SOA,
             RData::WKS(_) => TYPE::WKS,
             RData::SRV(_) => TYPE::SRV,
+            RData::RP(_) => TYPE::RP,
+            RData::AFSDB(_) => TYPE::AFSDB,
+            RData::X25(_) => TYPE::X25,
+            RData::ISDN(_) => TYPE::ISDN,
+            RData::RouteThrough(_) => TYPE::RouteThrough,
             RData::NULL(type_code, _) => TYPE::Unknown(*type_code),
         }
     }
@@ -181,6 +216,11 @@ impl<'a> RData<'a> {
             RData::WKS(data) => RData::WKS(data.into_owned()),
             RData::SRV(data) => RData::SRV(data.into_owned()),
             RData::NULL(rdatatype, data) => RData::NULL(rdatatype, data.into_owned()),
+            RData::RP(data) => RData::RP(data.into_owned()),
+            RData::AFSDB(data) => RData::AFSDB(data.into_owned()),
+            RData::X25(data) => RData::X25(data.into_owned()),
+            RData::ISDN(data) => RData::ISDN(data.into_owned()),
+            RData::RouteThrough(data) => RData::RouteThrough(data.into_owned()),
         }
     }
 }
@@ -204,7 +244,13 @@ fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<R
         TYPE::MX => RData::MX(MX::parse(data, position)?),
         TYPE::TXT => RData::TXT(TXT::parse(data, position)?),
         TYPE::SRV => RData::SRV(SRV::parse(data, position)?),
-        rdatatype => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
+        TYPE::RP => RData::RP(RP::parse(data, position)?),
+        TYPE::AFSDB => RData::AFSDB(AFSDB::parse(data, position)?),
+        TYPE::X25 => RData::X25(CharacterString::parse(data, position)?),
+        TYPE::ISDN => RData::ISDN(ISDN::parse(data, position)?),
+        TYPE::RouteThrough => RData::RouteThrough(RouteThrough::parse(data, position)?),
+        TYPE::NULL => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
+        TYPE::Unknown(rdatatype) => RData::NULL(rdatatype, NULL::parse(data, position)?),
     };
 
     Ok(rdata)

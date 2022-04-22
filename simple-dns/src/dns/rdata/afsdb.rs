@@ -1,0 +1,76 @@
+use std::collections::HashMap;
+
+use crate::dns::{DnsPacketContent, Name};
+
+/// AFSDB records represents servers with ASD cells
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct AFSDB<'a> {
+    /// An integer that represents the subtype
+    pub subtype: u16,
+    /// The <hostname> field is a [name](`Name`) name of a host that has a server for the cell named by the owner name of the RR
+    pub hostname: Name<'a>,
+}
+
+impl<'a> AFSDB<'a> {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned<'b>(self) -> AFSDB<'b> {
+        AFSDB {
+            subtype: self.subtype,
+            hostname: self.hostname.into_owned(),
+        }
+    }
+}
+
+impl<'a> DnsPacketContent<'a> for AFSDB<'a> {
+    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    where
+        Self: Sized,
+    {
+        let subtype = u16::from_be_bytes(data[position..position + 2].try_into()?);
+        let hostname = Name::parse(data, position + 2)?;
+
+        Ok(Self { subtype, hostname })
+    }
+
+    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        out.extend(self.subtype.to_be_bytes());
+        self.hostname.append_to_vec(out)
+    }
+
+    fn len(&self) -> usize {
+        self.hostname.len() + 2
+    }
+
+    fn compress_append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        out.extend(self.subtype.to_be_bytes());
+        self.hostname.compress_append_to_vec(out, name_refs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_and_write_afsdb() {
+        let afsdb = AFSDB {
+            subtype: 1,
+            hostname: Name::new("e.hostname.com").unwrap(),
+        };
+
+        let mut data = Vec::new();
+        assert!(afsdb.append_to_vec(&mut data).is_ok());
+
+        let afsdb = AFSDB::parse(&data, 0);
+        assert!(afsdb.is_ok());
+        let afsdb = afsdb.unwrap();
+
+        assert_eq!(data.len(), afsdb.len());
+        assert_eq!(1, afsdb.subtype);
+        assert_eq!("e.hostname.com", afsdb.hostname.to_string());
+    }
+}

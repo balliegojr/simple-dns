@@ -88,6 +88,17 @@ pub enum TYPE {
     MX,
     /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     TXT,
+    /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
+    RP,
+    /// AFS locator, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-1)
+    AFSDB,
+    /// X.25 address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.1)
+    X25,
+    /// ISDN address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.2)
+    ISDN,
+    /// The RT resource record provides a route-through binding for hosts that do not have their own direct wide area network addresses
+    /// [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.3)
+    RouteThrough,
     /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
     SRV,
     /// Unknown value, for future (or unimplemented RFC) compatibility
@@ -114,6 +125,11 @@ impl From<TYPE> for u16 {
             TYPE::MINFO => 14,
             TYPE::MX => 15,
             TYPE::TXT => 16,
+            TYPE::RP => 17,
+            TYPE::AFSDB => 18,
+            TYPE::X25 => 19,
+            TYPE::ISDN => 20,
+            TYPE::RouteThrough => 21,
             TYPE::SRV => 33,
             TYPE::Unknown(x) => x,
         }
@@ -141,6 +157,11 @@ impl From<u16> for TYPE {
             14 => MINFO,
             15 => MX,
             16 => TXT,
+            17 => RP,
+            18 => AFSDB,
+            19 => X25,
+            20 => ISDN,
+            21 => RouteThrough,
             28 => AAAA,
             33 => SRV,
             v => TYPE::Unknown(v),
@@ -186,6 +207,17 @@ pub enum QTYPE {
     MX = 15,
     /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     TXT = 16,
+    /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
+    RP = 17,
+    /// AFS locator, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-1)
+    AFSDB = 18,
+    /// X.25 address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.1)
+    X25 = 19,
+    /// ISDN address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.2)
+    ISDN = 20,
+    /// The RT resource record provides a route-through binding for hosts that do not have their own direct wide area network addresses
+    /// [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.3)
+    RouteThrough = 21,
     /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
     SRV = 33,
     /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -221,6 +253,11 @@ impl TryFrom<u16> for QTYPE {
             14 => Ok(MINFO),
             15 => Ok(MX),
             16 => Ok(TXT),
+            17 => Ok(RP),
+            18 => Ok(AFSDB),
+            19 => Ok(X25),
+            20 => Ok(ISDN),
+            21 => Ok(RouteThrough),
             28 => Ok(AAAA),
             33 => Ok(SRV),
             252 => Ok(AXFR),
