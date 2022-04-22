@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, QTYPE};
+use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, TYPE};
 
 use crate::{
     dns_packet_receiver::DnsPacketReceiver, resource_record_manager::ResourceRecordManager,
@@ -161,7 +161,9 @@ pub(crate) fn build_reply<'b>(
                     let target = resources
                         .get_domain_resources(&srv.target, false, true)
                         .flatten()
-                        .filter(|r| r.match_qtype(QTYPE::A) && r.match_qclass(question.qclass));
+                        .filter(|r| {
+                            r.match_qtype(TYPE::A.into()) && r.match_qclass(question.qclass)
+                        });
 
                     additional_records.extend(target);
                 }
@@ -275,7 +277,7 @@ mod tests {
         packet
             .add_question(&Question::new(
                 "_res1._tcp.com".try_into().unwrap(),
-                simple_dns::QTYPE::A,
+                simple_dns::TYPE::A.into(),
                 simple_dns::QCLASS::ANY,
                 true,
             ))
@@ -302,7 +304,7 @@ mod tests {
         packet
             .add_question(&Question::new(
                 "_res1._tcp.com".try_into().unwrap(),
-                simple_dns::QTYPE::SRV,
+                simple_dns::TYPE::SRV.into(),
                 simple_dns::QCLASS::ANY,
                 false,
             ))

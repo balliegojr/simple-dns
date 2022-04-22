@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryInto};
+use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use crate::dns::DnsPacketContent;
 
@@ -37,7 +37,11 @@ impl<'a> DnsPacketContent<'a> for WKS<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.extend(self.address.to_be_bytes());
         out.push(self.protocol);
         out.extend(self.bit_map.iter());

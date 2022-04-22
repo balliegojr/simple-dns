@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::TryInto;
 
 use crate::dns::DnsPacketContent;
@@ -50,12 +51,16 @@ impl<'a> DnsPacketContent<'a> for SRV<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.extend(self.priority.to_be_bytes());
         out.extend(self.weight.to_be_bytes());
         out.extend(self.port.to_be_bytes());
 
-        self.target.append_to_vec(out)
+        self.target.append_to_vec(out, &mut None)
     }
 
     fn len(&self) -> usize {
@@ -77,7 +82,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(srv.append_to_vec(&mut bytes).is_ok());
+        assert!(srv.append_to_vec(&mut bytes, &mut None).is_ok());
 
         let srv = SRV::parse(&bytes, 0);
         assert!(srv.is_ok());
@@ -87,5 +92,31 @@ mod tests {
         assert_eq!(2, srv.weight);
         assert_eq!(3, srv.port);
         assert_eq!(bytes.len(), srv.len());
+    }
+
+    #[test]
+    fn srv_should_not_be_compressed() {
+        let srv = SRV {
+            priority: 1,
+            weight: 2,
+            port: 3,
+            target: Name::new("_srv._tcp.example.com").unwrap(),
+        };
+
+        let mut plain = Vec::new();
+        let mut compressed = Vec::new();
+        let mut names = HashMap::new();
+
+        assert!(srv.append_to_vec(&mut plain, &mut None).is_ok());
+        assert!(srv.append_to_vec(&mut plain, &mut None).is_ok());
+
+        assert!(srv
+            .append_to_vec(&mut compressed, &mut Some(&mut names))
+            .is_ok());
+        assert!(srv
+            .append_to_vec(&mut compressed, &mut Some(&mut names))
+            .is_ok());
+
+        assert_eq!(plain, compressed);
     }
 }

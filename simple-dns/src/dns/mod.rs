@@ -35,16 +35,11 @@ pub(crate) trait DnsPacketContent<'a> {
         Self: Sized;
 
     /// Append the bytes of this content to a given vector
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()>;
-
-    /// Append the bytes of this content to a given vector, compress Names before appending
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        _name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.append_to_vec(out)
-    }
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()>;
 
     /// Returns the length in bytes of this content
     fn len(&self) -> usize;
@@ -173,98 +168,48 @@ impl From<u16> for TYPE {
 /// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum QTYPE {
-    /// Host address, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    A = 1,
-    /// Host address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
-    AAAA = 28,
-    /// Authoritative name server, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    NS = 2,
-    /// Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MD = 3,
-    /// Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MF = 4,
-    /// Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CNAME = 5,
-    /// Marks the start of a zone of authority, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    SOA = 6,
-    /// Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MB = 7,
-    /// Mail group member (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MG = 8,
-    /// Mail rename domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MR = 9,
-    /// Null RR (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    NULL = 10,
-    /// Well known service description, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    WKS = 11,
-    /// Domain name pointer, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    PTR = 12,
-    /// Host Information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    HINFO = 13,
-    /// Mailbox or mail list information, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MINFO = 14,
-    /// Mail exchange, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MX = 15,
-    /// Text strings, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    TXT = 16,
-    /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
-    RP = 17,
-    /// AFS locator, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-1)
-    AFSDB = 18,
-    /// X.25 address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.1)
-    X25 = 19,
-    /// ISDN address, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.2)
-    ISDN = 20,
-    /// The RT resource record provides a route-through binding for hosts that do not have their own direct wide area network addresses
-    /// [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-3.3)
-    RouteThrough = 21,
-    /// SRV specifies the location of the server(s) for a specific protocol and domain. [RFC 2780](https://tools.ietf.org/html/rfc2782)
-    SRV = 33,
+    TYPE(TYPE),
     /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    AXFR = 252,
+    AXFR,
     /// A request for mailbox-related records (MB, MG or MR), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MAILB = 253,
+    MAILB,
     /// A request for mail agent RRs (Obsolete - see MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    MAILA = 254,
+    MAILA,
     /// A request for all records, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    ANY = 255,
+    ANY,
+}
+
+impl From<TYPE> for QTYPE {
+    fn from(v: TYPE) -> Self {
+        Self::TYPE(v)
+    }
 }
 
 impl TryFrom<u16> for QTYPE {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
-        use self::QTYPE::*;
-
         match value {
-            1 => Ok(A),
-            2 => Ok(NS),
-            3 => Ok(MD),
-            4 => Ok(MF),
-            5 => Ok(CNAME),
-            6 => Ok(SOA),
-            7 => Ok(MB),
-            8 => Ok(MG),
-            9 => Ok(MR),
-            10 => Ok(NULL),
-            11 => Ok(WKS),
-            12 => Ok(PTR),
-            13 => Ok(HINFO),
-            14 => Ok(MINFO),
-            15 => Ok(MX),
-            16 => Ok(TXT),
-            17 => Ok(RP),
-            18 => Ok(AFSDB),
-            19 => Ok(X25),
-            20 => Ok(ISDN),
-            21 => Ok(RouteThrough),
-            28 => Ok(AAAA),
-            33 => Ok(SRV),
-            252 => Ok(AXFR),
-            253 => Ok(MAILB),
-            254 => Ok(MAILA),
-            255 => Ok(ANY),
-            v => Err(Self::Error::InvalidQType(v)),
+            252 => Ok(QTYPE::AXFR),
+            253 => Ok(QTYPE::MAILB),
+            254 => Ok(QTYPE::MAILA),
+            255 => Ok(QTYPE::ANY),
+            v => match TYPE::from(v) {
+                TYPE::Unknown(_) => Err(Self::Error::InvalidQType(v)),
+                ty => Ok(ty.into()),
+            },
+        }
+    }
+}
+
+impl From<QTYPE> for u16 {
+    fn from(val: QTYPE) -> Self {
+        match val {
+            QTYPE::TYPE(ty) => ty.into(),
+            QTYPE::AXFR => 252,
+            QTYPE::MAILB => 253,
+            QTYPE::MAILA => 254,
+            QTYPE::ANY => 255,
         }
     }
 }
@@ -302,30 +247,34 @@ impl TryFrom<u16> for CLASS {
 /// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum QCLASS {
-    /// The Internet, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    IN = 1,
-    /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs), [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CS = 2,
-    /// The CHAOS class, [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    CH = 3,
-    /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    HS = 4,
+    CLASS(CLASS),
     /// [RFC 1035](https://tools.ietf.org/html/rfc1035)
-    ANY = 255,
+    ANY,
+}
+
+impl From<CLASS> for QCLASS {
+    fn from(v: CLASS) -> Self {
+        Self::CLASS(v)
+    }
 }
 
 impl TryFrom<u16> for QCLASS {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
-        use self::QCLASS::*;
         match value {
-            1 => Ok(IN),
-            2 => Ok(CS),
-            3 => Ok(CH),
-            4 => Ok(HS),
-            255 => Ok(ANY),
+            v @ 1..=5 => CLASS::try_from(v).map(|x| x.into()),
+            255 => Ok(QCLASS::ANY),
             v => Err(Self::Error::InvalidQClass(v)),
+        }
+    }
+}
+
+impl From<QCLASS> for u16 {
+    fn from(val: QCLASS) -> Self {
+        match val {
+            QCLASS::CLASS(class) => class as u16,
+            QCLASS::ANY => 255,
         }
     }
 }

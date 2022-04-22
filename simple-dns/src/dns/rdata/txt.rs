@@ -131,12 +131,16 @@ impl<'a> DnsPacketContent<'a> for TXT<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         if self.strings.is_empty() {
             out.push(0);
         } else {
             for string in &self.strings {
-                string.append_to_vec(out)?;
+                string.append_to_vec(out, &mut None)?;
             }
         }
 
@@ -166,7 +170,7 @@ mod tests {
             .with_char_string("version=0.1".try_into()?)
             .with_char_string("proto=123".try_into()?);
 
-        txt.append_to_vec(&mut out)?;
+        txt.append_to_vec(&mut out, &mut None)?;
         assert_eq!(out.len(), txt.len());
 
         let txt2 = TXT::parse(&out, 0)?;

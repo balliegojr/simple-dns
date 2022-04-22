@@ -72,24 +72,25 @@ impl<'a> DnsPacketContent<'a> for SOA<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.mname.append_to_vec(out)?;
-        self.rname.append_to_vec(out)?;
-        self.append_commom(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        self.mname.append_to_vec(out, name_refs)?;
+        self.rname.append_to_vec(out, name_refs)?;
+
+        out.extend(self.serial.to_be_bytes());
+        out.extend(self.refresh.to_be_bytes());
+        out.extend(self.retry.to_be_bytes());
+        out.extend(self.expire.to_be_bytes());
+        out.extend(self.minimum.to_be_bytes());
+
+        Ok(())
     }
 
     fn len(&self) -> usize {
         self.mname.len() + self.rname.len() + 20
-    }
-
-    fn compress_append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.mname.compress_append_to_vec(out, name_refs)?;
-        self.rname.compress_append_to_vec(out, name_refs)?;
-        self.append_commom(out)
     }
 }
 
@@ -109,7 +110,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(soa.append_to_vec(&mut data).is_ok());
+        assert!(soa.append_to_vec(&mut data, &mut None).is_ok());
 
         let soa = SOA::parse(&data, 0);
         assert!(soa.is_ok());

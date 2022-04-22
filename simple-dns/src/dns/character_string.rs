@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryFrom, fmt::Display};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display};
 
 use crate::SimpleDnsError;
 
@@ -71,7 +71,11 @@ impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
         }
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.push(self.data.len() as u8);
         out.extend(self.data.iter());
 
@@ -147,7 +151,7 @@ mod tests {
     fn append_to_vec() {
         let mut out = Vec::new();
         let c_string = CharacterString::new("some_long_text".as_bytes()).unwrap();
-        c_string.append_to_vec(&mut out).unwrap();
+        c_string.append_to_vec(&mut out, &mut None).unwrap();
 
         assert_eq!(b"\x0esome_long_text", &out[..]);
     }

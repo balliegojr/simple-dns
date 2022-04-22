@@ -76,42 +76,14 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
         parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        match &self {
-            RData::A(data) => data.append_to_vec(out),
-            RData::AAAA(data) => data.append_to_vec(out),
-            RData::NS(data)
-            | RData::CNAME(data)
-            | RData::MB(data)
-            | RData::MG(data)
-            | RData::MR(data)
-            | RData::PTR(data)
-            | RData::MF(data)
-            | RData::MD(data) => data.append_to_vec(out),
-            RData::HINFO(data) => data.append_to_vec(out),
-            RData::MINFO(data) => data.append_to_vec(out),
-            RData::MX(data) => data.append_to_vec(out),
-            RData::NULL(_, data) => data.append_to_vec(out),
-            RData::TXT(data) => data.append_to_vec(out),
-            RData::SOA(data) => data.append_to_vec(out),
-            RData::WKS(data) => data.append_to_vec(out),
-            RData::SRV(data) => data.append_to_vec(out),
-            RData::RP(data) => data.append_to_vec(out),
-            RData::AFSDB(data) => data.append_to_vec(out),
-            RData::X25(data) => data.append_to_vec(out),
-            RData::ISDN(data) => data.append_to_vec(out),
-            RData::RouteThrough(data) => data.append_to_vec(out),
-        }
-    }
-
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
         match &self {
-            RData::A(data) => data.compress_append_to_vec(out, name_refs),
-            RData::AAAA(data) => data.compress_append_to_vec(out, name_refs),
+            RData::A(data) => data.append_to_vec(out, name_refs),
+            RData::AAAA(data) => data.append_to_vec(out, name_refs),
             RData::NS(data)
             | RData::CNAME(data)
             | RData::MB(data)
@@ -119,20 +91,20 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
             | RData::MR(data)
             | RData::PTR(data)
             | RData::MF(data)
-            | RData::MD(data) => data.compress_append_to_vec(out, name_refs),
-            RData::HINFO(data) => data.compress_append_to_vec(out, name_refs),
-            RData::MINFO(data) => data.compress_append_to_vec(out, name_refs),
-            RData::MX(data) => data.compress_append_to_vec(out, name_refs),
-            RData::NULL(_, data) => data.compress_append_to_vec(out, name_refs),
-            RData::TXT(data) => data.compress_append_to_vec(out, name_refs),
-            RData::SOA(data) => data.compress_append_to_vec(out, name_refs),
-            RData::WKS(data) => data.compress_append_to_vec(out, name_refs),
-            RData::SRV(data) => data.compress_append_to_vec(out, name_refs),
-            RData::RP(data) => data.compress_append_to_vec(out, name_refs),
-            RData::AFSDB(data) => data.compress_append_to_vec(out, name_refs),
-            RData::X25(data) => data.compress_append_to_vec(out, name_refs),
-            RData::ISDN(data) => data.compress_append_to_vec(out, name_refs),
-            RData::RouteThrough(data) => data.compress_append_to_vec(out, name_refs),
+            | RData::MD(data) => data.append_to_vec(out, name_refs),
+            RData::HINFO(data) => data.append_to_vec(out, name_refs),
+            RData::MINFO(data) => data.append_to_vec(out, name_refs),
+            RData::MX(data) => data.append_to_vec(out, name_refs),
+            RData::NULL(_, data) => data.append_to_vec(out, name_refs),
+            RData::TXT(data) => data.append_to_vec(out, name_refs),
+            RData::SOA(data) => data.append_to_vec(out, name_refs),
+            RData::WKS(data) => data.append_to_vec(out, name_refs),
+            RData::SRV(data) => data.append_to_vec(out, name_refs),
+            RData::RP(data) => data.append_to_vec(out, name_refs),
+            RData::AFSDB(data) => data.append_to_vec(out, name_refs),
+            RData::X25(data) => data.append_to_vec(out, name_refs),
+            RData::ISDN(data) => data.append_to_vec(out, name_refs),
+            RData::RouteThrough(data) => data.append_to_vec(out, name_refs),
         }
     }
 

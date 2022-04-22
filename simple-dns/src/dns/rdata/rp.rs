@@ -31,22 +31,17 @@ impl<'a> DnsPacketContent<'a> for RP<'a> {
         Ok(RP { mbox, txt })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.mbox.append_to_vec(out)?;
-        self.txt.append_to_vec(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        self.mbox.append_to_vec(out, name_refs)?;
+        self.txt.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
         self.txt.len() + self.mbox.len()
-    }
-
-    fn compress_append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.mbox.compress_append_to_vec(out, name_refs)?;
-        self.txt.compress_append_to_vec(out, name_refs)
     }
 }
 
@@ -62,7 +57,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(rp.append_to_vec(&mut data).is_ok());
+        assert!(rp.append_to_vec(&mut data, &mut None).is_ok());
 
         let rp = RP::parse(&data, 0);
         assert!(rp.is_ok());

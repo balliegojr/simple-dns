@@ -30,18 +30,6 @@ impl<'a> Question<'a> {
         }
     }
 
-    fn append_common(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        let qclass = match self.unicast_response {
-            true => self.qclass as u16 | 0x8000,
-            false => self.qclass as u16,
-        };
-
-        out.extend((self.qtype as u16).to_be_bytes());
-        out.extend(qclass.to_be_bytes());
-
-        Ok(())
-    }
-
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> Question<'b> {
         Question {
@@ -68,18 +56,21 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.qname.append_to_vec(out)?;
-        self.append_common(out)
-    }
-
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
-        self.qname.compress_append_to_vec(out, name_refs)?;
-        self.append_common(out)
+        self.qname.append_to_vec(out, name_refs)?;
+
+        let qclass: u16 = match self.unicast_response {
+            true => Into::<u16>::into(self.qclass) | 0x8000,
+            false => self.qclass.into(),
+        };
+
+        out.extend(Into::<u16>::into(self.qtype).to_be_bytes());
+        out.extend(qclass.to_be_bytes());
+        Ok(())
     }
 
     fn len(&self) -> usize {
@@ -89,6 +80,8 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{CLASS, TYPE};
+
     use super::*;
     use std::convert::TryInto;
 
@@ -100,8 +93,8 @@ mod tests {
         assert!(question.is_ok());
         let question = question.unwrap();
 
-        assert_eq!(QCLASS::IN, question.qclass);
-        assert_eq!(QTYPE::TXT, question.qtype);
+        assert_eq!(QCLASS::CLASS(CLASS::IN), question.qclass);
+        assert_eq!(QTYPE::TYPE(TYPE::TXT), question.qtype);
         assert!(!question.unicast_response);
     }
 
@@ -109,12 +102,12 @@ mod tests {
     fn append_to_vec() {
         let question = Question::new(
             "_srv._udp.local".try_into().unwrap(),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         );
         let mut bytes = Vec::new();
-        question.append_to_vec(&mut bytes).unwrap();
+        question.append_to_vec(&mut bytes, &mut None).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01", &bytes[..]);
         assert_eq!(bytes.len(), question.len());
@@ -123,9 +116,14 @@ mod tests {
     #[test]
     fn unicast_response() {
         let mut bytes = Vec::new();
-        Question::new("x.local".try_into().unwrap(), QTYPE::TXT, QCLASS::IN, true)
-            .append_to_vec(&mut bytes)
-            .unwrap();
+        Question::new(
+            "x.local".try_into().unwrap(),
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
+            true,
+        )
+        .append_to_vec(&mut bytes, &mut None)
+        .unwrap();
         let parsed = Question::parse(&bytes, 0).unwrap();
 
         assert!(parsed.unicast_response);

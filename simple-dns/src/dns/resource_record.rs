@@ -49,7 +49,10 @@ impl<'a> ResourceRecord<'a> {
 
     /// Return true if current resource match given query class
     pub fn match_qclass(&self, qclass: QCLASS) -> bool {
-        qclass == QCLASS::ANY || self.class as u16 == qclass as u16
+        match qclass {
+            QCLASS::CLASS(class) => class == self.class,
+            QCLASS::ANY => true,
+        }
     }
 
     /// Return true if current resource match given query type
@@ -57,23 +60,15 @@ impl<'a> ResourceRecord<'a> {
     pub fn match_qtype(&self, qtype: QTYPE) -> bool {
         let type_code = self.rdata.type_code();
         match qtype {
-            QTYPE::A | QTYPE::AAAA => type_code == TYPE::A || type_code == TYPE::AAAA,
             QTYPE::ANY => true,
-            qtype => Into::<u16>::into(type_code) == qtype as u16,
+            QTYPE::AXFR => true, // TODO: figure out what to do here
+            QTYPE::MAILB => type_code == TYPE::MR || type_code == TYPE::MB || type_code == TYPE::MG,
+            QTYPE::MAILA => type_code == TYPE::MX,
+            QTYPE::TYPE(ty) => match ty {
+                TYPE::A | TYPE::AAAA => type_code == TYPE::A || type_code == TYPE::AAAA,
+                _ => ty == type_code,
+            },
         }
-    }
-
-    fn append_common(&self, out: &mut Vec<u8>) {
-        let class = if self.cache_flush {
-            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
-        } else {
-            (self.class as u16).to_be_bytes()
-        };
-
-        out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
-        out.extend(class);
-        out.extend(self.ttl.to_be_bytes());
-        out.extend((self.rdata.len() as u16).to_be_bytes());
     }
 
     /// Transforms the inner data into it's owned type
@@ -113,20 +108,25 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.name.append_to_vec(out)?;
-        self.append_common(out);
-        self.rdata.append_to_vec(out)
-    }
-
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
-        self.name.compress_append_to_vec(out, name_refs)?;
-        self.append_common(out);
-        self.rdata.compress_append_to_vec(out, name_refs)
+        self.name.append_to_vec(out, name_refs)?;
+
+        let class = if self.cache_flush {
+            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
+        } else {
+            (self.class as u16).to_be_bytes()
+        };
+
+        out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
+        out.extend(class);
+        out.extend(self.ttl.to_be_bytes());
+        out.extend((self.rdata.len() as u16).to_be_bytes());
+
+        self.rdata.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -192,7 +192,7 @@ mod tests {
             cache_flush: false,
         };
 
-        assert!(rr.append_to_vec(&mut out).is_ok());
+        assert!(rr.append_to_vec(&mut out, &mut None).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]
@@ -213,7 +213,7 @@ mod tests {
             cache_flush: true,
         };
 
-        assert!(rr.append_to_vec(&mut out).is_ok());
+        assert!(rr.append_to_vec(&mut out, &mut None).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
             &out[..]
@@ -232,8 +232,8 @@ mod tests {
         };
 
         assert!(rr.match_qclass(QCLASS::ANY));
-        assert!(rr.match_qclass(QCLASS::IN));
-        assert!(!rr.match_qclass(QCLASS::CS));
+        assert!(rr.match_qclass(CLASS::IN.into()));
+        assert!(!rr.match_qclass(CLASS::CS.into()));
     }
 
     #[test]
@@ -247,8 +247,8 @@ mod tests {
         };
 
         assert!(rr.match_qtype(QTYPE::ANY));
-        assert!(rr.match_qtype(QTYPE::A));
-        assert!(!rr.match_qtype(QTYPE::WKS));
+        assert!(rr.match_qtype(TYPE::A.into()));
+        assert!(!rr.match_qtype(TYPE::WKS.into()));
     }
 
     #[test]
@@ -261,13 +261,13 @@ mod tests {
             cache_flush: false,
         };
 
-        assert!(rr.match_qtype(QTYPE::A));
-        assert!(rr.match_qtype(QTYPE::AAAA));
+        assert!(rr.match_qtype(TYPE::A.into()));
+        assert!(rr.match_qtype(TYPE::AAAA.into()));
 
         rr.rdata = RData::AAAA(crate::rdata::AAAA { address: 0 });
 
-        assert!(rr.match_qtype(QTYPE::A));
-        assert!(rr.match_qtype(QTYPE::AAAA));
+        assert!(rr.match_qtype(TYPE::A.into()));
+        assert!(rr.match_qtype(TYPE::AAAA.into()));
     }
 
     #[test]

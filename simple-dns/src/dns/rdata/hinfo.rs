@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{CharacterString, DnsPacketContent};
 
 /// HINFO records are used to acquire general information about a host.  
@@ -32,9 +34,13 @@ impl<'a> DnsPacketContent<'a> for HINFO<'a> {
         Ok(Self { cpu, os })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.cpu.append_to_vec(out)?;
-        self.os.append_to_vec(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        self.cpu.append_to_vec(out, name_refs)?;
+        self.os.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -54,7 +60,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(hinfo.append_to_vec(&mut data).is_ok());
+        assert!(hinfo.append_to_vec(&mut data, &mut None).is_ok());
 
         let hinfo = HINFO::parse(&data, 0);
         assert!(hinfo.is_ok());

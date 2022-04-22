@@ -37,19 +37,13 @@ impl<'a> DnsPacketContent<'a> for RouteThrough<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        out.extend(self.preference.to_be_bytes());
-        self.intermediate_host.append_to_vec(out)
-    }
-
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
         out.extend(self.preference.to_be_bytes());
-        self.intermediate_host
-            .compress_append_to_vec(out, name_refs)
+        self.intermediate_host.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -69,7 +63,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(rt.append_to_vec(&mut data).is_ok());
+        assert!(rt.append_to_vec(&mut data, &mut None).is_ok());
 
         let rt = RouteThrough::parse(&data, 0);
         assert!(rt.is_ok());

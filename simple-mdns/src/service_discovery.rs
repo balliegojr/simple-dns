@@ -1,5 +1,5 @@
 use simple_dns::{
-    rdata::RData, Name, PacketBuf, PacketHeader, Question, ResourceRecord, QCLASS, QTYPE,
+    rdata::RData, Name, PacketBuf, PacketHeader, Question, ResourceRecord, CLASS, TYPE,
 };
 
 use std::{
@@ -202,14 +202,15 @@ impl ServiceDiscovery {
             success = success
                 && if cache_flush {
                     d_resources
-                        .filter(|r| r.match_qclass(QCLASS::IN))
+                        .filter(|r| r.match_qclass(CLASS::IN.into()))
                         .map(|r| packet.add_answer(&r.to_cache_flush_record()))
                         .all(|r| r.is_ok())
                 } else {
                     d_resources
                         .filter(|r| {
-                            r.match_qclass(QCLASS::IN)
-                                && (r.match_qtype(QTYPE::SRV) || r.match_qtype(QTYPE::TXT))
+                            r.match_qclass(CLASS::IN.into())
+                                && (r.match_qtype(TYPE::SRV.into())
+                                    || r.match_qtype(TYPE::TXT.into()))
                         })
                         .map(|resource| {
                             if packet.add_answer(resource).is_err() {
@@ -221,7 +222,8 @@ impl ServiceDiscovery {
                                     .get_domain_resources(&srv.target, false, true)
                                     .flatten()
                                     .filter(|r| {
-                                        r.match_qtype(QTYPE::A) && r.match_qclass(QCLASS::IN)
+                                        r.match_qtype(TYPE::A.into())
+                                            && r.match_qclass(CLASS::IN.into())
                                     });
 
                                 additional_records.extend(target);
@@ -305,11 +307,16 @@ fn query_service_instances(
     let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
     packet.add_question(&Question::new(
         service_name.clone(),
-        QTYPE::SRV,
-        QCLASS::IN,
+        TYPE::SRV.into(),
+        CLASS::IN.into(),
         false,
     ))?;
-    packet.add_question(&Question::new(service_name, QTYPE::TXT, QCLASS::IN, false))?;
+    packet.add_question(&Question::new(
+        service_name,
+        TYPE::TXT.into(),
+        CLASS::IN.into(),
+        false,
+    ))?;
 
     packet_sender.send((packet, *super::MULTICAST_IPV4_SOCKET))?;
     Ok(())
@@ -348,10 +355,10 @@ fn add_response_to_resources(
         .filter(|aw| {
             aw.name.ne(full_name)
                 && aw.name.is_subdomain_of(service_name)
-                && (aw.match_qtype(QTYPE::SRV)
-                    || aw.match_qtype(QTYPE::TXT)
-                    || aw.match_qtype(QTYPE::A)
-                    || aw.match_qtype(QTYPE::PTR))
+                && (aw.match_qtype(TYPE::SRV.into())
+                    || aw.match_qtype(TYPE::TXT.into())
+                    || aw.match_qtype(TYPE::A.into())
+                    || aw.match_qtype(TYPE::PTR.into()))
         });
 
     for resource in resources {

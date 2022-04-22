@@ -41,9 +41,9 @@ impl PacketBuf {
             return Err(SimpleDnsError::AttemptedInvalidOperation);
         }
         if self.compression {
-            question.compress_append_to_vec(&mut self.inner, &mut self.name_refs)?;
+            question.append_to_vec(&mut self.inner, &mut Some(&mut self.name_refs))?;
         } else {
-            question.append_to_vec(&mut self.inner)?;
+            question.append_to_vec(&mut self.inner, &mut None)?;
         }
         let questions_count = PacketHeader::read_questions(&self.inner);
         PacketHeader::write_questions(&mut self.inner, questions_count + 1);
@@ -58,9 +58,9 @@ impl PacketBuf {
         }
 
         if self.compression {
-            answer.compress_append_to_vec(&mut self.inner, &mut self.name_refs)?;
+            answer.append_to_vec(&mut self.inner, &mut Some(&mut self.name_refs))?;
         } else {
-            answer.append_to_vec(&mut self.inner)?;
+            answer.append_to_vec(&mut self.inner, &mut None)?;
         }
 
         let answers_count = PacketHeader::read_answers(&self.inner);
@@ -76,9 +76,9 @@ impl PacketBuf {
         }
 
         if self.compression {
-            name_server.compress_append_to_vec(&mut self.inner, &mut self.name_refs)?;
+            name_server.append_to_vec(&mut self.inner, &mut Some(&mut self.name_refs))?;
         } else {
-            name_server.append_to_vec(&mut self.inner)?;
+            name_server.append_to_vec(&mut self.inner, &mut None)?;
         }
 
         let ns_count = PacketHeader::read_name_servers(&self.inner);
@@ -92,9 +92,9 @@ impl PacketBuf {
         additional_record: &ResourceRecord,
     ) -> crate::Result<()> {
         if self.compression {
-            additional_record.compress_append_to_vec(&mut self.inner, &mut self.name_refs)?;
+            additional_record.append_to_vec(&mut self.inner, &mut Some(&mut self.name_refs))?;
         } else {
-            additional_record.append_to_vec(&mut self.inner)?;
+            additional_record.append_to_vec(&mut self.inner, &mut None)?;
         }
         let additional_records_count = PacketHeader::read_additional_records(&self.inner);
         PacketHeader::write_additional_records(&mut self.inner, additional_records_count + 1);
@@ -273,10 +273,10 @@ impl<'a> Packet<'a> {
     pub fn build_bytes_vec(&self) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
 
-        Self::add_section(&mut out, &self.questions)?;
-        Self::add_section(&mut out, &self.answers)?;
-        Self::add_section(&mut out, &self.name_servers)?;
-        Self::add_section(&mut out, &self.additional_records)?;
+        Self::add_section(&mut out, &self.questions, &mut None)?;
+        Self::add_section(&mut out, &self.answers, &mut None)?;
+        Self::add_section(&mut out, &self.name_servers, &mut None)?;
+        Self::add_section(&mut out, &self.additional_records, &mut None)?;
         self.write_header(&mut out);
 
         Ok(out)
@@ -287,15 +287,19 @@ impl<'a> Packet<'a> {
         let mut out = vec![0u8; 12];
         let mut name_refs = HashMap::new();
 
-        Self::add_section_compressed(&mut out, &mut name_refs, &self.questions)?;
-        Self::add_section_compressed(&mut out, &mut name_refs, &self.answers)?;
-        Self::add_section_compressed(&mut out, &mut name_refs, &self.name_servers)?;
-        Self::add_section_compressed(&mut out, &mut name_refs, &self.additional_records)?;
+        Self::add_section(&mut out, &self.questions, &mut Some(&mut name_refs))?;
+        Self::add_section(&mut out, &self.answers, &mut Some(&mut name_refs))?;
+        Self::add_section(&mut out, &self.name_servers, &mut Some(&mut name_refs))?;
+        Self::add_section(
+            &mut out,
+            &self.additional_records,
+            &mut Some(&mut name_refs),
+        )?;
         self.write_header(&mut out);
 
         Ok(out)
     }
-    fn write_header(&self, out: &mut Vec<u8>) {
+    fn write_header(&self, out: &mut [u8]) {
         self.header.write_to(&mut out[0..12]);
         if !self.questions.is_empty() {
             PacketHeader::write_questions(out, self.questions.len() as u16)
@@ -317,28 +321,19 @@ impl<'a> Packet<'a> {
     fn add_section<'b, T: DnsPacketContent<'b>>(
         out: &mut Vec<u8>,
         section: &[T],
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
         for item in section {
-            item.append_to_vec(out)?;
+            item.append_to_vec(out, name_refs)?;
         }
 
-        Ok(())
-    }
-    fn add_section_compressed<'b, T: DnsPacketContent<'b>>(
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-        section: &[T],
-    ) -> crate::Result<()> {
-        for item in section {
-            item.compress_append_to_vec(out, name_refs)?;
-        }
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{dns::CLASS, rdata::RData, rdata::A, Name, SimpleDnsError};
+    use crate::{dns::CLASS, dns::TYPE, rdata::RData, rdata::A, Name, SimpleDnsError};
 
     use super::super::{QCLASS, QTYPE};
     use super::*;
@@ -349,14 +344,14 @@ mod tests {
         let mut query = Packet::new_query(1, false);
         query.questions.push(Question::new(
             "_srv._udp.local".try_into().unwrap(),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         ));
         query.questions.push(Question::new(
             "_srv2._udp.local".try_into().unwrap(),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         ));
 
@@ -378,8 +373,8 @@ mod tests {
 
         assert_eq!(1, packet.questions.len());
         assert_eq!("google.com", packet.questions[0].qname.to_string());
-        assert_eq!(QTYPE::A, packet.questions[0].qtype);
-        assert_eq!(QCLASS::IN, packet.questions[0].qclass);
+        assert_eq!(QTYPE::TYPE(TYPE::A), packet.questions[0].qtype);
+        assert_eq!(QCLASS::CLASS(CLASS::IN), packet.questions[0].qclass);
 
         Ok(())
     }
@@ -419,8 +414,8 @@ mod tests {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
         let question = Question::new(
             Name::new_unchecked("_srv._udp.local"),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         );
         let resource = ResourceRecord::new(
@@ -511,8 +506,8 @@ mod tests {
         let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
         let question = Question::new(
             Name::new_unchecked("_srv._udp.local"),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         );
 

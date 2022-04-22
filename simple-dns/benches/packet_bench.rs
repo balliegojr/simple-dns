@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use simple_dns::{Name, Packet, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
+use simple_dns::{Name, Packet, PacketBuf, PacketHeader, Question, CLASS, TYPE};
 
 const DOMAINS: [&str; 4] = [
     "domain.local",
@@ -13,8 +13,8 @@ fn packet_questions() -> Vec<u8> {
     for domain in DOMAINS {
         query.questions.push(Question::new(
             Name::new(domain).unwrap(),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         ));
     }
@@ -27,8 +27,8 @@ fn packet_questions_compressed() -> Vec<u8> {
     for domain in DOMAINS {
         query.questions.push(Question::new(
             Name::new(domain).unwrap(),
-            QTYPE::TXT,
-            QCLASS::IN,
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
             false,
         ));
     }
@@ -39,7 +39,12 @@ fn packet_questions_compressed() -> Vec<u8> {
 fn packetbuf_questions() -> Vec<u8> {
     let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
     for domain in DOMAINS {
-        let question = Question::new(Name::new(domain).unwrap(), QTYPE::TXT, QCLASS::IN, false);
+        let question = Question::new(
+            Name::new(domain).unwrap(),
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
+            false,
+        );
         buf_packet.add_question(&question).unwrap();
     }
 
@@ -49,7 +54,12 @@ fn packetbuf_questions() -> Vec<u8> {
 fn packetbuf_questions_compressed() -> Vec<u8> {
     let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
     for domain in DOMAINS {
-        let question = Question::new(Name::new(domain).unwrap(), QTYPE::TXT, QCLASS::IN, false);
+        let question = Question::new(
+            Name::new(domain).unwrap(),
+            TYPE::TXT.into(),
+            CLASS::IN.into(),
+            false,
+        );
         buf_packet.add_question(&question).unwrap();
     }
 

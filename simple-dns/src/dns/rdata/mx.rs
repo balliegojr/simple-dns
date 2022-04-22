@@ -37,18 +37,13 @@ impl<'a> DnsPacketContent<'a> for MX<'a> {
         })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        out.extend(self.preference.to_be_bytes());
-        self.exchange.append_to_vec(out)
-    }
-
-    fn compress_append_to_vec(
+    fn append_to_vec(
         &self,
         out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
     ) -> crate::Result<()> {
         out.extend(self.preference.to_be_bytes());
-        self.exchange.compress_append_to_vec(out, name_refs)
+        self.exchange.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -68,7 +63,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(mx.append_to_vec(&mut data).is_ok());
+        assert!(mx.append_to_vec(&mut data, &mut None).is_ok());
 
         let mx = MX::parse(&data, 0);
         assert!(mx.is_ok());

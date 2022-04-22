@@ -32,22 +32,17 @@ impl<'a> DnsPacketContent<'a> for AFSDB<'a> {
         Ok(Self { subtype, hostname })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.extend(self.subtype.to_be_bytes());
-        self.hostname.append_to_vec(out)
+        self.hostname.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
         self.hostname.len() + 2
-    }
-
-    fn compress_append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        out.extend(self.subtype.to_be_bytes());
-        self.hostname.compress_append_to_vec(out, name_refs)
     }
 }
 
@@ -63,7 +58,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(afsdb.append_to_vec(&mut data).is_ok());
+        assert!(afsdb.append_to_vec(&mut data, &mut None).is_ok());
 
         let afsdb = AFSDB::parse(&data, 0);
         assert!(afsdb.is_ok());

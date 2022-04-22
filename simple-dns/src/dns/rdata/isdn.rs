@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::dns::{CharacterString, DnsPacketContent};
 
 /// An ISDN (Integrated Service Digital Network) number is simply a telephone number.
@@ -30,9 +32,13 @@ impl<'a> DnsPacketContent<'a> for ISDN<'a> {
         Ok(Self { address, sa })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.address.append_to_vec(out)?;
-        self.sa.append_to_vec(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        self.address.append_to_vec(out, name_refs)?;
+        self.sa.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -52,7 +58,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(isdn.append_to_vec(&mut data).is_ok());
+        assert!(isdn.append_to_vec(&mut data, &mut None).is_ok());
 
         let isdn = ISDN::parse(&data, 0);
         assert!(isdn.is_ok());

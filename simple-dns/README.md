@@ -10,7 +10,7 @@ you need to manipulate the packet before generating the final bytes buffer
 ```rust
 use simple_dns::*;
 use simple_dns::rdata::*;
-let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
+let question = Question::new(Name::new_unchecked("_srv._udp.local"), TYPE::TXT.into(), CLASS::IN.into(), false);
 let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 
 let mut packet = Packet::new_query(1, false);
@@ -42,7 +42,7 @@ It DOES matter the order in which the resources are added
 ```rust
 use simple_dns::*;
 use simple_dns::rdata::*;
-let question = Question::new(Name::new_unchecked("_srv._udp.local"), QTYPE::TXT, QCLASS::IN, false);
+let question = Question::new(Name::new_unchecked("_srv._udp.local"), TYPE::TXT.into(), CLASS::IN.into(), false);
 let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 
 let mut packet = PacketBuf::new(PacketHeader::new_query(1, false), true);

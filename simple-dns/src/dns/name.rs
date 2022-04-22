@@ -88,6 +88,48 @@ impl<'a> Name<'a> {
     pub fn get_labels(&'_ self) -> &'_ [Label<'_>] {
         &self.labels[..]
     }
+
+    fn plain_append(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+        for label in self.iter() {
+            out.push(label.len() as u8);
+            out.extend(label.data.iter());
+        }
+
+        if out[out.len() - 1] != 0 {
+            out.push(0);
+        }
+
+        Ok(())
+    }
+
+    fn compress_append(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        for label in self.iter() {
+            let mut h = name_refs.hasher().build_hasher();
+            label.hash(&mut h);
+            let key = h.finish();
+
+            if let std::collections::hash_map::Entry::Vacant(e) = name_refs.entry(key) {
+                e.insert(out.len());
+                out.push(label.len() as u8);
+                out.extend(label.data.iter());
+            } else {
+                let p = name_refs[&key] as u16;
+                out.extend((p | POINTER_MASK_U16).to_be_bytes());
+
+                return Ok(());
+            }
+        }
+
+        if out[out.len() - 1] != 0 {
+            out.push(0);
+        }
+
+        Ok(())
+    }
 }
 
 impl<'a> DnsPacketContent<'a> for Name<'a> {
@@ -137,50 +179,19 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
         Ok(Self { labels, total_size })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        for label in self.iter() {
-            out.push(label.len() as u8);
-            out.extend(label.data.iter());
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        match name_refs {
+            Some(name_refs) => self.compress_append(out, name_refs),
+            None => self.plain_append(out),
         }
-
-        if out[out.len() - 1] != 0 {
-            out.push(0);
-        }
-
-        Ok(())
     }
 
     fn len(&self) -> usize {
         self.total_size
-    }
-
-    fn compress_append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        for label in self.iter() {
-            let mut h = name_refs.hasher().build_hasher();
-            label.hash(&mut h);
-            let key = h.finish();
-
-            if let std::collections::hash_map::Entry::Vacant(e) = name_refs.entry(key) {
-                e.insert(out.len());
-                out.push(label.len() as u8);
-                out.extend(label.data.iter());
-            } else {
-                let p = name_refs[&key] as u16;
-                out.extend((p | POINTER_MASK_U16).to_be_bytes());
-
-                return Ok(());
-            }
-        }
-
-        if out[out.len() - 1] != 0 {
-            out.push(0);
-        }
-
-        Ok(())
     }
 }
 
@@ -329,14 +340,14 @@ mod tests {
         let mut bytes = Vec::with_capacity(30);
 
         Name::new_unchecked("_srv._udp.local")
-            .append_to_vec(&mut bytes)
+            .append_to_vec(&mut bytes, &mut None)
             .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
 
         let mut bytes = Vec::with_capacity(30);
         Name::new_unchecked("_srv._udp.local2.")
-            .append_to_vec(&mut bytes)
+            .append_to_vec(&mut bytes, &mut None)
             .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes[..]);
@@ -349,13 +360,13 @@ mod tests {
         let mut name_refs = HashMap::new();
 
         Name::new_unchecked("F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("FOO.F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add FOO.F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add FOO.F.ISI.ARPA");
 
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
@@ -368,16 +379,16 @@ mod tests {
         let mut name_refs = HashMap::new();
 
         Name::new_unchecked("ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add ISI.ARPA");
         Name::new_unchecked("F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("FOO.F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
-            .compress_append_to_vec(&mut buf, &mut name_refs)
+            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
             .expect("failed to add F.ISI.ARPA");
 
         let expected = b"\x03ISI\x04ARPA\x00\x01F\xc0\x00\x03FOO\xc0\x0a\x03BAR\xc0\x0a";
@@ -410,7 +421,7 @@ mod tests {
     fn len() -> crate::Result<()> {
         let mut bytes = Vec::new();
         let name_one = Name::new_unchecked("ex.com.");
-        name_one.append_to_vec(&mut bytes)?;
+        name_one.append_to_vec(&mut bytes, &mut None)?;
 
         assert_eq!(8, bytes.len());
         assert_eq!(bytes.len(), name_one.len());
@@ -418,8 +429,8 @@ mod tests {
 
         let mut name_refs = HashMap::new();
         let mut bytes = Vec::new();
-        name_one.compress_append_to_vec(&mut bytes, &mut name_refs)?;
-        name_one.compress_append_to_vec(&mut bytes, &mut name_refs)?;
+        name_one.append_to_vec(&mut bytes, &mut Some(&mut name_refs))?;
+        name_one.append_to_vec(&mut bytes, &mut Some(&mut name_refs))?;
 
         assert_eq!(10, bytes.len());
         Ok(())

@@ -1,5 +1,5 @@
 use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
-use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, QCLASS, QTYPE};
+use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, CLASS, TYPE};
 
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
@@ -64,8 +64,8 @@ impl OneShotMdnsResolver {
         let service_name = Name::new(service_name)?;
         packet.add_question(&Question::new(
             service_name.clone(),
-            QTYPE::A,
-            QCLASS::IN,
+            TYPE::A.into(),
+            CLASS::IN.into(),
             self.unicast_response,
         ))?;
 
@@ -106,8 +106,8 @@ impl OneShotMdnsResolver {
         let parsed_name_service = Name::new(service_name)?;
         packet.add_question(&Question::new(
             parsed_name_service.clone(),
-            QTYPE::SRV,
-            QCLASS::IN,
+            TYPE::SRV.into(),
+            CLASS::IN.into(),
             self.unicast_response,
         ))?;
 
@@ -127,7 +127,7 @@ impl OneShotMdnsResolver {
             let port = response
                 .answers
                 .iter()
-                .filter(|a| a.name == parsed_name_service && a.match_qtype(QTYPE::SRV))
+                .filter(|a| a.name == parsed_name_service && a.match_qtype(TYPE::SRV.into()))
                 .find_map(|a| match &a.rdata {
                     RData::SRV(srv) => Some(srv.port),
                     _ => None,
@@ -136,7 +136,7 @@ impl OneShotMdnsResolver {
             let mut address = response
                 .additional_records
                 .iter()
-                .filter(|a| a.name == parsed_name_service && a.match_qtype(QTYPE::A))
+                .filter(|a| a.name == parsed_name_service && a.match_qtype(TYPE::A.into()))
                 .find_map(|a| match &a.rdata {
                     RData::A(a) => Some(IpAddr::V4(Ipv4Addr::from(a.address))),
                     RData::AAAA(aaaa) => Some(IpAddr::V6(Ipv6Addr::from(aaaa.address))),

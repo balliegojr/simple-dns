@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
 
@@ -44,7 +44,11 @@ impl<'a> DnsPacketContent<'a> for NULL<'a> {
         Self::new(&data[position..])
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.extend(self.data.iter());
         Ok(())
     }

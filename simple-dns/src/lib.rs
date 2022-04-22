@@ -8,7 +8,7 @@ use std::array::TryFromSliceError;
 pub use dns::*;
 use thiserror::Error;
 
-/// Alias type for Result<T, SimpleDnsError>;
+/// Alias type for Result<T, SimpleDnsError>;
 pub type Result<T> = std::result::Result<T, SimpleDnsError>;
 
 /// Error types for SimpleDns

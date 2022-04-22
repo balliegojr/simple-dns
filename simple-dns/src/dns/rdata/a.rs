@@ -1,5 +1,5 @@
 use crate::dns::DnsPacketContent;
-use std::{convert::TryInto, net::Ipv4Addr};
+use std::{collections::HashMap, convert::TryInto, net::Ipv4Addr};
 
 /// Represents a Resource Address (IPv4)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -17,7 +17,11 @@ impl<'a> DnsPacketContent<'a> for A {
         Ok(Self { address })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
         out.extend(self.address.to_be_bytes());
         Ok(())
     }
@@ -46,7 +50,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(a.append_to_vec(&mut bytes).is_ok());
+        assert!(a.append_to_vec(&mut bytes, &mut None).is_ok());
 
         let a = A::parse(&bytes, 0);
         assert!(a.is_ok());

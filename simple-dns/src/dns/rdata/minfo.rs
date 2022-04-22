@@ -33,22 +33,17 @@ impl<'a> DnsPacketContent<'a> for MINFO<'a> {
         Ok(Self { rmailbox, emailbox })
     }
 
-    fn append_to_vec(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        self.rmailbox.append_to_vec(out)?;
-        self.emailbox.append_to_vec(out)
+    fn append_to_vec(
+        &self,
+        out: &mut Vec<u8>,
+        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+    ) -> crate::Result<()> {
+        self.rmailbox.append_to_vec(out, name_refs)?;
+        self.emailbox.append_to_vec(out, name_refs)
     }
 
     fn len(&self) -> usize {
         self.rmailbox.len() + self.emailbox.len()
-    }
-
-    fn compress_append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut HashMap<u64, usize>,
-    ) -> crate::Result<()> {
-        self.rmailbox.compress_append_to_vec(out, name_refs)?;
-        self.emailbox.compress_append_to_vec(out, name_refs)
     }
 }
 
@@ -64,7 +59,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(minfo.append_to_vec(&mut data).is_ok());
+        assert!(minfo.append_to_vec(&mut data, &mut None).is_ok());
 
         let minfo = MINFO::parse(&data, 0);
         assert!(minfo.is_ok());
