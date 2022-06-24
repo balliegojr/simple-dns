@@ -41,6 +41,9 @@ pub enum SimpleDnsError {
     /// Attempted to perform an invalid operation
     #[error("Attempted to perform an invalid operation")]
     AttemptedInvalidOperation,
+    /// Incomplete dns packet, should try again after more data available
+    #[error("Incomplete dns packet")]
+    NoEnoughData,
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
