@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dns::{CharacterString, DnsPacketContent};
+use crate::dns::{CharacterString, PacketPart};
+
+use super::RR;
 
 /// An ISDN (Integrated Service Digital Network) number is simply a telephone number.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -9,6 +11,10 @@ pub struct ISDN<'a> {
     pub address: CharacterString<'a>,
     /// A [CharacterString](`CharacterString`) which specifies the subaddress.
     pub sa: CharacterString<'a>,
+}
+
+impl<'a> RR for ISDN<'a> {
+    const TYPE_CODE: u16 = 20;
 }
 
 impl<'a> ISDN<'a> {
@@ -21,7 +27,7 @@ impl<'a> ISDN<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for ISDN<'a> {
+impl<'a> PacketPart<'a> for ISDN<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

@@ -1,5 +1,7 @@
-use crate::dns::DnsPacketContent;
+use crate::dns::PacketPart;
 use std::{collections::HashMap, convert::TryInto, net::Ipv6Addr};
+
+use super::RR;
 
 /// Represents a Resource Address (IPv6) [rfc3596](https://tools.ietf.org/html/rfc3596)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -8,7 +10,11 @@ pub struct AAAA {
     pub address: u128,
 }
 
-impl<'a> DnsPacketContent<'a> for AAAA {
+impl RR for AAAA {
+    const TYPE_CODE: u16 = 28;
+}
+
+impl<'a> PacketPart<'a> for AAAA {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -28,6 +34,13 @@ impl<'a> DnsPacketContent<'a> for AAAA {
 
     fn len(&self) -> usize {
         16
+    }
+}
+
+impl AAAA {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned(self) -> Self {
+        self
     }
 }
 

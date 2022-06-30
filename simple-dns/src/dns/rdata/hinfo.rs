@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dns::{CharacterString, DnsPacketContent};
+use crate::dns::{CharacterString, PacketPart};
+
+use super::RR;
 
 /// HINFO records are used to acquire general information about a host.  
 /// The main use is for protocols such as FTP that can use special procedures
@@ -13,6 +15,10 @@ pub struct HINFO<'a> {
     pub os: CharacterString<'a>,
 }
 
+impl<'a> RR for HINFO<'a> {
+    const TYPE_CODE: u16 = 13;
+}
+
 impl<'a> HINFO<'a> {
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> HINFO<'b> {
@@ -23,7 +29,7 @@ impl<'a> HINFO<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for HINFO<'a> {
+impl<'a> PacketPart<'a> for HINFO<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

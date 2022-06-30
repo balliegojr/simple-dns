@@ -1,6 +1,8 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// MX is used to acquire mail exchange information
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -13,6 +15,10 @@ pub struct MX<'a> {
     pub exchange: Name<'a>,
 }
 
+impl<'a> RR for MX<'a> {
+    const TYPE_CODE: u16 = 15;
+}
+
 impl<'a> MX<'a> {
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> MX<'b> {
@@ -23,7 +29,7 @@ impl<'a> MX<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for MX<'a> {
+impl<'a> PacketPart<'a> for MX<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

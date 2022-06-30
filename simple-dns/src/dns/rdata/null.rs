@@ -1,12 +1,18 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use crate::dns::{DnsPacketContent, MAX_NULL_LENGTH};
+use crate::dns::{PacketPart, MAX_NULL_LENGTH};
+
+use super::RR;
 
 /// NULL resources are used to represent any kind of information.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NULL<'a> {
     length: u16,
     data: Cow<'a, [u8]>,
+}
+
+impl<'a> RR for NULL<'a> {
+    const TYPE_CODE: u16 = 10;
 }
 
 impl<'a> NULL<'a> {
@@ -36,7 +42,7 @@ impl<'a> NULL<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for NULL<'a> {
+impl<'a> PacketPart<'a> for NULL<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

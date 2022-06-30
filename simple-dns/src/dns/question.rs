@@ -3,7 +3,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use super::{DnsPacketContent, Name, QCLASS, QTYPE};
+use super::{Name, PacketPart, QCLASS, QTYPE};
 
 /// Question represents a query in the DNS Packet
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ impl<'a> Question<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for Question<'a> {
+impl<'a> PacketPart<'a> for Question<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
         let offset = position + qname.len();

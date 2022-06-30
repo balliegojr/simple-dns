@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use crate::dns::DnsPacketContent;
+use crate::dns::PacketPart;
 use crate::Name;
+
+use super::RR;
 
 /// SRV records specifies the location of the server(s) for a specific protocol and domain.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -21,6 +23,10 @@ pub struct SRV<'a> {
     pub target: Name<'a>,
 }
 
+impl<'a> RR for SRV<'a> {
+    const TYPE_CODE: u16 = 33;
+}
+
 impl<'a> SRV<'a> {
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> SRV<'b> {
@@ -33,7 +39,7 @@ impl<'a> SRV<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for SRV<'a> {
+impl<'a> PacketPart<'a> for SRV<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

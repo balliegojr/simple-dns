@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Deref, usize};
 
 use crate::{SimpleDnsError, OPCODE};
 
-use super::{DnsPacketContent, PacketHeader, Question, ResourceRecord};
+use super::{PacketHeader, PacketPart, Question, ResourceRecord};
 
 /// Owned version of [`Packet`] that contains a internal buffer.  
 /// This struct fills the internal buffer on the fly, because of this, it imposes some constraints.  
@@ -253,7 +253,7 @@ impl<'a> Packet<'a> {
         })
     }
 
-    fn parse_section<T: DnsPacketContent<'a>>(
+    fn parse_section<T: PacketPart<'a>>(
         data: &'a [u8],
         offset: &mut usize,
         items_count: u16,
@@ -282,7 +282,7 @@ impl<'a> Packet<'a> {
         Ok(out)
     }
 
-    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package with [Name](`Name`) compression
+    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package with [Name](`crate::Name`) compression
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
         let mut out = vec![0u8; 12];
         let mut name_refs = HashMap::new();
@@ -318,7 +318,7 @@ impl<'a> Packet<'a> {
         }
     }
 
-    fn add_section<'b, T: DnsPacketContent<'b>>(
+    fn add_section<'b, T: PacketPart<'b>>(
         out: &mut Vec<u8>,
         section: &[T],
         name_refs: &mut Option<&mut HashMap<u64, usize>>,

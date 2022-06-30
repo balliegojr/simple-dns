@@ -1,6 +1,8 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// The RT resource record provides a route-through binding for hosts that do not have their own direct wide area network addresses
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -13,6 +15,10 @@ pub struct RouteThrough<'a> {
     pub intermediate_host: Name<'a>,
 }
 
+impl<'a> RR for RouteThrough<'a> {
+    const TYPE_CODE: u16 = 21;
+}
+
 impl<'a> RouteThrough<'a> {
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> RouteThrough<'b> {
@@ -23,7 +29,7 @@ impl<'a> RouteThrough<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for RouteThrough<'a> {
+impl<'a> PacketPart<'a> for RouteThrough<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

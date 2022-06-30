@@ -3,13 +3,19 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use crate::{dns::DnsPacketContent, CharacterString};
+use crate::{dns::PacketPart, CharacterString};
+
+use super::RR;
 
 /// Represents a TXT Resource Record
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TXT<'a> {
     strings: Vec<CharacterString<'a>>,
     size: usize,
+}
+
+impl<'a> RR for TXT<'a> {
+    const TYPE_CODE: u16 = 16;
 }
 
 impl<'a> Default for TXT<'a> {
@@ -111,7 +117,7 @@ impl<'a> TryFrom<HashMap<String, Option<String>>> for TXT<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for TXT<'a> {
+impl<'a> PacketPart<'a> for TXT<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

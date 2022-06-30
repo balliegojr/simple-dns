@@ -1,6 +1,8 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// SOA records are used to mark the start of a zone of authority
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -22,16 +24,11 @@ pub struct SOA<'a> {
     pub minimum: u32,
 }
 
-impl<'a> SOA<'a> {
-    fn append_commom(&self, out: &mut Vec<u8>) -> crate::Result<()> {
-        out.extend(self.serial.to_be_bytes());
-        out.extend(self.refresh.to_be_bytes());
-        out.extend(self.retry.to_be_bytes());
-        out.extend(self.expire.to_be_bytes());
-        out.extend(self.minimum.to_be_bytes());
-        Ok(())
-    }
+impl<'a> RR for SOA<'a> {
+    const TYPE_CODE: u16 = 6;
+}
 
+impl<'a> SOA<'a> {
     /// Transforms the inner data into it's owned type
     pub fn into_owned<'b>(self) -> SOA<'b> {
         SOA {
@@ -46,7 +43,7 @@ impl<'a> SOA<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for SOA<'a> {
+impl<'a> PacketPart<'a> for SOA<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

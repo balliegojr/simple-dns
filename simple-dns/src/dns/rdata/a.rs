@@ -1,5 +1,7 @@
-use crate::dns::DnsPacketContent;
+use crate::dns::PacketPart;
 use std::{collections::HashMap, convert::TryInto, net::Ipv4Addr};
+
+use super::RR;
 
 /// Represents a Resource Address (IPv4)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -8,7 +10,11 @@ pub struct A {
     pub address: u32,
 }
 
-impl<'a> DnsPacketContent<'a> for A {
+impl RR for A {
+    const TYPE_CODE: u16 = 1;
+}
+
+impl<'a> PacketPart<'a> for A {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -28,6 +34,13 @@ impl<'a> DnsPacketContent<'a> for A {
 
     fn len(&self) -> usize {
         4
+    }
+}
+
+impl A {
+    /// Transforms the inner data into it's owned type
+    pub fn into_owned(self) -> Self {
+        self
     }
 }
 
