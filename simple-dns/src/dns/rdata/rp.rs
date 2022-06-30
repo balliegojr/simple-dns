@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// RP Responsible Person, [RFC 1183](https://datatracker.ietf.org/doc/html/rfc1183#section-2.2)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -9,6 +11,10 @@ pub struct RP<'a> {
     pub mbox: Name<'a>,
     /// A [Name](`Name`) which specifies a domain name the TXT records.
     pub txt: Name<'a>,
+}
+
+impl<'a> RR for RP<'a> {
+    const TYPE_CODE: u16 = 17;
 }
 
 impl<'a> RP<'a> {
@@ -21,7 +27,7 @@ impl<'a> RP<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for RP<'a> {
+impl<'a> PacketPart<'a> for RP<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

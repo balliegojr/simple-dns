@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// MINFO recors are used to acquire mailbox or mail list information
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -10,6 +12,10 @@ pub struct MINFO<'a> {
     /// A [Name](`Name`) which specifies a mailbox which is to receive error messages related to  
     /// the mailing list or mailbox specified by the owner of the MINFO RR
     pub emailbox: Name<'a>,
+}
+
+impl<'a> RR for MINFO<'a> {
+    const TYPE_CODE: u16 = 14;
 }
 
 impl<'a> MINFO<'a> {
@@ -22,7 +28,7 @@ impl<'a> MINFO<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for MINFO<'a> {
+impl<'a> PacketPart<'a> for MINFO<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::dns::{DnsPacketContent, Name};
+use crate::dns::{Name, PacketPart};
+
+use super::RR;
 
 /// AFSDB records represents servers with ASD cells
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -9,6 +11,10 @@ pub struct AFSDB<'a> {
     pub subtype: u16,
     /// The <hostname> field is a [name](`Name`) name of a host that has a server for the cell named by the owner name of the RR
     pub hostname: Name<'a>,
+}
+
+impl<'a> RR for AFSDB<'a> {
+    const TYPE_CODE: u16 = 18;
 }
 
 impl<'a> AFSDB<'a> {
@@ -21,7 +27,7 @@ impl<'a> AFSDB<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for AFSDB<'a> {
+impl<'a> PacketPart<'a> for AFSDB<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

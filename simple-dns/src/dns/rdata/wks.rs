@@ -1,6 +1,8 @@
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
-use crate::dns::DnsPacketContent;
+use crate::dns::PacketPart;
+
+use super::RR;
 
 /// The WKS record is used to describe the well known services supported by a particular protocol on a particular internet address.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -11,6 +13,10 @@ pub struct WKS<'a> {
     pub protocol: u8,
     /// A variable length bit map.  The bit map must be a multiple of 8 bits long.
     pub bit_map: Cow<'a, [u8]>,
+}
+
+impl<'a> RR for WKS<'a> {
+    const TYPE_CODE: u16 = 11;
 }
 
 impl<'a> WKS<'a> {
@@ -24,7 +30,7 @@ impl<'a> WKS<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for WKS<'a> {
+impl<'a> PacketPart<'a> for WKS<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

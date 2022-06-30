@@ -1,6 +1,6 @@
 use crate::{QCLASS, QTYPE};
 
-use super::{rdata::RData, DnsPacketContent, Name, CLASS, TYPE};
+use super::{rdata::RData, Name, PacketPart, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
@@ -83,7 +83,7 @@ impl<'a> ResourceRecord<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
+impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

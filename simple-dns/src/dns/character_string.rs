@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display};
 
 use crate::SimpleDnsError;
 
-use super::{DnsPacketContent, MAX_CHARACTER_STRING_LENGTH};
+use super::{PacketPart, MAX_CHARACTER_STRING_LENGTH};
 
 /// CharacterString is expressed in one or two ways:
 /// - as a contiguous set of characters without interior spaces,
@@ -55,7 +55,7 @@ impl<'a> CharacterString<'a> {
     }
 }
 
-impl<'a> DnsPacketContent<'a> for CharacterString<'a> {
+impl<'a> PacketPart<'a> for CharacterString<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
         Self: Sized,

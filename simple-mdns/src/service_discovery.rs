@@ -68,7 +68,7 @@ impl ServiceDiscovery {
             service_name.clone(),
             simple_dns::CLASS::IN,
             0,
-            RData::PTR(service_name.clone()),
+            RData::PTR(service_name.clone().into()),
         ));
 
         let (tx, rx) = channel();
