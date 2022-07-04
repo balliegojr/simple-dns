@@ -1,4 +1,8 @@
 # Simple DNS
+
+## unreleased
+- Add new error type `NoEnoughData` for stream parsing
+
 ## 0.4.6
 - Add cache flush bit parsing to resource records
 
