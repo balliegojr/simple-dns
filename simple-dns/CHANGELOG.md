@@ -1,6 +1,7 @@
 # Simple DNS
 
 ## unreleased
+- Add RFC 1183
 - Add new error type `NoEnoughData` for stream parsing
 
 ## 0.4.6
