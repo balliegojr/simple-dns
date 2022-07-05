@@ -143,14 +143,25 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
 
         let mut position = initial_position;
 
-        while data[position] != 0 {
+        loop {
+            if position >= data.len() {
+                return Err(crate::SimpleDnsError::NoEnoughData);
+            }
+
             match data[position] {
+                0 => {
+                    break;
+                }
                 len if len & POINTER_MASK == POINTER_MASK => {
                     //compression
                     if !is_compressed {
                         total_size += 1;
                     }
                     is_compressed = true;
+
+                    if position + 2 > data.len() {
+                        return Err(crate::SimpleDnsError::NoEnoughData);
+                    }
 
                     position = (u16::from_be_bytes(data[position..position + 2].try_into()?)
                         & !POINTER_MASK_U16) as usize;
@@ -160,7 +171,7 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                     let e = p + len as usize;
 
                     if e > data.len() {
-                        return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                        return Err(crate::SimpleDnsError::NoEnoughData);
                     }
 
                     labels.push(Label::new(&data[p..e])?);
@@ -169,10 +180,6 @@ impl<'a> DnsPacketContent<'a> for Name<'a> {
                     }
                     position = e;
                 }
-            }
-
-            if position > data.len() {
-                return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
         }
 

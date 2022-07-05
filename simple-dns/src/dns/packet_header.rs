@@ -95,7 +95,7 @@ impl PacketHeader {
     /// Parse a slice of 12 bytes into a Packet header
     pub fn parse(data: &[u8]) -> crate::Result<Self> {
         if data.len() < 12 {
-            return Err(crate::SimpleDnsError::InvalidHeaderData);
+            return Err(crate::SimpleDnsError::NoEnoughData);
         }
 
         let flags = u16::from_be_bytes(data[2..4].try_into()?);

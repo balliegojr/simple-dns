@@ -91,6 +91,10 @@ impl<'a> DnsPacketContent<'a> for ResourceRecord<'a> {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
 
+        if offset + 8 > data.len() {
+            return Err(crate::SimpleDnsError::NoEnoughData);
+        }
+
         let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
         let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
         let class = (class_value & !flag::CACHE_FLUSH).try_into()?;

@@ -70,8 +70,16 @@ impl<'a> DnsPacketContent<'a> for RData<'a> {
     where
         Self: Sized,
     {
+        if position + 10 > data.len() {
+            return Err(crate::SimpleDnsError::NoEnoughData);
+        }
+
         let rdatatype = u16::from_be_bytes(data[position..position + 2].try_into()?).into();
         let rdatalen = u16::from_be_bytes(data[position + 8..position + 10].try_into()?) as usize;
+
+        if position + 10 + rdatalen > data.len() {
+            return Err(crate::SimpleDnsError::NoEnoughData);
+        }
 
         parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)
     }

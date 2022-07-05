@@ -46,6 +46,10 @@ impl<'a> DnsPacketContent<'a> for Question<'a> {
         let qname = Name::parse(data, position)?;
         let offset = position + qname.len();
 
+        if offset + 4 > data.len() {
+            return Err(crate::SimpleDnsError::NoEnoughData);
+        }
+
         let qclass = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
 
         Ok(Self {
