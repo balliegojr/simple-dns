@@ -47,7 +47,7 @@ impl<'a> PacketPart<'a> for Question<'a> {
         let offset = position + qname.len();
 
         if offset + 4 > data.len() {
-            return Err(crate::SimpleDnsError::NoEnoughData);
+            return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         let qclass = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);

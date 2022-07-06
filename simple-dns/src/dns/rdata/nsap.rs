@@ -122,13 +122,13 @@ impl TryFrom<&[u8]> for NSAP {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < 20 {
-            return Err(SimpleDnsError::NoEnoughData);
+            return Err(SimpleDnsError::InsufficientData);
         }
 
         value[0..20]
             .try_into()
             .map(|inner| Self { inner })
-            .map_err(|_| SimpleDnsError::NoEnoughData)
+            .map_err(|_| SimpleDnsError::InsufficientData)
     }
 }
 
@@ -142,7 +142,7 @@ impl<'a> PacketPart<'a> for NSAP {
             .map(|inner: [u8; 20]| Self {
                 inner: inner.map(u8::from_be),
             })
-            .map_err(|_| SimpleDnsError::NoEnoughData)
+            .map_err(|_| SimpleDnsError::InsufficientData)
     }
 
     fn append_to_vec(
