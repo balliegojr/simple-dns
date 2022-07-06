@@ -3,7 +3,7 @@
 ## unreleased
 - Add RFC 1183
 - Add RFC 1706
-- Add new error type `NoEnoughData` for stream parsing
+- Add new error type `InsufficientData` for stream parsing
 
 ## 0.4.6
 - Add cache flush bit parsing to resource records

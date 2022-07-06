@@ -63,14 +63,14 @@ macro_rules! rdata_enum {
                 Self: Sized,
             {
                 if position + 10 > data.len() {
-                    return Err(crate::SimpleDnsError::NoEnoughData);
+                    return Err(crate::SimpleDnsError::InsufficientData);
                 }
 
                 let rdatatype = u16::from_be_bytes(data[position..position + 2].try_into()?).into();
                 let rdatalen = u16::from_be_bytes(data[position + 8..position + 10].try_into()?) as usize;
 
                 if position + 10 + rdatalen > data.len() {
-                    return Err(crate::SimpleDnsError::NoEnoughData);
+                    return Err(crate::SimpleDnsError::InsufficientData);
                 }
 
                 parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)

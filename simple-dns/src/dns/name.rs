@@ -145,7 +145,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
 
         loop {
             if position >= data.len() {
-                return Err(crate::SimpleDnsError::NoEnoughData);
+                return Err(crate::SimpleDnsError::InsufficientData);
             }
 
             match data[position] {
@@ -160,7 +160,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
                     is_compressed = true;
 
                     if position + 2 > data.len() {
-                        return Err(crate::SimpleDnsError::NoEnoughData);
+                        return Err(crate::SimpleDnsError::InsufficientData);
                     }
 
                     position = (u16::from_be_bytes(data[position..position + 2].try_into()?)
@@ -171,7 +171,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
                     let e = p + len as usize;
 
                     if e > data.len() {
-                        return Err(crate::SimpleDnsError::NoEnoughData);
+                        return Err(crate::SimpleDnsError::InsufficientData);
                     }
 
                     labels.push(Label::new(&data[p..e])?);

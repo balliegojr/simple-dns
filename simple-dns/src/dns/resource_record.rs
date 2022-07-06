@@ -92,7 +92,7 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
         let offset = position + name.len();
 
         if offset + 8 > data.len() {
-            return Err(crate::SimpleDnsError::NoEnoughData);
+            return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
