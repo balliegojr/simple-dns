@@ -29,6 +29,9 @@ pub use minfo::MINFO;
 mod mx;
 pub use mx::MX;
 
+mod nsap;
+pub use nsap::NSAP;
+
 mod null;
 pub use null::NULL;
 
@@ -121,4 +124,5 @@ macros::rdata_enum! {
     AFSDB<'a>,
     ISDN<'a>,
     RouteThrough<'a>,
+    NSAP,
 }
