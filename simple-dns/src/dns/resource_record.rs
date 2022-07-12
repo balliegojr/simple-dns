@@ -61,6 +61,7 @@ impl<'a> ResourceRecord<'a> {
         let type_code = self.rdata.type_code();
         match qtype {
             QTYPE::ANY => true,
+            QTYPE::IXFR => false,
             QTYPE::AXFR => true, // TODO: figure out what to do here
             QTYPE::MAILB => type_code == TYPE::MR || type_code == TYPE::MB || type_code == TYPE::MG,
             QTYPE::MAILA => type_code == TYPE::MX,
