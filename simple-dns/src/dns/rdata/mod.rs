@@ -23,6 +23,9 @@ pub use hinfo::HINFO;
 mod isdn;
 pub use isdn::ISDN;
 
+mod loc;
+pub use loc::LOC;
+
 mod minfo;
 pub use minfo::MINFO;
 
@@ -64,22 +67,22 @@ macros::rr_wrapper! {
 
 macros::rr_wrapper! {
     #[doc = "Mail destination (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)"]
-    MD:Name=3
+    MD:Name = 3
 }
 
 macros::rr_wrapper! {
     #[doc = "Mail forwarder (Obsolete - use MX), [RFC 1035](https://tools.ietf.org/html/rfc1035)"]
-    MF:Name=4
+    MF:Name = 4
 }
 
 macros::rr_wrapper! {
     #[doc = "Canonical name for an alias, [RFC 1035](https://tools.ietf.org/html/rfc1035)"]
-    CNAME:Name=5
+    CNAME:Name = 5
 }
 
 macros::rr_wrapper! {
     #[doc = "Mailbox domain name (EXPERIMENTAL), [RFC 1035](https://tools.ietf.org/html/rfc1035)"]
-    MB:Name=7
+    MB:Name = 7
 }
 
 macros::rr_wrapper! {
@@ -94,7 +97,7 @@ macros::rr_wrapper! {
 
 macros::rr_wrapper! {
     #[doc="Domain name pointer, [RFC 1035](https://tools.ietf.org/html/rfc1035)"]
-    PTR:Name=12
+    PTR:Name = 12
 }
 
 macros::rr_wrapper! {
@@ -125,4 +128,5 @@ macros::rdata_enum! {
     ISDN<'a>,
     RouteThrough<'a>,
     NSAP,
+    LOC,
 }
