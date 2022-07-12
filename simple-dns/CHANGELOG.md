@@ -3,6 +3,7 @@
 ## unreleased
 - Add RFC 1183
 - Add RFC 1706
+- Add RFC 1876
 - Add new error type `InsufficientData` for stream parsing
 
 ## 0.4.6
