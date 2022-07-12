@@ -60,6 +60,7 @@ The *Packet* structure provides parsing e building of a DNS packet, it aims to b
 - [RFC 1183](https://tools.ietf.org/html/rfc1183)
 - [RFC 1706](https://tools.ietf.org/html/rfc1706)
 - [RFC 1876](https://tools.ietf.org/html/rfc1876)
+- [RFC 1996](https://tools.ietf.org/html/rfc1996)
 - [RFC 6762](https://tools.ietf.org/html/rfc6762)
 - [RFC 2782](https://tools.ietf.org/html/rfc2782)
 - [RFC 3596](https://tools.ietf.org/html/rfc3596)

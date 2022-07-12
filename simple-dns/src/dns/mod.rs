@@ -35,6 +35,8 @@ const MAX_NULL_LENGTH: usize = 65535;
 pub enum QTYPE {
     /// Query for the specific [TYPE]
     TYPE(TYPE),
+    /// A request for incremental transfer of a zone. [RFC 1995](https://tools.ietf.org/html/rfc1995)
+    IXFR,
     /// A request for a transfer of an entire zone, [RFC 1035](https://tools.ietf.org/html/rfc1035)
     AXFR,
     /// A request for mailbox-related records (MB, MG or MR), [RFC 1035](https://tools.ietf.org/html/rfc1035)
@@ -56,6 +58,7 @@ impl TryFrom<u16> for QTYPE {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
+            251 => Ok(QTYPE::IXFR),
             252 => Ok(QTYPE::AXFR),
             253 => Ok(QTYPE::MAILB),
             254 => Ok(QTYPE::MAILA),
@@ -72,6 +75,7 @@ impl From<QTYPE> for u16 {
     fn from(val: QTYPE) -> Self {
         match val {
             QTYPE::TYPE(ty) => ty.into(),
+            QTYPE::IXFR => 251,
             QTYPE::AXFR => 252,
             QTYPE::MAILB => 253,
             QTYPE::MAILA => 254,
@@ -157,6 +161,8 @@ pub enum OPCODE {
     InverseQuery = 1,
     /// Server status request
     ServerStatusRequest = 2,
+    /// Notify query
+    Notify = 4,
     /// Reserved opcode for future use
     Reserved,
 }
@@ -167,6 +173,7 @@ impl From<u16> for OPCODE {
             0 => OPCODE::StandardQuery,
             1 => OPCODE::InverseQuery,
             2 => OPCODE::ServerStatusRequest,
+            4 => OPCODE::Notify,
             _ => OPCODE::Reserved,
         }
     }
