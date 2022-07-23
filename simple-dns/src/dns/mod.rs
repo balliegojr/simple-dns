@@ -96,6 +96,8 @@ pub enum CLASS {
     CH = 3,
     /// Hesiod [Dyer 87], [RFC 1035](https://tools.ietf.org/html/rfc1035)
     HS = 4,
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    NONE = 254,
 }
 
 impl TryFrom<u16> for CLASS {
@@ -108,6 +110,7 @@ impl TryFrom<u16> for CLASS {
             2 => Ok(CS),
             3 => Ok(CH),
             4 => Ok(HS),
+            254 => Ok(NONE),
             v => Err(Self::Error::InvalidClass(v)),
         }
     }
@@ -134,9 +137,8 @@ impl TryFrom<u16> for QCLASS {
 
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            v @ 1..=5 => CLASS::try_from(v).map(|x| x.into()),
             255 => Ok(QCLASS::ANY),
-            v => Err(Self::Error::InvalidQClass(v)),
+            v => CLASS::try_from(v).map(|x| x.into()),
         }
     }
 }
@@ -163,6 +165,8 @@ pub enum OPCODE {
     ServerStatusRequest = 2,
     /// Notify query
     Notify = 4,
+    /// Update query [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    Update = 5,
     /// Reserved opcode for future use
     Reserved,
 }
@@ -174,6 +178,7 @@ impl From<u16> for OPCODE {
             1 => OPCODE::InverseQuery,
             2 => OPCODE::ServerStatusRequest,
             4 => OPCODE::Notify,
+            5 => OPCODE::Update,
             _ => OPCODE::Reserved,
         }
     }
@@ -199,19 +204,41 @@ pub enum RCODE {
     /// For example, a name server may not wish to provide the information to the particular requester,   
     /// or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data.
     Refused = 5,
+    /// Some name that ought not to exist, does exist.
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    YXDOMAIN = 6,
+    /// Some RRset that ought not to exist, does exist.
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    YXRRSET = 7,
+    /// Some RRset that ought to exist, does not exist.
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    NXRRSET = 8,
+    /// The server is not authoritative for the zone named in the Zone Section.
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    NOTAUTH = 9,
+    /// A name used in the Prerequisite or Update Section is not within the zone denoted by the Zone Section.
+    /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
+    NOTZONE = 10,
+
     /// Reserved for future use.
     Reserved,
 }
 
 impl From<u16> for RCODE {
     fn from(code: u16) -> Self {
+        use RCODE::*;
         match code {
-            0 => RCODE::NoError,
-            1 => RCODE::FormatError,
-            2 => RCODE::ServerFailure,
-            3 => RCODE::NameError,
-            4 => RCODE::NotImplemented,
-            5 => RCODE::Refused,
+            0 => NoError,
+            1 => FormatError,
+            2 => ServerFailure,
+            3 => NameError,
+            4 => NotImplemented,
+            5 => Refused,
+            6 => YXDOMAIN,
+            7 => YXRRSET,
+            8 => NXRRSET,
+            9 => NOTAUTH,
+            10 => NOTZONE,
             _ => RCODE::Reserved,
         }
     }

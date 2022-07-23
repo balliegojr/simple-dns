@@ -1,6 +1,7 @@
 # Simple DNS
 
 ## unreleased
+- Add RFC 2136
 - Add RFC 1183
 - Add RFC 1706
 - Add RFC 1876
