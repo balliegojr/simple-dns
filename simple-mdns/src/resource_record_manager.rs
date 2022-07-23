@@ -149,7 +149,7 @@ enum ResourceRecordType {
     Expirable(ExpirationInfo),
 }
 
-impl<'a> ResourceRecordType {
+impl ResourceRecordType {
     pub fn is_owned(&self) -> bool {
         matches!(self, &ResourceRecordType::Owned)
     }

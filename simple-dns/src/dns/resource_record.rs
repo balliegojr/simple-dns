@@ -8,7 +8,7 @@ mod flag {
     pub const CACHE_FLUSH: u16 = 0b1000_0000_0000_0000;
 }
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, Clone)]
 pub struct ResourceRecord<'a> {
     /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
@@ -144,6 +144,12 @@ impl<'a> Hash for ResourceRecord<'a> {
         self.name.hash(state);
         self.class.hash(state);
         self.rdata.hash(state);
+    }
+}
+
+impl<'a> PartialEq for ResourceRecord<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.class == other.class && self.rdata == other.rdata
     }
 }
 

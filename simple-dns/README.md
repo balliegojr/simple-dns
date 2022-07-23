@@ -61,9 +61,14 @@ The *Packet* structure provides parsing e building of a DNS packet, it aims to b
 - [RFC 1706](https://tools.ietf.org/html/rfc1706)
 - [RFC 1876](https://tools.ietf.org/html/rfc1876)
 - [RFC 1996](https://tools.ietf.org/html/rfc1996)
+- [RFC 2136](https://tools.ietf.org/html/rfc2136)
 - [RFC 6762](https://tools.ietf.org/html/rfc6762)
 - [RFC 2782](https://tools.ietf.org/html/rfc2782)
 - [RFC 3596](https://tools.ietf.org/html/rfc3596)
 
 Other Resource Records defined by other RFCs that are not in this list will be implemented over time
+
+# Update packets (RFC 2136)
+
+This library can parse update packets, however, it does not validate update rules and the update fields are overloaded in the packet fields, as defined in the RFC 2136.
 
