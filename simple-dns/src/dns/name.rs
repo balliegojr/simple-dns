@@ -153,7 +153,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
             }
 
             // domain name max size is 255
-            if name_size > 255 {
+            if name_size > MAX_NAME_LENGTH  {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
 
