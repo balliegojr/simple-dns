@@ -145,7 +145,6 @@ impl<'a> PacketPart<'a> for Name<'a> {
 
         // avoid invalid data caused oom
         let mut name_size = 0usize;
-        let mut ptr_count = 0usize;
 
         loop {
             if position >= data.len() {
@@ -157,19 +156,11 @@ impl<'a> PacketPart<'a> for Name<'a> {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
 
-            // avoid pointer dead loop
-            if ptr_count > 255 {
-                // 255 for no reason, only for limit
-                return Err(crate::SimpleDnsError::InvalidDnsPacket);
-            }
-
             match data[position] {
                 0 => {
                     break;
                 }
                 len if len & POINTER_MASK == POINTER_MASK => {
-                    ptr_count += 1;
-
                     //compression
                     if !is_compressed {
                         total_size += 1;
@@ -180,8 +171,13 @@ impl<'a> PacketPart<'a> for Name<'a> {
                         return Err(crate::SimpleDnsError::InsufficientData);
                     }
 
-                    position = (u16::from_be_bytes(data[position..position + 2].try_into()?)
+                    // avoid pointer forward (RFC 1035)
+                    let pointer = (u16::from_be_bytes(data[position..position + 2].try_into()?)
                         & !POINTER_MASK_U16) as usize;
+                    if pointer <= position {
+                        return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                    }
+                    position = pointer;
                 }
                 len => {
                     name_size += 1 + len as usize;
