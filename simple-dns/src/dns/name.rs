@@ -174,7 +174,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
                     // avoid pointer forward (RFC 1035)
                     let pointer = (u16::from_be_bytes(data[position..position + 2].try_into()?)
                         & !POINTER_MASK_U16) as usize;
-                    if pointer > position {
+                    if pointer >= position {
                         return Err(crate::SimpleDnsError::InvalidDnsPacket);
                     }
                     position = pointer;
