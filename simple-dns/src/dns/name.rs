@@ -152,7 +152,7 @@ impl<'a> PacketPart<'a> for Name<'a> {
             }
 
             // domain name max size is 255
-            if name_size > MAX_NAME_LENGTH  {
+            if name_size > MAX_NAME_LENGTH {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
 
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn parse_with_compression() {
-        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
+        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03\x07INVALID\xc0\x1b";
         let mut offset = 3usize;
 
         let name = Name::parse(data, offset).unwrap();
@@ -355,6 +355,9 @@ mod tests {
         offset += name.len();
         let name = Name::parse(data, offset).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", name.to_string());
+
+        offset += name.len();
+        assert!(Name::parse(data, offset).is_err());
     }
 
     #[test]
