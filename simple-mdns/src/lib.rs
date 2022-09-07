@@ -9,19 +9,19 @@ use std::{
     time::Duration,
 };
 
-use simple_dns::SimpleDnsError;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use thiserror::Error;
 
 pub mod conversion_utils;
 mod dns_packet_receiver;
 mod oneshot_resolver;
 mod resource_record_manager;
 mod service_discovery;
+mod simple_mdns_error;
 mod simple_responder;
 
 pub use oneshot_resolver::OneShotMdnsResolver;
 pub use service_discovery::{InstanceInformation, ServiceDiscovery};
+pub use simple_mdns_error::SimpleMdnsError;
 pub use simple_responder::SimpleMdnsResponder;
 
 const UNICAST_RESPONSE: bool = cfg!(not(test));
@@ -36,18 +36,6 @@ lazy_static! {
     pub(crate) static ref MULTICAST_IPV6_SOCKET: SocketAddr =
         SocketAddr::new(IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT);
 }
-
-/// Error types for simple-mdns
-#[derive(Debug, Error)]
-pub enum SimpleMdnsError {
-    /// Udp socket related error
-    #[error("There was an error related to UDP socket")]
-    UdpSocketError(#[from] std::io::Error),
-    /// Simple-dns error related, usually packet parsing
-    #[error("Failed to parse dns packet")]
-    DnsParsing(#[from] SimpleDnsError),
-}
-
 fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     let domain = if addr.is_ipv4() {
         Domain::IPV4

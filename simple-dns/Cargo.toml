@@ -10,9 +10,6 @@ keywords = ["dns", "parser"]
 categories = ["parser-implementations", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-thiserror = "^1.0.24"
-
 [dev-dependencies]
 criterion = "0.3"
 

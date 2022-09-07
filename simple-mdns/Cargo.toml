@@ -15,7 +15,6 @@ categories = ["network-programming"]
 simple-dns = { path = "../simple-dns", version = "0.4" }
 socket2 = { version = "^0.4", features = ["all"] }
 log = "^0.4"
-thiserror = "^1.0.24"
 lazy_static = "^1.4.0"
 radix_trie = "^0.2.1"
 

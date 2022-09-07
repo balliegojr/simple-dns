@@ -1,6 +1,7 @@
 # Simple DNS
 
 ## unreleased
+- Remove `thiserror` dependency
 - Add RFC 2136
 - Add RFC 1183
 - Add RFC 1706
