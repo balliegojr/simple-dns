@@ -1,4 +1,8 @@
 # Simple MDNS
+## 0.3.10
+- Update dependencies 
+- Remove thiserror
+
 ## 0.3.8
 - Update dependencies
 
