@@ -59,3 +59,29 @@ impl<'a> PacketPart<'a> for WKS<'a> {
         self.bit_map.len() + 5
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv4Addr;
+
+    use crate::{rdata::RData, ResourceRecord};
+
+    use super::*;
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/WKS.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::WKS(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        let sample_ip: u32 = "10.0.0.1".parse::<Ipv4Addr>()?.into();
+
+        assert_eq!(sample_rdata.address, sample_ip);
+        assert_eq!(sample_rdata.protocol, 6);
+        assert_eq!(sample_rdata.bit_map, vec![224, 0, 5]);
+
+        Ok(())
+    }
+}

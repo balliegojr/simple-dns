@@ -22,29 +22,11 @@ impl<'a> CharacterString<'a> {
     }
 
     fn internal_new(data: Cow<'a, [u8]>) -> crate::Result<Self> {
-        if data.len() > MAX_CHARACTER_STRING_LENGTH || !Self::is_valid(&data) {
+        if data.len() > MAX_CHARACTER_STRING_LENGTH {
             return Err(SimpleDnsError::InvalidCharacterString);
         }
 
         Ok(Self { data })
-    }
-
-    fn is_valid(data: &'_ [u8]) -> bool {
-        if data[0] == b'"' {
-            if data[data.len() - 1] != b'"' {
-                return false;
-            }
-
-            for (p, c) in data[1..data.len() - 1].iter().enumerate() {
-                if *c == b'"' && data[p] != b'\\' {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        return data.iter().all(|c| *c != b' ');
     }
 
     /// Transforms the inner data into it's owned type
@@ -62,7 +44,7 @@ impl<'a> PacketPart<'a> for CharacterString<'a> {
     {
         let length = data[position] as usize;
 
-        if length == 0 || Self::is_valid(&data[position + 1..position + 1 + length]) {
+        if length < MAX_CHARACTER_STRING_LENGTH && length + position < data.len() {
             Ok(Self {
                 data: Cow::Borrowed(&data[position + 1..position + 1 + length]),
             })
@@ -132,7 +114,7 @@ mod tests {
         assert!(CharacterString::new(b"Iamvalid").is_ok());
         assert!(CharacterString::new(br#""I am valid""#).is_ok());
         assert!(CharacterString::new(br#""I am \" also valid""#).is_ok());
-        assert!(CharacterString::new(b"I am invalid").is_err());
+        assert!(CharacterString::new(b"I am valid").is_ok());
 
         let long_string = [0u8; 300];
         assert!(CharacterString::new(&long_string).is_err());

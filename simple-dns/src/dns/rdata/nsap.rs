@@ -99,6 +99,8 @@ impl<'a> PacketPart<'a> for NSAP {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -132,5 +134,28 @@ mod tests {
         assert_eq!(0x0020, nsap.area);
         assert_eq!(0x00800a123456, nsap.id);
         assert_eq!(0x10, nsap.sel);
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/NSAP.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::NSAP(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        //  0x47.0005.80.005a00.0000.0001.e133.ffffff000164.00
+        assert_eq!(0x47, sample_rdata.afi);
+        assert_eq!(0x0005, sample_rdata.idi);
+        assert_eq!(0x80, sample_rdata.dfi);
+        assert_eq!(0x005a00, sample_rdata.aa);
+        assert_eq!(0x00, sample_rdata.rsvd);
+        assert_eq!(0x0001, sample_rdata.rd);
+        assert_eq!(0xe133, sample_rdata.area);
+        assert_eq!(0xffffff000164, sample_rdata.id);
+        assert_eq!(0x00, sample_rdata.sel);
+
+        Ok(())
     }
 }

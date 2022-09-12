@@ -54,23 +54,39 @@ impl From<Ipv6Addr> for AAAA {
 mod tests {
     use std::{net::Ipv6Addr, str::FromStr};
 
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
     fn parse_and_write_a() {
         let address = std::net::Ipv6Addr::from_str("FF02::FB").unwrap();
-        let a = AAAA {
+        let aaaa = AAAA {
             address: address.into(),
         };
 
         let mut bytes = Vec::new();
-        assert!(a.append_to_vec(&mut bytes, &mut None).is_ok());
+        assert!(aaaa.append_to_vec(&mut bytes, &mut None).is_ok());
 
-        let a = AAAA::parse(&bytes, 0);
-        assert!(a.is_ok());
-        let a = a.unwrap();
+        let aaaa = AAAA::parse(&bytes, 0);
+        assert!(aaaa.is_ok());
+        let aaaa = aaaa.unwrap();
 
-        assert_eq!(address, Ipv6Addr::from(a.address));
-        assert_eq!(bytes.len(), a.len());
+        assert_eq!(address, Ipv6Addr::from(aaaa.address));
+        assert_eq!(bytes.len(), aaaa.len());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/AAAA.sample.")?;
+        let sample_ip: u128 = "fd92:7065:b8e:ffff::5".parse::<Ipv6Addr>()?.into();
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::AAAA(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.address, sample_ip);
+        Ok(())
     }
 }

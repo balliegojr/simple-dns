@@ -1,3 +1,4 @@
+#![allow(non_camel_case_types)]
 //! Contains RData implementations
 
 use crate::CharacterString;
@@ -105,6 +106,11 @@ macros::rr_wrapper! {
     X25:CharacterString = 19
 }
 
+macros::rr_wrapper! {
+    #[doc = "PTR for NSAP records, [RFC 1348](https://datatracker.ietf.org/doc/rfc1348/)"]
+    NSAP_PTR:Name = 23
+}
+
 macros::rdata_enum! {
     A,
     AAAA,
@@ -128,5 +134,6 @@ macros::rdata_enum! {
     ISDN<'a>,
     RouteThrough<'a>,
     NSAP,
+    NSAP_PTR<'a>,
     LOC,
 }

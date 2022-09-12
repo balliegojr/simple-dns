@@ -53,6 +53,8 @@ impl<'a> PacketPart<'a> for RP<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -72,5 +74,19 @@ mod tests {
         assert_eq!(data.len(), rp.len());
         assert_eq!("mbox.rp.com", rp.mbox.to_string());
         assert_eq!("txt.rp.com", rp.txt.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/RP.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::RP(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.mbox, "mbox-dname.sample".try_into()?);
+        assert_eq!(sample_rdata.txt, "txt-dname.sample".try_into()?);
+        Ok(())
     }
 }

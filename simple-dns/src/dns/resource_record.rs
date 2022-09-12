@@ -326,4 +326,18 @@ mod tests {
         rr.hash(&mut hasher);
         hasher.finish()
     }
+
+    #[test]
+    fn parse_sample_files() -> Result<(), Box<dyn std::error::Error>> {
+        for file_path in std::fs::read_dir("samples/zonefile")? {
+            let data = std::fs::read(&file_path?.path())?;
+            let mut pos = 0;
+            while pos < data.len() {
+                let res = crate::ResourceRecord::parse(&data, pos)?;
+                pos += res.len();
+            }
+        }
+
+        Ok(())
+    }
 }

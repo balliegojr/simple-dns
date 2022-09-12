@@ -58,7 +58,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_and_write_hinfo() {
+    fn parse_and_write_minfo() {
         let minfo = MINFO {
             rmailbox: Name::new("r.mailbox.com").unwrap(),
             emailbox: Name::new("e.mailbox.com").unwrap(),

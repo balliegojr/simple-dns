@@ -23,12 +23,14 @@ pub struct Name<'a> {
 impl<'a> Name<'a> {
     /// Creates a new validated Name
     pub fn new(name: &'a str) -> crate::Result<Self> {
-        let mut labels = Vec::new();
         let mut total_size = 1;
-        for data in name.split('.').filter(|d| !d.is_empty()) {
-            total_size += data.len() + 1;
-            labels.push(Label::new(data.as_bytes())?);
-        }
+
+        let labels = NameSpliter::new(name.as_bytes())
+            .map(|label| {
+                total_size += label.len() + 1;
+                Label::new(label)
+            })
+            .collect::<Result<Vec<Label>, _>>()?;
 
         let name = Self { labels, total_size };
 
@@ -42,12 +44,11 @@ impl<'a> Name<'a> {
     /// Create a new Name without checking for size limits
     pub fn new_unchecked(name: &'a str) -> Self {
         let mut total_size = 1;
-        let labels = name
-            .split('.')
-            .filter(|d| !d.is_empty())
-            .map(|data| {
-                total_size += data.len() + 1;
-                Label::new_unchecked(data.as_bytes())
+
+        let labels = NameSpliter::new(name.as_bytes())
+            .map(|label| {
+                total_size += label.len() + 1;
+                Label::new_unchecked(label)
             })
             .collect();
 
@@ -260,6 +261,64 @@ impl<'a> Hash for Name<'a> {
     }
 }
 
+struct NameSpliter<'a> {
+    bytes: &'a [u8],
+    current: usize,
+}
+
+impl<'a> NameSpliter<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, current: 0 }
+    }
+}
+
+impl<'a> Iterator for NameSpliter<'a> {
+    type Item = Cow<'a, [u8]>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut slices: Vec<&[u8]> = Vec::new();
+
+        for i in self.current..self.bytes.len() {
+            if self.bytes[i] == b'.' && i - self.current > 0 {
+                let current = std::mem::replace(&mut self.current, i + 1);
+                if self.bytes[i - 1] == b'\\' {
+                    slices.push(&self.bytes[current..i - 1]);
+                    continue;
+                }
+
+                return Some(join_slices(slices, &self.bytes[current..i]));
+            }
+        }
+
+        if self.current < self.bytes.len() {
+            let current = std::mem::replace(&mut self.current, self.bytes.len());
+            Some(join_slices(slices, &self.bytes[current..]))
+        } else {
+            None
+        }
+    }
+}
+
+fn join_slices<'a>(mut slices: Vec<&'a [u8]>, slice: &'a [u8]) -> Cow<'a, [u8]> {
+    if slices.is_empty() {
+        slice.into()
+    } else {
+        slices.push(slice);
+
+        slices
+            .iter_mut()
+            .fold(Vec::new(), |mut c, v| {
+                if !c.is_empty() {
+                    c.push(b'.');
+                }
+
+                c.extend(&v[..]);
+                c
+            })
+            .into()
+    }
+}
+
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Label<'a> {
     data: Cow<'a, [u8]>,
@@ -315,11 +374,16 @@ mod tests {
     use crate::SimpleDnsError;
 
     #[test]
-    fn construct_valid_names() {
+    fn construct_valid_names() -> Result<(), SimpleDnsError> {
         assert!(Name::new("some").is_ok());
         assert!(Name::new("some.local").is_ok());
         assert!(Name::new("some.local.").is_ok());
         assert!(Name::new("\u{1F600}.local.").is_ok());
+
+        let scaped = Name::new("some\\.local")?;
+        assert_eq!(scaped.labels.len(), 1);
+
+        Ok(())
     }
 
     #[test]

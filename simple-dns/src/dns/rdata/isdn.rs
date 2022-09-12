@@ -54,6 +54,8 @@ impl<'a> PacketPart<'a> for ISDN<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -73,5 +75,19 @@ mod tests {
         assert_eq!(data.len(), isdn.len());
         assert_eq!("150862028003217", isdn.address.to_string());
         assert_eq!("004", isdn.sa.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/ISDN.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::ISDN(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.address, "isdn-address".try_into()?);
+        assert_eq!(sample_rdata.sa, "subaddress".try_into()?);
+        Ok(())
     }
 }

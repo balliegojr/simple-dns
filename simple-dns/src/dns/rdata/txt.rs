@@ -164,13 +164,13 @@ impl<'a> PacketPart<'a> for TXT<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Result;
+    use crate::{rdata::RData, ResourceRecord};
     use std::convert::TryInto;
 
     use super::*;
 
     #[test]
-    pub fn parse_and_write_txt() -> Result<()> {
+    pub fn parse_and_write_txt() -> Result<(), Box<dyn std::error::Error>> {
         let mut out = vec![];
         let txt = TXT::new()
             .with_char_string("version=0.1".try_into()?)
@@ -188,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    pub fn get_attributes() -> Result<()> {
+    pub fn get_attributes() -> Result<(), Box<dyn std::error::Error>> {
         let attributes = TXT::new()
             .with_string("version=0.1")?
             .with_string("flag")?
@@ -202,6 +202,21 @@ mod tests {
         assert_eq!(Some("eq=".to_owned()), attributes["with_eq"]);
         assert_eq!(Some(String::new()), attributes["empty"]);
         assert_eq!(None, attributes["flag"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/TXT.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::TXT(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        let strings = vec!["\"foo\nbar\"".try_into()?];
+        assert_eq!(sample_rdata.strings, strings);
 
         Ok(())
     }

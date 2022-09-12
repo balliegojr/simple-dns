@@ -54,6 +54,8 @@ impl<'a> PacketPart<'a> for AFSDB<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -73,5 +75,19 @@ mod tests {
         assert_eq!(data.len(), afsdb.len());
         assert_eq!(1, afsdb.subtype);
         assert_eq!("e.hostname.com", afsdb.hostname.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/AFSDB.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::AFSDB(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.subtype, 0);
+        assert_eq!(sample_rdata.hostname, "hostname.sample".try_into()?);
+        Ok(())
     }
 }

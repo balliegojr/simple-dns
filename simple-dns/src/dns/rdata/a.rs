@@ -54,6 +54,8 @@ impl From<Ipv4Addr> for A {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -71,5 +73,19 @@ mod tests {
 
         assert_eq!(2130706433, a.address);
         assert_eq!(bytes.len(), a.len());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_a = std::fs::read("samples/zonefile/A.sample.A")?;
+        let sample_ip: u32 = "26.3.0.103".parse::<Ipv4Addr>()?.into();
+
+        let sample_a_rdata = match ResourceRecord::parse(&sample_a, 0)?.rdata {
+            RData::A(a) => a,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_a_rdata.address, sample_ip);
+        Ok(())
     }
 }

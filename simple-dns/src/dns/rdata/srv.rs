@@ -76,6 +76,8 @@ impl<'a> PacketPart<'a> for SRV<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -124,5 +126,22 @@ mod tests {
             .is_ok());
 
         assert_eq!(plain, compressed);
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/SRV.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::SRV(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.priority, 65535);
+        assert_eq!(sample_rdata.weight, 65535);
+        assert_eq!(sample_rdata.port, 65535);
+        assert_eq!(sample_rdata.target, "old-slow-box.sample".try_into()?);
+
+        Ok(())
     }
 }

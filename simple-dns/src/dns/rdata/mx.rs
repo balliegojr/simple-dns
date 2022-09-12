@@ -59,6 +59,8 @@ impl<'a> PacketPart<'a> for MX<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -78,5 +80,19 @@ mod tests {
         assert_eq!(data.len(), mx.len());
         assert_eq!(10, mx.preference);
         assert_eq!("e.exchange.com", mx.exchange.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/MX.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::MX(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.preference, 10);
+        assert_eq!(sample_rdata.exchange, "VENERA.sample.".try_into()?);
+        Ok(())
     }
 }
