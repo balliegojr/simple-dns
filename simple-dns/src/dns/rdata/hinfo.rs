@@ -56,13 +56,15 @@ impl<'a> PacketPart<'a> for HINFO<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
     fn parse_and_write_hinfo() {
         let hinfo = HINFO {
-            cpu: CharacterString::new(b"\"some cpu\"").unwrap(),
-            os: CharacterString::new(b"\"some os\"").unwrap(),
+            cpu: CharacterString::new(b"\"some cpu").unwrap(),
+            os: CharacterString::new(b"\"some os").unwrap(),
         };
 
         let mut data = Vec::new();
@@ -73,7 +75,21 @@ mod tests {
         let hinfo = hinfo.unwrap();
 
         assert_eq!(data.len(), hinfo.len());
-        assert_eq!("\"some cpu\"", hinfo.cpu.to_string());
-        assert_eq!("\"some os\"", hinfo.os.to_string());
+        assert_eq!("\"some cpu", hinfo.cpu.to_string());
+        assert_eq!("\"some os", hinfo.os.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/HINFO.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::HINFO(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.cpu, "Generic PC clone".try_into()?);
+        assert_eq!(sample_rdata.os, "NetBSD-1.4".try_into()?);
+        Ok(())
     }
 }

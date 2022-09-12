@@ -59,6 +59,8 @@ impl<'a> PacketPart<'a> for RouteThrough<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -78,5 +80,22 @@ mod tests {
         assert_eq!(data.len(), rt.len());
         assert_eq!(10, rt.preference);
         assert_eq!("e.exchange.com", rt.intermediate_host.to_string());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/RT.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::RouteThrough(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.preference, 0);
+        assert_eq!(
+            sample_rdata.intermediate_host,
+            "intermediate-host.sample".try_into()?
+        );
+        Ok(())
     }
 }

@@ -31,7 +31,7 @@ const MAX_NULL_LENGTH: usize = 65535;
 
 /// Possible QTYPE values for a Question in a DNS packet  
 /// Each value is described according to its own RFC
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum QTYPE {
     /// Query for the specific [TYPE]
     TYPE(TYPE),
@@ -118,7 +118,7 @@ impl TryFrom<u16> for CLASS {
 
 /// Possible QCLASS values for a Question in a DNS packet  
 /// Each value is described according to its own RFC
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum QCLASS {
     /// Query for the specific [CLASS]
     CLASS(CLASS),
@@ -155,7 +155,7 @@ impl From<QCLASS> for u16 {
 /// Possible OPCODE values for a DNS packet, use to specify the type of operation.  
 /// [RFC 1035](https://tools.ietf.org/html/rfc1035): A four bit field that specifies kind of query in this message.  
 /// This value is set by the originator of a query and copied into the response.
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OPCODE {
     /// Normal query
     StandardQuery = 0,
@@ -187,7 +187,7 @@ impl From<u16> for OPCODE {
 /// Possible RCODE values for a DNS packet   
 /// [RFC 1035](https://tools.ietf.org/html/rfc1035) Response code - this 4 bit field is set as part of responses.  
 /// The values have the following interpretation
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RCODE {
     /// No error condition
     NoError = 0,

@@ -93,6 +93,8 @@ impl<'a> PacketPart<'a> for LOC {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
 
     #[test]
@@ -122,5 +124,24 @@ mod tests {
         assert_eq!(3000, loc.latitude);
 
         assert_eq!(data.len(), loc.len());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/LOC.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::LOC(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        // 60 09 00.000 N 24 39 00.000 E 10.00m 20.00m ( 2000.00m 20.00m )
+        assert_eq!(35, sample_rdata.size);
+        assert_eq!(35, sample_rdata.vertical_precision);
+        assert_eq!(37, sample_rdata.horizontal_precision);
+        assert_eq!(10001000, sample_rdata.altitude);
+        assert_eq!(-2058743648, sample_rdata.longitude);
+        assert_eq!(-1930943648, sample_rdata.latitude);
+        Ok(())
     }
 }

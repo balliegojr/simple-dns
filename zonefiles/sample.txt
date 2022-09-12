@@ -1,0 +1,41 @@
+@   IN  SOA     VENERA      Action\.domains (
+                                 20     ; SERIAL
+                                 7200   ; REFRESH
+                                 600    ; RETRY
+                                 3600000; EXPIRE
+                                 60)    ; MINIMUM
+
+        NS      A.ISI.EDU.
+        MX      10      VENERA
+
+A       A       26.3.0.103
+
+VENERA  A       10.1.0.52
+
+VAXA    A       10.2.0.27
+
+@       AAAA    fd92:7065:b8e:ffff::5
+
+        AFSDB	  0   hostname
+
+        HINFO	"Generic PC clone" "NetBSD-1.4"
+;        MINFO	rmailbx emailbx
+
+        ISDN	"isdn-address" "subaddress"
+
+        LOC 	60 09 00.000 N 24 39 00.000 E 10.00m 20.00m (	  2000.00m 20.00m )
+
+        NSAP  0x47.0005.80.005a00.0000.0001.e133.ffffff000164.00
+        NSAP-PTR foo.
+
+;        NULL
+
+        RT	0 intermediate-host
+
+        RP	mbox-dname txt-dname
+
+        SRV	65535 65535 65535  old-slow-box
+
+        TXT	"\"foo\010bar\""
+
+        WKS	10.0.0.1 tcp telnet ftp 0 1 2

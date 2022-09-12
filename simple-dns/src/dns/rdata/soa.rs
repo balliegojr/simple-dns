@@ -50,7 +50,7 @@ impl<'a> PacketPart<'a> for SOA<'a> {
     {
         let mname = Name::parse(data, position)?;
         let rname = Name::parse(data, position + mname.len())?;
-        let offset = mname.len() + rname.len();
+        let offset = position + mname.len() + rname.len();
 
         let serial = u32::from_be_bytes(data[offset..offset + 4].try_into()?);
         let refresh = i32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
@@ -93,6 +93,8 @@ impl<'a> PacketPart<'a> for SOA<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, ResourceRecord};
+
     use super::*;
     #[test]
     fn parse_and_write_soa() {
@@ -114,5 +116,25 @@ mod tests {
         let soa = soa.unwrap();
 
         assert_eq!(data.len(), soa.len());
+    }
+
+    #[test]
+    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        let sample_file = std::fs::read("samples/zonefile/SOA.sample.")?;
+
+        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+            RData::SOA(rdata) => rdata,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(sample_rdata.mname, "VENERA.sample".try_into()?);
+        assert_eq!(sample_rdata.rname, "Action\\.domains.sample".try_into()?);
+        assert_eq!(sample_rdata.serial, 20);
+        assert_eq!(sample_rdata.refresh, 7200);
+        assert_eq!(sample_rdata.retry, 600);
+        assert_eq!(sample_rdata.expire, 3600000);
+        assert_eq!(sample_rdata.minimum, 60);
+
+        Ok(())
     }
 }
