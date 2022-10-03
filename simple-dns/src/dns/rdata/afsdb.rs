@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
-        let sample_file = std::fs::read("samples/zonefile/AFSDB.sample.")?;
+        let sample_file = std::fs::read("samples/zonefile/AFSDB.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
             RData::AFSDB(rdata) => rdata,
