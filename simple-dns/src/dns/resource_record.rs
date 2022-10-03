@@ -7,13 +7,21 @@ use std::{collections::HashMap, convert::TryInto, hash::Hash};
 mod flag {
     pub const CACHE_FLUSH: u16 = 0b1000_0000_0000_0000;
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ClassOrPayload {
+    Class(CLASS),
+    Payload(u16),
+}
+
 /// Resource Records are used to represent the answer, authority, and additional sections in DNS packets.
 #[derive(Debug, Eq, Clone)]
 pub struct ResourceRecord<'a> {
     /// A [`Name`] to which this resource record pertains.
     pub name: Name<'a>,
     /// A [`CLASS`] that defines the class of the rdata field
-    pub class: CLASS,
+    // or, for EDNS OPT RRs, the requestor's UDP payload size
+    pub class_or_payload: ClassOrPayload,
     /// The time interval (in seconds) that the resource record may becached before it should be discarded.  
     /// Zero values are interpreted to mean that the RR can only be used for the transaction in progress, and should not be cached.
     pub ttl: u32,
@@ -29,7 +37,7 @@ impl<'a> ResourceRecord<'a> {
     pub fn new(name: Name<'a>, class: CLASS, ttl: u32, rdata: RData<'a>) -> Self {
         Self {
             name,
-            class,
+            class_or_payload: ClassOrPayload::Class(class),
             ttl,
             rdata,
             cache_flush: false,
@@ -50,7 +58,12 @@ impl<'a> ResourceRecord<'a> {
     /// Return true if current resource match given query class
     pub fn match_qclass(&self, qclass: QCLASS) -> bool {
         match qclass {
-            QCLASS::CLASS(class) => class == self.class,
+            QCLASS::CLASS(class) => {
+                match self.class_or_payload {
+                    ClassOrPayload::Class(rr_class) => class == rr_class,
+                    _ => false,
+                }
+            },
             QCLASS::ANY => true,
         }
     }
@@ -76,7 +89,7 @@ impl<'a> ResourceRecord<'a> {
     pub fn into_owned<'b>(self) -> ResourceRecord<'b> {
         ResourceRecord {
             name: self.name.into_owned(),
-            class: self.class,
+            class_or_payload: self.class_or_payload,
             ttl: self.ttl,
             rdata: self.rdata.into_owned(),
             cache_flush: self.cache_flush,
@@ -91,26 +104,40 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     {
         let name = Name::parse(data, position)?;
         let offset = position + name.len();
-
         if offset + 8 > data.len() {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
-        let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
-        let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
 
         let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
 
         let rdata = RData::parse(data, offset)?;
 
-        Ok(Self {
-            name,
-            class,
-            ttl,
-            rdata,
-            cache_flush,
-        })
+        if name.get_labels().len() == 0
+            && u16::from_be_bytes(data[offset..offset+2].try_into()?) == 41 {
+                // is EDNS OPT RR
+                Ok(Self {
+                    name,
+                    class_or_payload: ClassOrPayload::Payload(class_value),
+                    ttl,
+                    rdata,
+                    cache_flush: false,
+                })
+            }
+        else {
+            let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
+            let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
+
+            Ok(Self {
+                name,
+                class_or_payload: ClassOrPayload::Class(class),
+                ttl,
+                rdata,
+                cache_flush,
+            })
+
+        }
     }
 
     fn append_to_vec(
@@ -120,10 +147,15 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     ) -> crate::Result<()> {
         self.name.append_to_vec(out, name_refs)?;
 
+        let copv = match self.class_or_payload {
+            ClassOrPayload::Class(cls) => cls as u16,
+            ClassOrPayload::Payload(pyl) => pyl,
+        };
+
         let class = if self.cache_flush {
-            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
+            ((copv) | flag::CACHE_FLUSH).to_be_bytes()
         } else {
-            (self.class as u16).to_be_bytes()
+            (copv).to_be_bytes()
         };
 
         out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
@@ -142,14 +174,14 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
 impl<'a> Hash for ResourceRecord<'a> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        self.class.hash(state);
+        self.class_or_payload.hash(state);
         self.rdata.hash(state);
     }
 }
 
 impl<'a> PartialEq for ResourceRecord<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.class == other.class && self.rdata == other.rdata
+        self.name == other.name && self.class_or_payload == other.class_or_payload && self.rdata == other.rdata
     }
 }
 
