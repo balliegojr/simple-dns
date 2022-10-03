@@ -58,12 +58,7 @@ impl<'a> ResourceRecord<'a> {
     /// Return true if current resource match given query class
     pub fn match_qclass(&self, qclass: QCLASS) -> bool {
         match qclass {
-            QCLASS::CLASS(class) => {
-                match self.class_or_payload {
-                    ClassOrPayload::Class(rr_class) => class == rr_class,
-                    _ => false,
-                }
-            },
+            QCLASS::CLASS(class) => ClassOrPayload::Class(class) == self.class_or_payload,
             QCLASS::ANY => true,
         }
     }
@@ -115,17 +110,17 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
         let rdata = RData::parse(data, offset)?;
 
         if name.get_labels().len() == 0
-            && u16::from_be_bytes(data[offset..offset+2].try_into()?) == 41 {
-                // is EDNS OPT RR
-                Ok(Self {
-                    name,
-                    class_or_payload: ClassOrPayload::Payload(class_value),
-                    ttl,
-                    rdata,
-                    cache_flush: false,
-                })
-            }
-        else {
+            && u16::from_be_bytes(data[offset..offset + 2].try_into()?) == 41
+        {
+            // is EDNS OPT RR
+            Ok(Self {
+                name,
+                class_or_payload: ClassOrPayload::Payload(class_value),
+                ttl,
+                rdata,
+                cache_flush: false,
+            })
+        } else {
             let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
             let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
 
@@ -136,7 +131,6 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
                 rdata,
                 cache_flush,
             })
-
         }
     }
 
@@ -181,7 +175,9 @@ impl<'a> Hash for ResourceRecord<'a> {
 
 impl<'a> PartialEq for ResourceRecord<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.class_or_payload == other.class_or_payload && self.rdata == other.rdata
+        self.name == other.name
+            && self.class_or_payload == other.class_or_payload
+            && self.rdata == other.rdata
     }
 }
 
