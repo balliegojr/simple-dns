@@ -53,7 +53,7 @@ fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn join_multicast(addr: &SocketAddr) -> io::Result<UdpSocket> {
+fn join_multicast(addr: &SocketAddr, interface: &Ipv4Addr) -> io::Result<UdpSocket> {
     let ip_addr = addr.ip();
 
     let socket = create_socket(addr)?;
@@ -61,7 +61,7 @@ fn join_multicast(addr: &SocketAddr) -> io::Result<UdpSocket> {
     // depending on the IP protocol we have slightly different work
     match ip_addr {
         IpAddr::V4(ref mdns_v4) => {
-            socket.join_multicast_v4(mdns_v4, &Ipv4Addr::UNSPECIFIED)?;
+            socket.join_multicast_v4(mdns_v4, interface)?;
         }
         IpAddr::V6(ref mdns_v6) => {
             socket.join_multicast_v6(mdns_v6, 0)?;
@@ -94,11 +94,11 @@ fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn sender_socket(addr: &SocketAddr) -> io::Result<UdpSocket> {
+fn sender_socket(addr: &SocketAddr, interface: &Ipv4Addr) -> io::Result<UdpSocket> {
     let socket = create_socket(addr)?;
     if addr.is_ipv4() {
         socket.bind(&SockAddr::from(SocketAddr::new(
-            Ipv4Addr::UNSPECIFIED.into(),
+            IpAddr::V4(*interface).into(),
             0,
         )))?;
     } else {

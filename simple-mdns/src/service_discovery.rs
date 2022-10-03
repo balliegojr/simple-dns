@@ -31,10 +31,10 @@ use crate::{
 /// ## Example
 /// ```
 /// use simple_mdns::ServiceDiscovery;
-/// use std::net::SocketAddr;
+/// use std::net::{SocketAddr, Ipv4Addr};
 /// use std::str::FromStr;
 ///
-/// let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
+/// let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60, &Ipv4Addr::UNSPECIFIED).expect("Invalid Service Name");
 /// discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
 ///
 /// ```
@@ -54,10 +54,13 @@ impl ServiceDiscovery {
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
+    /// 
+    /// Ipv4 interface to listen on can be specified, or `&Ipv4Addr::UNSPECIFIED` for OS choice
     pub fn new(
         instance_name: &str,
         service_name: &str,
         resource_ttl: u32,
+        interface: &Ipv4Addr,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
         let full_name = Name::new(&full_name)?.into_owned();
@@ -80,9 +83,9 @@ impl ServiceDiscovery {
             packets_sender: tx.clone(),
         };
 
-        send_packages_loop(rx);
+        send_packages_loop(rx, interface);
 
-        service_discovery.receive_packets_loop(tx.clone())?;
+        service_discovery.receive_packets_loop(tx.clone(), interface)?;
         service_discovery.refresh_known_instances(tx.clone());
 
         if let Err(err) = query_service_instances(service_discovery.service_name.clone(), &tx) {
@@ -258,12 +261,13 @@ impl ServiceDiscovery {
     fn receive_packets_loop(
         &self,
         packet_sender: Sender<(PacketBuf, SocketAddr)>,
+        interface: &Ipv4Addr
     ) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
         let full_name = self.full_name.clone();
         let resources = self.resource_manager.clone();
 
-        let mut receiver = DnsPacketReceiver::new()?;
+        let mut receiver = DnsPacketReceiver::new(interface)?;
 
         std::thread::spawn(move || loop {
             match receiver.recv_packet() {
@@ -322,8 +326,8 @@ fn query_service_instances(
     Ok(())
 }
 
-fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>) {
-    let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
+fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>, interface: &Ipv4Addr) {
+    let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET, interface).unwrap();
     std::thread::spawn(move || {
         while let Ok((packet, address)) = receiver.recv() {
             if let Err(err) = socket.send_to(&packet, address) {

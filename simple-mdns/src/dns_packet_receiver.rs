@@ -1,4 +1,4 @@
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{SocketAddr, UdpSocket, Ipv4Addr};
 
 use simple_dns::{PacketBuf, PacketHeader};
 
@@ -10,8 +10,8 @@ pub struct DnsPacketReceiver {
 }
 
 impl DnsPacketReceiver {
-    pub fn new() -> Result<Self, SimpleMdnsError> {
-        let recv_socket = join_multicast(&MULTICAST_IPV4_SOCKET)?;
+    pub fn new(interface: &Ipv4Addr) -> Result<Self, SimpleMdnsError> {
+        let recv_socket = join_multicast(&MULTICAST_IPV4_SOCKET, interface)?;
         let _ = recv_socket.set_read_timeout(None);
         let recv_buffer = [0u8; 9000];
 

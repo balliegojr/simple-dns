@@ -12,9 +12,9 @@ use std::{
 /// One Shot queries returns only the first valid response to arrive
 /// ```
 ///     use simple_mdns::OneShotMdnsResolver;
-///     use std::time::Duration;
+///     use std::{time::Duration, net::Ipv4Addr};
 ///     
-///     let mut resolver = OneShotMdnsResolver::new().expect("Can't create one shot resolver");
+///     let mut resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Can't create one shot resolver");
 ///     resolver.set_query_timeout(Duration::from_secs(1));
 ///     
 ///     // querying for IP Address
@@ -36,12 +36,14 @@ pub struct OneShotMdnsResolver {
 
 impl OneShotMdnsResolver {
     /// Creates a new OneShotMdnsResolver
-    pub fn new() -> Result<Self, SimpleMdnsError> {
+    /// 
+    /// Ipv4 interface to listen on can be specified, or `&Ipv4Addr::UNSPECIFIED` for OS choice
+    pub fn new(interface: &Ipv4Addr) -> Result<Self, SimpleMdnsError> {
         Ok(Self {
             query_timeout: Duration::from_secs(3),
             unicast_response: UNICAST_RESPONSE,
-            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET)?,
-            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET)?,
+            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET, interface)?,
+            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET, interface)?,
         })
     }
 
@@ -214,7 +216,7 @@ mod tests {
         let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
         thread::sleep(Duration::from_millis(500));
 
-        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
+        let resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv._tcp.local");
 
         assert!(answer.is_ok());
@@ -234,7 +236,7 @@ mod tests {
 
     #[test]
     fn one_shot_resolver_timeout() {
-        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
+        let resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv_miss._tcp.local");
         assert!(answer.is_ok());
         let answer = answer.unwrap();

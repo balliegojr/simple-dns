@@ -8,10 +8,10 @@ It is necessary to provide instance and service name
 
 ```rust  
     use simple_mdns::ServiceDiscovery;
-    use std::net::SocketAddr;
+    use std::net::{SocketAddr, Ipv4Addr};
     use std::str::FromStr;
 
-    let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
+    let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60, &Ipv4Addr::UNSPECIFIED).expect("Invalid Service Name");
     discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
 ```
 
@@ -29,7 +29,9 @@ Since mDNS is a well known protocol, you can register your service in any mDNS r
 Query example:
 ```rust  
     use simple_mdns::OneShotMdnsResolver;
-    let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
+    use std::net::Ipv4Addr;
+
+    let resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Failed to create resolver");
     // querying for IP Address
     let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");
     println!("{:?}", answer);
@@ -53,7 +55,7 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
     use std::net::Ipv4Addr;
 
 
-    let mut responder = SimpleMdnsResponder::new(10);
+    let mut responder = SimpleMdnsResponder::new(10, &Ipv4Addr::UNSPECIFIED);
     let srv_name = Name::new_unchecked("_srvname._tcp.local");
 
     responder.add_resource(ResourceRecord::new(

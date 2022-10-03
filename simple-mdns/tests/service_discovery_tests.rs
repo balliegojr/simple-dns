@@ -1,5 +1,5 @@
 use simple_mdns::{InstanceInformation, ServiceDiscovery};
-use std::{collections::HashMap, error::Error, net::SocketAddr, str::FromStr, time::Duration};
+use std::{collections::HashMap, error::Error, net::{SocketAddr, Ipv4Addr}, str::FromStr, time::Duration};
 
 // fn init_log() {
 //     stderrlog::new()
@@ -9,15 +9,17 @@ use std::{collections::HashMap, error::Error, net::SocketAddr, str::FromStr, tim
 //         .unwrap();
 // }
 
+const INTERFACE: &Ipv4Addr = &Ipv4Addr::UNSPECIFIED;
+
 #[test]
 fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
     // init_log();
 
     std::thread::sleep(Duration::from_secs(1));
 
-    let mut service_discovery_a = ServiceDiscovery::new("a", "_srv3._tcp.local", 60)?;
-    let mut service_discovery_b = ServiceDiscovery::new("b", "_srv3._tcp.local", 60)?;
-    let mut service_discovery_c = ServiceDiscovery::new("c", "_srv3._tcp.local", 60)?;
+    let mut service_discovery_a = ServiceDiscovery::new("a", "_srv3._tcp.local", 60, INTERFACE)?;
+    let mut service_discovery_b = ServiceDiscovery::new("b", "_srv3._tcp.local", 60, INTERFACE)?;
+    let mut service_discovery_c = ServiceDiscovery::new("c", "_srv3._tcp.local", 60, INTERFACE)?;
 
     service_discovery_a
         .add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into())
@@ -74,8 +76,8 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(1));
 
-    let mut service_discovery_d = ServiceDiscovery::new("d", "_srv4._tcp.local", 60)?;
-    let mut service_discovery_e = ServiceDiscovery::new("e", "_srv4._tcp.local", 60)?;
+    let mut service_discovery_d = ServiceDiscovery::new("d", "_srv4._tcp.local", 60, INTERFACE)?;
+    let mut service_discovery_e = ServiceDiscovery::new("e", "_srv4._tcp.local", 60, INTERFACE)?;
 
     let mut service_info: InstanceInformation = SocketAddr::from_str("192.168.1.2:8080")?.into();
     service_info

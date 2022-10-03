@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    net::{SocketAddr, UdpSocket},
+    net::{SocketAddr, UdpSocket, Ipv4Addr},
     sync::{Arc, RwLock},
 };
 
@@ -24,7 +24,7 @@ const FIVE_MINUTES: u32 = 60 * 5;
 ///     use std::net::Ipv4Addr;
 ///
 ///
-///     let mut responder = SimpleMdnsResponder::new(10);
+///     let mut responder = SimpleMdnsResponder::new(10, &Ipv4Addr::UNSPECIFIED);
 ///     let srv_name = Name::new_unchecked("_srvname._tcp.local");
 ///
 ///     responder.add_resource(ResourceRecord::new(
@@ -55,15 +55,18 @@ pub struct SimpleMdnsResponder {
 
 impl SimpleMdnsResponder {
     /// Creates a new SimpleMdnsResponder with ttl of 5 minutes and enabled loopback
-    pub fn new(rr_ttl: u32) -> Self {
+    /// 
+    /// Ipv4 interface to listen on can be specified, or `&Ipv4Addr::UNSPECIFIED` for OS choice
+    pub fn new(rr_ttl: u32, interface: &Ipv4Addr) -> Self {
         let responder = Self {
             resources: Arc::new(RwLock::new(ResourceRecordManager::new())),
             rr_ttl,
         };
 
         let resources = responder.resources.clone();
+        let iface = interface.clone();
         std::thread::spawn(move || {
-            if let Err(err) = Self::reply_dns_queries(resources) {
+            if let Err(err) = Self::reply_dns_queries(resources, &iface) {
                 log::error!("Dns Responder failed: {}", err);
             }
         });
@@ -90,9 +93,10 @@ impl SimpleMdnsResponder {
 
     fn reply_dns_queries(
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
+        interface: &Ipv4Addr
     ) -> Result<(), SimpleMdnsError> {
-        let mut receiver = DnsPacketReceiver::new()?;
-        let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET)?;
+        let mut receiver = DnsPacketReceiver::new(interface)?;
+        let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET, interface)?;
 
         loop {
             match receiver.recv_packet() {
@@ -116,7 +120,7 @@ impl SimpleMdnsResponder {
 
 impl Default for SimpleMdnsResponder {
     fn default() -> Self {
-        Self::new(FIVE_MINUTES)
+        Self::new(FIVE_MINUTES, &Ipv4Addr::UNSPECIFIED)
     }
 }
 
