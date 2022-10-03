@@ -4,6 +4,8 @@ use crate::{SimpleDnsError, OPCODE};
 
 use super::{PacketHeader, PacketPart, Question, ResourceRecord};
 
+use super::resource_record::ClassOrPayload;
+
 /// Owned version of [`Packet`] that contains a internal buffer.  
 /// This struct fills the internal buffer on the fly, because of this, it imposes some constraints.  
 /// You have to build the packet in order.  
@@ -395,7 +397,7 @@ mod tests {
         assert_eq!(11, packet.answers.len());
 
         assert_eq!("google.com", packet.answers[0].name.to_string());
-        assert_eq!(CLASS::IN, packet.answers[0].class);
+        assert_eq!(ClassOrPayload::Class(CLASS::IN), packet.answers[0].class_or_payload);
         assert_eq!(4, packet.answers[0].ttl);
         assert_eq!(4, packet.answers[0].rdata.len());
 

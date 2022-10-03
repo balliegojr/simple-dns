@@ -202,7 +202,7 @@ mod tests {
         let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
 
         assert_eq!("_srv._udp.local", rr.name.to_string());
-        assert_eq!(CLASS::IN, rr.class);
+        assert_eq!(ClassOrPayload::Class(CLASS::IN), rr.class_or_payload);
         assert_eq!(10, rr.ttl);
         assert_eq!(4, rr.rdata.len());
         assert!(!rr.cache_flush);
@@ -218,7 +218,7 @@ mod tests {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
         let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
 
-        assert_eq!(CLASS::IN, rr.class);
+        assert_eq!(ClassOrPayload::Class(CLASS::IN), rr.class_or_payload);
         assert!(rr.cache_flush);
     }
 
@@ -228,7 +228,7 @@ mod tests {
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
-            class: CLASS::IN,
+            class_or_payload: ClassOrPayload::Class(CLASS::IN),
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
@@ -249,7 +249,7 @@ mod tests {
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
-            class: CLASS::IN,
+            class_or_payload: ClassOrPayload::Class(CLASS::IN),
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&rdata).unwrap()),
@@ -267,7 +267,7 @@ mod tests {
     #[test]
     fn test_match_qclass() {
         let rr = ResourceRecord {
-            class: CLASS::IN,
+            class_or_payload: ClassOrPayload::Class(CLASS::IN),
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::NULL(0, NULL::new(&[255u8; 4]).unwrap()),
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn test_match_qtype() {
         let rr = ResourceRecord {
-            class: CLASS::IN,
+            class_or_payload: ClassOrPayload::Class(CLASS::IN),
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_match_qtype_for_aaaa() {
         let mut rr = ResourceRecord {
-            class: CLASS::IN,
+            class_or_payload: ClassOrPayload::Class(CLASS::IN),
             name: "_srv._udp.local".try_into().unwrap(),
             ttl: 10,
             rdata: RData::A(crate::rdata::A { address: 0 }),
