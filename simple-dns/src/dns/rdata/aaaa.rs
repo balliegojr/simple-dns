@@ -78,7 +78,7 @@ mod tests {
 
     #[test]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
-        let sample_file = std::fs::read("samples/zonefile/AAAA.sample.")?;
+        let sample_file = std::fs::read("samples/zonefile/AAAA.sample")?;
         let sample_ip: u128 = "fd92:7065:b8e:ffff::5".parse::<Ipv6Addr>()?.into();
 
         let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {

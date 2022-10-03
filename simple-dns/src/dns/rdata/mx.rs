@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
-        let sample_file = std::fs::read("samples/zonefile/MX.sample.")?;
+        let sample_file = std::fs::read("samples/zonefile/MX.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
             RData::MX(rdata) => rdata,
@@ -92,7 +92,7 @@ mod tests {
         };
 
         assert_eq!(sample_rdata.preference, 10);
-        assert_eq!(sample_rdata.exchange, "VENERA.sample.".try_into()?);
+        assert_eq!(sample_rdata.exchange, "VENERA.sample".try_into()?);
         Ok(())
     }
 }

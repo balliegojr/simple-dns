@@ -17,7 +17,8 @@ def convert_zonefile(origin, root_dest):
 
     for (rname, rset) in zone.iterate_rdatasets():
         rdtype = dns.rdatatype.to_text(rset.rdtype)
-        name = base_name if str(rname) == "@" else f"{base_name}{rname}"
+        name = str(base_name)[:-1] if str(rname) == "@" else f"{base_name}{rname}"
+
         dest_file_name = f"{root_dest}/{rdtype}.{name}"
         dest_file = open(dest_file_name, "wb")
         rset.to_wire(rname, dest_file, origin=base_name)
