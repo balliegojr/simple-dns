@@ -1,4 +1,4 @@
-use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
+use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE, Interface};
 use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, CLASS, TYPE};
 
 use std::{
@@ -38,12 +38,12 @@ impl OneShotMdnsResolver {
     /// Creates a new OneShotMdnsResolver
     /// 
     /// Ipv4 interface to listen on can be specified, or `&Ipv4Addr::UNSPECIFIED` for OS choice
-    pub fn new(interface: &Ipv4Addr) -> Result<Self, SimpleMdnsError> {
+    pub fn new(interface: &Interface) -> Result<Self, SimpleMdnsError> {
         Ok(Self {
             query_timeout: Duration::from_secs(3),
             unicast_response: UNICAST_RESPONSE,
-            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET, interface)?,
-            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET, interface)?,
+            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET, &interface)?,
+            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET, &interface)?,
         })
     }
 
@@ -216,7 +216,7 @@ mod tests {
         let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
         thread::sleep(Duration::from_millis(500));
 
-        let resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Failed to create resolver");
+        let resolver = OneShotMdnsResolver::new(&(Ipv4Addr::UNSPECIFIED, Ipv6Addr::UNSPECIFIED)).expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv._tcp.local");
 
         assert!(answer.is_ok());
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn one_shot_resolver_timeout() {
-        let resolver = OneShotMdnsResolver::new(&Ipv4Addr::UNSPECIFIED).expect("Failed to create resolver");
+        let resolver = OneShotMdnsResolver::new(&(Ipv4Addr::UNSPECIFIED, Ipv6Addr::UNSPECIFIED)).expect("Failed to create resolver");
         let answer = resolver.query_service_address("_srv_miss._tcp.local");
         assert!(answer.is_ok());
         let answer = answer.unwrap();

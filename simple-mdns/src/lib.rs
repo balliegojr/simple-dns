@@ -36,6 +36,9 @@ lazy_static! {
     pub(crate) static ref MULTICAST_IPV6_SOCKET: SocketAddr =
         SocketAddr::new(IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT);
 }
+
+type Interface = (Ipv4Addr, Ipv6Addr);
+
 fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     let domain = if addr.is_ipv4() {
         Domain::IPV4
@@ -53,7 +56,7 @@ fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn join_multicast(addr: &SocketAddr, interface: &Ipv4Addr) -> io::Result<UdpSocket> {
+fn join_multicast(addr: &SocketAddr, interface: &Interface) -> io::Result<UdpSocket> {
     let ip_addr = addr.ip();
 
     let socket = create_socket(addr)?;
@@ -61,7 +64,7 @@ fn join_multicast(addr: &SocketAddr, interface: &Ipv4Addr) -> io::Result<UdpSock
     // depending on the IP protocol we have slightly different work
     match ip_addr {
         IpAddr::V4(ref mdns_v4) => {
-            socket.join_multicast_v4(mdns_v4, interface)?;
+            socket.join_multicast_v4(mdns_v4, &interface.0)?;
         }
         IpAddr::V6(ref mdns_v6) => {
             socket.join_multicast_v6(mdns_v6, 0)?;
@@ -94,16 +97,16 @@ fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
     Ok(socket)
 }
 
-fn sender_socket(addr: &SocketAddr, interface: &Ipv4Addr) -> io::Result<UdpSocket> {
+fn sender_socket(addr: &SocketAddr, interface: &Interface) -> io::Result<UdpSocket> {
     let socket = create_socket(addr)?;
     if addr.is_ipv4() {
         socket.bind(&SockAddr::from(SocketAddr::new(
-            IpAddr::V4(*interface).into(),
+            IpAddr::V4(interface.0).into(),
             0,
         )))?;
     } else {
         socket.bind(&SockAddr::from(SocketAddr::new(
-            Ipv6Addr::UNSPECIFIED.into(),
+            IpAddr::V6(interface.1).into(),
             0,
         )))?;
     }

@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    net::{SocketAddr, UdpSocket, Ipv4Addr},
+    net::{SocketAddr, UdpSocket, Ipv4Addr, Ipv6Addr},
     sync::{Arc, RwLock},
 };
 
@@ -8,7 +8,7 @@ use simple_dns::{rdata::RData, PacketBuf, PacketHeader, ResourceRecord, TYPE};
 
 use crate::{
     dns_packet_receiver::DnsPacketReceiver, resource_record_manager::ResourceRecordManager,
-    sender_socket, SimpleMdnsError, MULTICAST_IPV4_SOCKET,
+    sender_socket, SimpleMdnsError, MULTICAST_IPV4_SOCKET, Interface,
 };
 
 const FIVE_MINUTES: u32 = 60 * 5;
@@ -57,7 +57,7 @@ impl SimpleMdnsResponder {
     /// Creates a new SimpleMdnsResponder with ttl of 5 minutes and enabled loopback
     /// 
     /// Ipv4 interface to listen on can be specified, or `&Ipv4Addr::UNSPECIFIED` for OS choice
-    pub fn new(rr_ttl: u32, interface: &Ipv4Addr) -> Self {
+    pub fn new(rr_ttl: u32, interface: &Interface) -> Self {
         let responder = Self {
             resources: Arc::new(RwLock::new(ResourceRecordManager::new())),
             rr_ttl,
@@ -66,6 +66,7 @@ impl SimpleMdnsResponder {
         let resources = responder.resources.clone();
         let iface = interface.clone();
         std::thread::spawn(move || {
+            let iface = iface.clone();
             if let Err(err) = Self::reply_dns_queries(resources, &iface) {
                 log::error!("Dns Responder failed: {}", err);
             }
@@ -93,7 +94,7 @@ impl SimpleMdnsResponder {
 
     fn reply_dns_queries(
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
-        interface: &Ipv4Addr
+        interface: &Interface
     ) -> Result<(), SimpleMdnsError> {
         let mut receiver = DnsPacketReceiver::new(interface)?;
         let sender_socket = sender_socket(&MULTICAST_IPV4_SOCKET, interface)?;
@@ -120,7 +121,7 @@ impl SimpleMdnsResponder {
 
 impl Default for SimpleMdnsResponder {
     fn default() -> Self {
-        Self::new(FIVE_MINUTES, &Ipv4Addr::UNSPECIFIED)
+        Self::new(FIVE_MINUTES, &(Ipv4Addr::UNSPECIFIED, Ipv6Addr::UNSPECIFIED))
     }
 }
 

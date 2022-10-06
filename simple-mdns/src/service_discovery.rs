@@ -19,7 +19,7 @@ use crate::{
     resource_record_manager::ResourceRecordManager,
     sender_socket,
     simple_responder::build_reply,
-    SimpleMdnsError,
+    SimpleMdnsError, Interface,
 };
 
 /// Service Discovery implementation using DNS-SD.
@@ -60,7 +60,7 @@ impl ServiceDiscovery {
         instance_name: &str,
         service_name: &str,
         resource_ttl: u32,
-        interface: &Ipv4Addr,
+        interface: &Interface,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
         let full_name = Name::new(&full_name)?.into_owned();
@@ -261,7 +261,7 @@ impl ServiceDiscovery {
     fn receive_packets_loop(
         &self,
         packet_sender: Sender<(PacketBuf, SocketAddr)>,
-        interface: &Ipv4Addr
+        interface: &Interface
     ) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
         let full_name = self.full_name.clone();
@@ -326,7 +326,7 @@ fn query_service_instances(
     Ok(())
 }
 
-fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>, interface: &Ipv4Addr) {
+fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>, interface: &Interface) {
     let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET, interface).unwrap();
     std::thread::spawn(move || {
         while let Ok((packet, address)) = receiver.recv() {
