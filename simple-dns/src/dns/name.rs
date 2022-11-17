@@ -11,6 +11,10 @@ use super::{PacketPart, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 
+// NOTE: there are not extend labels implemented today
+// const EXTENDED_LABEL: u8 = 0b0100_0000;
+// const EXTENDED_LABEL_U16: u16 = 0b0100_0000_0000_0000;
+
 /// A Name represents a domain-name, which consists of character strings separated by dots.  
 /// Each section of a name is called label  
 /// ex: `google.com` consists of two labels `google` and `com`

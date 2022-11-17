@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use simple_dns::{Name, Packet, PacketBuf, PacketHeader, Question, CLASS, TYPE};
+use criterion::{criterion_group, criterion_main, Criterion};
+use simple_dns::{Name, Packet, PacketBuf, Question, CLASS, TYPE};
 
 const DOMAINS: [&str; 4] = [
     "domain.local",
@@ -8,7 +8,7 @@ const DOMAINS: [&str; 4] = [
     "sub.another.domain.local",
 ];
 fn packet_questions() -> Vec<u8> {
-    let mut query = Packet::new_query(1, false);
+    let mut query = Packet::new_query(1);
 
     for domain in DOMAINS {
         query.questions.push(Question::new(
@@ -22,7 +22,7 @@ fn packet_questions() -> Vec<u8> {
     query.build_bytes_vec().unwrap()
 }
 fn packet_questions_compressed() -> Vec<u8> {
-    let mut query = Packet::new_query(1, false);
+    let mut query = Packet::new_query(1);
 
     for domain in DOMAINS {
         query.questions.push(Question::new(
@@ -37,7 +37,7 @@ fn packet_questions_compressed() -> Vec<u8> {
 }
 
 fn packetbuf_questions() -> Vec<u8> {
-    let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), false);
+    let mut buf_packet = PacketBuf::new_query(false, 0);
     for domain in DOMAINS {
         let question = Question::new(
             Name::new(domain).unwrap(),
@@ -52,7 +52,7 @@ fn packetbuf_questions() -> Vec<u8> {
 }
 
 fn packetbuf_questions_compressed() -> Vec<u8> {
-    let mut buf_packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+    let mut buf_packet = PacketBuf::new_query(true, 0);
     for domain in DOMAINS {
         let question = Question::new(
             Name::new(domain).unwrap(),

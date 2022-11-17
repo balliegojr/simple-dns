@@ -1,6 +1,4 @@
-use simple_dns::{
-    rdata::RData, Name, PacketBuf, PacketHeader, Question, ResourceRecord, CLASS, TYPE,
-};
+use simple_dns::{rdata::RData, Name, PacketBuf, Question, ResourceRecord, CLASS, TYPE};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -188,10 +186,7 @@ impl ServiceDiscovery {
         cache_flush: bool,
     ) {
         log::info!("Advertising service");
-        let mut packet = PacketBuf::new(
-            PacketHeader::new_reply(1, simple_dns::OPCODE::StandardQuery),
-            true,
-        );
+        let mut packet = PacketBuf::new_reply(true, 1, simple_dns::OPCODE::StandardQuery);
         let resource_manager = self.resource_manager.read().unwrap();
         let mut additional_records = HashSet::new();
         let mut success = true;
@@ -267,8 +262,11 @@ impl ServiceDiscovery {
 
         std::thread::spawn(move || loop {
             match receiver.recv_packet() {
-                Ok((header, packet, addr)) => {
-                    if header.query {
+                Ok((packet, addr)) => {
+                    if !packet
+                        .has_flags(simple_dns::PacketFlag::RESPONSE)
+                        .unwrap_or_default()
+                    {
                         match build_reply(packet, addr, &resources.read().unwrap()) {
                             Some(reply_packet) => {
                                 log::debug!("sending reply");
@@ -304,7 +302,7 @@ fn query_service_instances(
     packet_sender: &Sender<(PacketBuf, SocketAddr)>,
 ) -> Result<(), Box<dyn Error>> {
     log::trace!("probing service instances");
-    let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+    let mut packet = PacketBuf::new_query(true, 0);
     packet.add_question(&Question::new(
         service_name.clone(),
         TYPE::SRV.into(),

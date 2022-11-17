@@ -1,5 +1,5 @@
 use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
-use simple_dns::{rdata::RData, Name, PacketBuf, PacketHeader, Question, CLASS, TYPE};
+use simple_dns::{header_buffer, rdata::RData, Name, PacketBuf, Question, CLASS, TYPE};
 
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
@@ -50,9 +50,9 @@ impl OneShotMdnsResolver {
         // let mut socket = create_udp_socket(self.enable_loopback)?;
         // send_packet_to_multicast_socket(&socket, &packet)?;
         self.sender_socket
-            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
+            .send_to(&packet, *super::MULTICAST_IPV4_SOCKET)?;
         let deadline = Instant::now() + self.query_timeout;
-        self.get_next_response(packet.packet_id(), deadline)
+        self.get_next_response(packet.packet_id()?, deadline)
     }
 
     /// Send a query for A or AAAA (IP v4 and v6 respectively) resources and return the first address
@@ -60,7 +60,7 @@ impl OneShotMdnsResolver {
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::IpAddr>, SimpleMdnsError> {
-        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+        let mut packet = PacketBuf::new_query(true, 0);
         let service_name = Name::new(service_name)?;
         packet.add_question(&Question::new(
             service_name.clone(),
@@ -70,10 +70,10 @@ impl OneShotMdnsResolver {
         ))?;
 
         self.sender_socket
-            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
+            .send_to(&packet, *super::MULTICAST_IPV4_SOCKET)?;
 
         let deadline = Instant::now() + self.query_timeout;
-        while let Some(response) = self.get_next_response(packet.packet_id(), deadline)? {
+        while let Some(response) = self.get_next_response(packet.packet_id()?, deadline)? {
             let response = match response.to_packet() {
                 Ok(packet) => packet,
                 Err(err) => {
@@ -102,7 +102,7 @@ impl OneShotMdnsResolver {
         &self,
         service_name: &str,
     ) -> Result<Option<std::net::SocketAddr>, SimpleMdnsError> {
-        let mut packet = PacketBuf::new(PacketHeader::new_query(0, false), true);
+        let mut packet = PacketBuf::new_query(true, 0);
         let parsed_name_service = Name::new(service_name)?;
         packet.add_question(&Question::new(
             parsed_name_service.clone(),
@@ -112,10 +112,10 @@ impl OneShotMdnsResolver {
         ))?;
 
         self.sender_socket
-            .send_to(&packet, &*super::MULTICAST_IPV4_SOCKET)?;
+            .send_to(&packet, *super::MULTICAST_IPV4_SOCKET)?;
 
         let deadline = Instant::now() + self.query_timeout;
-        while let Some(response) = self.get_next_response(packet.packet_id(), deadline)? {
+        while let Some(response) = self.get_next_response(packet.packet_id()?, deadline)? {
             let response = match response.to_packet() {
                 Ok(packet) => packet,
                 Err(err) => {
@@ -173,10 +173,11 @@ impl OneShotMdnsResolver {
         loop {
             match self.receiver_socket.recv_from(&mut buf[..]) {
                 Ok((count, _)) => {
-                    if let Ok(header) = PacketHeader::parse(&buf[0..12]) {
-                        if !header.query && header.id == packet_id && header.answers_count > 0 {
-                            return Ok(Some(buf[..count].into()));
-                        }
+                    if header_buffer::has_flags(&buf, simple_dns::PacketFlag::RESPONSE)?
+                        && header_buffer::id(&buf)? == packet_id
+                        && header_buffer::answers(&buf)? > 0
+                    {
+                        return Ok(Some(buf[..count].to_vec().into()));
                     }
                 }
                 Err(_) => {

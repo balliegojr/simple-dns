@@ -96,21 +96,30 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
-        let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
-        let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
-        let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
-
         let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
-
         let rdata = RData::parse(data, offset)?;
+        if rdata.type_code() == TYPE::OPT {
+            Ok(Self {
+                name,
+                class: CLASS::IN,
+                ttl,
+                rdata,
+                cache_flush: false,
+            })
+        } else {
+            let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
 
-        Ok(Self {
-            name,
-            class,
-            ttl,
-            rdata,
-            cache_flush,
-        })
+            let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
+            let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
+
+            Ok(Self {
+                name,
+                class,
+                ttl,
+                rdata,
+                cache_flush,
+            })
+        }
     }
 
     fn append_to_vec(
@@ -120,14 +129,20 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     ) -> crate::Result<()> {
         self.name.append_to_vec(out, name_refs)?;
 
-        let class = if self.cache_flush {
-            ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
-        } else {
-            (self.class as u16).to_be_bytes()
-        };
-
         out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
-        out.extend(class);
+
+        if let RData::OPT(ref opt) = self.rdata {
+            out.extend(opt.udp_packet_size.to_be_bytes());
+        } else {
+            let class = if self.cache_flush {
+                ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
+            } else {
+                (self.class as u16).to_be_bytes()
+            };
+
+            out.extend(class);
+        }
+
         out.extend(self.ttl.to_be_bytes());
         out.extend((self.rdata.len() as u16).to_be_bytes());
 

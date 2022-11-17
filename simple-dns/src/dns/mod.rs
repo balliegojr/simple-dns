@@ -1,29 +1,67 @@
 //! Provides parsing and manipulation for DNS packets
 
 mod character_string;
-mod name;
-mod packet;
-mod packet_header;
-mod packet_part;
-mod question;
-pub mod rdata;
-mod resource_record;
-
-pub use rdata::TYPE;
-use std::convert::TryFrom;
-
 pub use character_string::CharacterString;
+
+mod name;
 pub use name::Name;
-pub use packet::{Packet, PacketBuf, QuestionsIter};
-pub use packet_header::PacketHeader;
+
+mod packet;
+pub use packet::Packet;
+
+mod packet_buf;
+pub use packet_buf::{PacketBuf, QuestionsIter};
+
+mod header;
+use header::Header;
+
+pub mod header_buffer;
+
+mod packet_part;
 use packet_part::PacketPart;
+
+mod question;
 pub use question::Question;
+
+pub mod rdata;
+pub use rdata::TYPE;
+
+mod resource_record;
 pub use resource_record::ResourceRecord;
+
+use bitflags::bitflags;
+use std::convert::TryFrom;
 
 const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;
 const MAX_CHARACTER_STRING_LENGTH: usize = 255;
 const MAX_NULL_LENGTH: usize = 65535;
+
+bitflags! {
+    /// Possible Packet Flags
+    // #[derive(Debug, Clone)]
+    pub struct PacketFlag: u16 {
+        /// Indicates if this packet is a query or a response. This is the QR flag in the DNS
+        /// specifications, this flag is called Response here to be more ergonomic
+        const RESPONSE = 0b1000_0000_0000_0000;
+
+        /// Authoritative Answer - this bit is valid in responses,
+        /// and specifies that the responding name server is an authority for the domain name in question section.
+        const AUTHORITATIVE_ANSWER = 0b0000_0100_0000_0000;
+        /// TrunCation - specifies that this message was truncated due to
+        /// length greater than that permitted on the transmission channel.
+        const TRUNCATION = 0b0000_0010_0000_0000;
+        /// Recursion Desired may be set in a query and is copied into the response.
+        /// If RD is set, it directs the name server to pursue the query recursively.
+        /// Recursive query support is optional.
+        const RECURSION_DESIRED = 0b0000_0001_0000_0000;
+        /// Recursion Available is set or cleared in a response.
+        /// It denotes whether recursive query support is available in the name server.
+        const RECURSION_AVAILABLE = 0b0000_0000_1000_0000;
+        const AUTHENTIC_DATA = 0b0000_0000_0010_0000;
+        const CHECKING_DISABLED = 0b0000_0000_0001_0000;
+    }
+}
 
 // /// The maximum DNS packet size is 9000 bytes less the maximum
 // /// sizes of the IP (60) and UDP (8) headers.
@@ -219,6 +257,9 @@ pub enum RCODE {
     /// A name used in the Prerequisite or Update Section is not within the zone denoted by the Zone Section.
     /// [RFC 2136](https://datatracker.ietf.org/doc/html/rfc2136)
     NOTZONE = 10,
+    /// EDNS Version not supported by the responder
+    /// [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891)
+    BADVERS = 16,
 
     /// Reserved for future use.
     Reserved,
@@ -239,6 +280,7 @@ impl From<u16> for RCODE {
             8 => NXRRSET,
             9 => NOTAUTH,
             10 => NOTZONE,
+            16 => BADVERS,
             _ => RCODE::Reserved,
         }
     }

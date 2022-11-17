@@ -39,6 +39,9 @@ pub use nsap::NSAP;
 mod null;
 pub use null::NULL;
 
+mod opt;
+pub use opt::OPT;
+
 mod route_through;
 pub use route_through::RouteThrough;
 
@@ -57,7 +60,7 @@ pub use txt::TXT;
 mod wks;
 pub use wks::WKS;
 
-trait RR {
+pub(crate) trait RR {
     const TYPE_CODE: u16;
 }
 
@@ -136,4 +139,5 @@ macros::rdata_enum! {
     NSAP,
     NSAP_PTR<'a>,
     LOC,
+    OPT<'a>,
 }

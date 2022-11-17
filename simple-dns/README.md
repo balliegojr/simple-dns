@@ -10,11 +10,13 @@ you need to manipulate the packet before generating the final bytes buffer
 ```rust
 use simple_dns::*;
 use simple_dns::rdata::*;
-let question = Question::new(Name::new_unchecked("_srv._udp.local"), TYPE::TXT.into(), CLASS::IN.into(), false);
-let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 
-let mut packet = Packet::new_query(1, false);
+let mut packet = Packet::new_query(1);
+
+let question = Question::new(Name::new_unchecked("_srv._udp.local"), TYPE::TXT.into(), CLASS::IN.into(), false);
 packet.questions.push(question);
+
+let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 packet.additional_records.push(resource);
 
 let bytes = packet.build_bytes_vec();
@@ -35,22 +37,40 @@ let packet = Packet::parse(&bytes[..]);
 assert!(packet.is_ok());
 ```
 
-## PacketBuf
-PacketBuf holds an internal buffer that is populated right when a resource is added.  
-It DOES matter the order in which the resources are added
+It is possible to check some information about a packet withouth parsing the packet, by using the `header_buffer` module functions.  
+Be cautious when checking **RCODE** and packet flags, see the module documentation for more information.  
 
 ```rust
-use simple_dns::*;
-use simple_dns::rdata::*;
-let question = Question::new(Name::new_unchecked("_srv._udp.local"), TYPE::TXT.into(), CLASS::IN.into(), false);
-let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
+use simple_dns::{header_buffer, PacketFlag};
+let buffer = b"\x00\x03\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x06\x67\x6f\x6f\x67\x6c\x65\x03\x63\x6f\x6d\x00\x00\x01\x00\x01";
 
-let mut packet = PacketBuf::new(PacketHeader::new_query(1, false), true);
-assert!(packet.add_answer(&resource).is_ok());
-assert!(packet.add_question(&question).is_err()); //This will fail, since an answer is already added
+assert_eq!(Ok(3), header_buffer::id(&buffer[..]));
+assert!(!header_buffer::has_flags(&buffer[..], PacketFlag::RESPONSE).unwrap());
 ```
 
-It is possible to create a [PacketBuf](`PacketBuf`) from a buffer by calling [PacketBuf::from](`PacketBuf::from`), but be aware that this will clone the contents from the buffer
+EDNS is supported by Packet [opt](Packet::opt) and [opt_mut](Packet::opt_mut) functions, when working with ENDS packets, 
+you **SHOULD NOT** add **OPT Resource Records** directly to the **Additional Records** sections unless you know exactly what you are doing.  
+
+
+# EDNS0 caveats
+
+EDNS extends the DNS packet header by adding an OPT resource record and *moving* part of the header information to the additional records section. 
+RCODE went from 4 bits to 12 bits, where the first 4 bits are stored in the header section and the last 8 bits are stored somewhere else inside the packet.  
+
+This has some implications on how a packet can be parsed or build
+```
+use simple_dns::{header_buffer, RCODE, Packet};
+
+let buffer = b"\x00\x00\x80\x00\x00\x00\x00\x00\x00\x00\x00\x01\x01\x2e\x00\x00\x29\x01\xf4\x00\x00\x03\x01\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+let packet = Packet::parse(&buffer[..]).unwrap();
+
+// Without parsing the full packet, it is impossible to know the true RCODE of the packet
+assert_eq!(RCODE::NoError, header_buffer::rcode(&buffer[..]).unwrap());
+assert_eq!(RCODE::BADVERS, packet.rcode());
+```
+
+Please, refer to [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) for more information
+
 
 ## DNS Packet Parser/Builder
 The *Packet* structure provides parsing e building of a DNS packet, it aims to be fully compliant with the RFCs bellow:
@@ -65,6 +85,7 @@ The *Packet* structure provides parsing e building of a DNS packet, it aims to b
 - [RFC 6762](https://tools.ietf.org/html/rfc6762)
 - [RFC 2782](https://tools.ietf.org/html/rfc2782)
 - [RFC 3596](https://tools.ietf.org/html/rfc3596)
+- [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891)
 
 Other Resource Records defined by other RFCs that are not in this list will be implemented over time
 

@@ -1,7 +1,7 @@
 use std::{array::TryFromSliceError, error::Error, fmt::Display};
 
 /// Error types for SimpleDns
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SimpleDnsError {
     /// Invalid value for CLASS type
     InvalidClass(u16),
