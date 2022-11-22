@@ -45,6 +45,11 @@ impl<'a> Packet<'a> {
         }
     }
 
+    /// Get packet id
+    pub fn id(&self) -> u16 {
+        self.header.id
+    }
+
     /// Set flags in the packet
     pub fn set_flags(&mut self, flags: PacketFlag) {
         self.header.set_flags(flags);

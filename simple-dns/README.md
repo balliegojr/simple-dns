@@ -1,7 +1,7 @@
 # Simple DNS
 Pure Rust implementation to work with DNS packets
 
-You can parse or write a DNS packet by using [Packet](`Packet`) or [PacketBuf](`PacketBuf`) structs
+You can parse or write a DNS packet by using [Packet](`Packet`) 
 
 ## Packet
 Packet holds references for the original data and it is more suitable for situations where

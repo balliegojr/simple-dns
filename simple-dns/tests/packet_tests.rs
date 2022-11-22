@@ -1,6 +1,6 @@
 use simple_dns::{
     rdata::{RData, A},
-    Name, Packet, PacketBuf, ResourceRecord, SimpleDnsError, CLASS, QCLASS, QTYPE, RCODE, TYPE,
+    Name, Packet, ResourceRecord, SimpleDnsError, CLASS, QCLASS, QTYPE, RCODE, TYPE,
 };
 
 #[test]
@@ -83,35 +83,33 @@ fn reply_google_com() -> Result<(), SimpleDnsError> {
 
 #[test]
 fn compression_multiple_names() {
-    let mut buf_packet = PacketBuf::new_query(true, 0);
+    let mut packet = Packet::new_query(0);
 
-    buf_packet
-        .add_answer(&ResourceRecord::new(
-            Name::new_unchecked("a._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ))
-        .unwrap();
-    buf_packet
-        .add_answer(&ResourceRecord::new(
-            Name::new_unchecked("b._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ))
-        .unwrap();
+    packet.answers.push(ResourceRecord::new(
+        Name::new_unchecked("a._tcp.local"),
+        CLASS::IN,
+        10,
+        RData::A(A { address: 10 }),
+    ));
+    packet.answers.push(ResourceRecord::new(
+        Name::new_unchecked("b._tcp.local"),
+        CLASS::IN,
+        10,
+        RData::A(A { address: 10 }),
+    ));
 
-    buf_packet
-        .add_answer(&ResourceRecord::new(
-            Name::new_unchecked("b._tcp.local"),
-            CLASS::IN,
-            10,
-            RData::A(A { address: 10 }),
-        ))
-        .unwrap();
+    packet.answers.push(ResourceRecord::new(
+        Name::new_unchecked("b._tcp.local"),
+        CLASS::IN,
+        10,
+        RData::A(A { address: 10 }),
+    ));
 
-    assert!(Packet::parse(&buf_packet).is_ok());
+    let buffer = packet
+        .build_bytes_vec_compressed()
+        .expect("Failed to generate packet");
+
+    assert!(Packet::parse(&buffer[..]).is_ok());
 }
 
 #[test]
@@ -119,8 +117,7 @@ fn parse_edns_packet() {
     let mut packet = Packet::new_reply(0);
     *packet.rcode_mut() = RCODE::BADVERS;
     *packet.opt_mut() = Some(simple_dns::rdata::OPT {
-        code: 0,
-        data: Vec::default().into(),
+        opt_codes: Default::default(),
         udp_packet_size: 500,
         version: 3,
     });

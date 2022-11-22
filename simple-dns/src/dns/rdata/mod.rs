@@ -40,7 +40,7 @@ mod null;
 pub use null::NULL;
 
 mod opt;
-pub use opt::OPT;
+pub use opt::{OPTCode, OPT};
 
 mod route_through;
 pub use route_through::RouteThrough;

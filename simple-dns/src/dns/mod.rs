@@ -9,9 +9,6 @@ pub use name::Name;
 mod packet;
 pub use packet::Packet;
 
-mod packet_buf;
-pub use packet_buf::{PacketBuf, QuestionsIter};
-
 mod header;
 use header::Header;
 

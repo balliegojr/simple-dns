@@ -1,4 +1,4 @@
-use simple_dns::{rdata::RData, Name, PacketBuf, Question, ResourceRecord, CLASS, TYPE};
+use simple_dns::{rdata::RData, Name, Packet, Question, ResourceRecord, CLASS, TYPE};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -41,7 +41,7 @@ pub struct ServiceDiscovery {
     service_name: Name<'static>,
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     resource_ttl: u32,
-    packets_sender: Sender<(PacketBuf, SocketAddr)>,
+    packets_sender: Sender<(Vec<u8>, SocketAddr)>,
 }
 
 impl ServiceDiscovery {
@@ -146,7 +146,7 @@ impl ServiceDiscovery {
             .collect()
     }
 
-    fn refresh_known_instances(&self, packet_sender: Sender<(PacketBuf, SocketAddr)>) {
+    fn refresh_known_instances(&self, packet_sender: Sender<(Vec<u8>, SocketAddr)>) {
         let service_name = self.service_name.clone();
         let resource_manager = self.resource_manager.clone();
 
@@ -180,70 +180,53 @@ impl ServiceDiscovery {
         });
     }
 
-    fn advertise_service(
-        &self,
-        packet_sender: &Sender<(PacketBuf, SocketAddr)>,
-        cache_flush: bool,
-    ) {
+    fn advertise_service(&self, packet_sender: &Sender<(Vec<u8>, SocketAddr)>, cache_flush: bool) {
         log::info!("Advertising service");
-        let mut packet = PacketBuf::new_reply(true, 1, simple_dns::OPCODE::StandardQuery);
+        let mut packet = Packet::new_reply(1);
         let resource_manager = self.resource_manager.read().unwrap();
         let mut additional_records = HashSet::new();
-        let mut success = true;
 
         for d_resources in
             resource_manager.get_domain_resources(&self.full_name.clone(), true, true)
         {
-            success = success
-                && if cache_flush {
-                    d_resources
-                        .filter(|r| r.match_qclass(CLASS::IN.into()))
-                        .map(|r| packet.add_answer(&r.to_cache_flush_record()))
-                        .all(|r| r.is_ok())
-                } else {
-                    d_resources
-                        .filter(|r| {
-                            r.match_qclass(CLASS::IN.into())
-                                && (r.match_qtype(TYPE::SRV.into())
-                                    || r.match_qtype(TYPE::TXT.into()))
-                        })
-                        .map(|resource| {
-                            if packet.add_answer(resource).is_err() {
-                                return false;
-                            }
+            if cache_flush {
+                d_resources
+                    .filter(|r| r.match_qclass(CLASS::IN.into()))
+                    .for_each(|r| packet.answers.push(r.to_cache_flush_record()));
+            } else {
+                d_resources
+                    .filter(|r| {
+                        r.match_qclass(CLASS::IN.into())
+                            && (r.match_qtype(TYPE::SRV.into()) || r.match_qtype(TYPE::TXT.into()))
+                    })
+                    .cloned()
+                    .for_each(|resource| {
+                        if let RData::SRV(srv) = &resource.rdata {
+                            let target = resource_manager
+                                .get_domain_resources(&srv.target, false, true)
+                                .flatten()
+                                .filter(|r| {
+                                    r.match_qtype(TYPE::A.into())
+                                        && r.match_qclass(CLASS::IN.into())
+                                })
+                                .cloned();
 
-                            if let RData::SRV(srv) = &resource.rdata {
-                                let target = resource_manager
-                                    .get_domain_resources(&srv.target, false, true)
-                                    .flatten()
-                                    .filter(|r| {
-                                        r.match_qtype(TYPE::A.into())
-                                            && r.match_qclass(CLASS::IN.into())
-                                    });
+                            additional_records.extend(target);
+                        }
 
-                                additional_records.extend(target);
-                            }
-
-                            true
-                        })
-                        .all(|r| r)
-                };
+                        packet.answers.push(resource);
+                    });
+            };
         }
 
         for additional_record in additional_records {
-            if packet.add_additional_record(additional_record).is_err() {
-                success = false;
-            }
+            packet.additional_records.push(additional_record)
         }
 
-        if !success {
-            log::info!("Failed to advertise service");
-            return;
-        }
-
-        if packet.has_answers()
-            && packet_sender
-                .send((packet, *super::MULTICAST_IPV4_SOCKET))
+        if !packet.answers.is_empty()
+            && packet
+                .build_bytes_vec_compressed()
+                .map(|bytes| packet_sender.send((bytes, *super::MULTICAST_IPV4_SOCKET)))
                 .is_err()
         {
             log::info!("Failed to advertise service");
@@ -252,7 +235,7 @@ impl ServiceDiscovery {
 
     fn receive_packets_loop(
         &self,
-        packet_sender: Sender<(PacketBuf, SocketAddr)>,
+        packet_sender: Sender<(Vec<u8>, SocketAddr)>,
     ) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
         let full_name = self.full_name.clone();
@@ -263,14 +246,18 @@ impl ServiceDiscovery {
         std::thread::spawn(move || loop {
             match receiver.recv_packet() {
                 Ok((packet, addr)) => {
-                    if !packet
-                        .has_flags(simple_dns::PacketFlag::RESPONSE)
-                        .unwrap_or_default()
-                    {
+                    if !packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
                         match build_reply(packet, addr, &resources.read().unwrap()) {
                             Some(reply_packet) => {
                                 log::debug!("sending reply");
-                                if packet_sender.send(reply_packet).is_err() {
+                                if packet_sender
+                                    .send((
+                                        // FIXME:
+                                        reply_packet.0.build_bytes_vec_compressed().unwrap(),
+                                        reply_packet.1,
+                                    ))
+                                    .is_err()
+                                {
                                     log::error!("Failed to send reply");
                                 }
                             }
@@ -299,28 +286,31 @@ impl ServiceDiscovery {
 
 fn query_service_instances(
     service_name: Name,
-    packet_sender: &Sender<(PacketBuf, SocketAddr)>,
+    packet_sender: &Sender<(Vec<u8>, SocketAddr)>,
 ) -> Result<(), Box<dyn Error>> {
     log::trace!("probing service instances");
-    let mut packet = PacketBuf::new_query(true, 0);
-    packet.add_question(&Question::new(
+    let mut packet = Packet::new_query(0);
+    packet.questions.push(Question::new(
         service_name.clone(),
         TYPE::SRV.into(),
         CLASS::IN.into(),
         false,
-    ))?;
-    packet.add_question(&Question::new(
+    ));
+    packet.questions.push(Question::new(
         service_name,
         TYPE::TXT.into(),
         CLASS::IN.into(),
         false,
-    ))?;
+    ));
 
-    packet_sender.send((packet, *super::MULTICAST_IPV4_SOCKET))?;
+    packet_sender.send((
+        packet.build_bytes_vec_compressed()?,
+        *super::MULTICAST_IPV4_SOCKET,
+    ))?;
     Ok(())
 }
 
-fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>) {
+fn send_packages_loop(receiver: Receiver<(Vec<u8>, SocketAddr)>) {
     let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
     std::thread::spawn(move || {
         while let Ok((packet, address)) = receiver.recv() {
@@ -332,20 +322,11 @@ fn send_packages_loop(receiver: Receiver<(PacketBuf, SocketAddr)>) {
 }
 
 fn add_response_to_resources(
-    packet: PacketBuf,
+    packet: Packet,
     service_name: &Name<'_>,
     full_name: &Name<'_>,
     owned_resources: &mut ResourceRecordManager,
 ) {
-    let packet = match packet.to_packet() {
-        Ok(packet) => packet,
-        Err(err) => {
-            log::error!("Received Invalid packet: {}", err);
-            log::debug!("{:?}", packet);
-            return;
-        }
-    };
-
     let resources = packet
         .answers
         .into_iter()

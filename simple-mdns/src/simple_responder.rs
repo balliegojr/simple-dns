@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use simple_dns::{rdata::RData, PacketBuf, PacketFlag, ResourceRecord, TYPE};
+use simple_dns::{rdata::RData, Packet, PacketFlag, ResourceRecord, TYPE};
 
 use crate::{
     dns_packet_receiver::DnsPacketReceiver, resource_record_manager::ResourceRecordManager,
@@ -97,7 +97,7 @@ impl SimpleMdnsResponder {
         loop {
             match receiver.recv_packet() {
                 Ok((packet, addr)) => {
-                    if !packet.has_flags(PacketFlag::RESPONSE).unwrap_or_default() {
+                    if !packet.has_flags(PacketFlag::RESPONSE) {
                         send_reply(packet, &resources.read().unwrap(), &sender_socket, addr)?;
                     }
                 }
@@ -121,31 +121,31 @@ impl Default for SimpleMdnsResponder {
 }
 
 pub(crate) fn send_reply<'a>(
-    packet: PacketBuf,
+    packet: Packet,
     resources: &'a ResourceRecordManager<'a>,
     socket: &UdpSocket,
     addr: SocketAddr,
 ) -> Result<(), SimpleMdnsError> {
     if let Some((reply_packet, reply_addr)) = build_reply(packet, addr, resources) {
-        socket.send_to(&reply_packet, reply_addr)?;
+        socket.send_to(&reply_packet.build_bytes_vec_compressed()?, reply_addr)?;
     }
 
     Ok(())
 }
 
 pub(crate) fn build_reply<'b>(
-    packet: PacketBuf,
+    packet: Packet,
     from_addr: SocketAddr,
     resources: &'b ResourceRecordManager<'b>,
-) -> Option<(PacketBuf, SocketAddr)> {
-    let mut reply_packet = packet.reply(true).ok()?;
+) -> Option<(Packet<'b>, SocketAddr)> {
+    let mut reply_packet = Packet::new_reply(packet.id());
 
     let mut unicast_response = false;
     let mut additional_records = HashSet::new();
 
     // TODO: fill the questions for the response
     // TODO: filter out questions with known answers
-    for question in packet.questions_iter().ok()? {
+    for question in packet.questions.iter() {
         if question.unicast_response {
             unicast_response = question.unicast_response
         }
@@ -154,7 +154,7 @@ pub(crate) fn build_reply<'b>(
             for answer in d_resources
                 .filter(|r| r.match_qclass(question.qclass) && r.match_qtype(question.qtype))
             {
-                reply_packet.add_answer(answer).ok()?;
+                reply_packet.answers.push(answer.clone());
 
                 if let RData::SRV(srv) = &answer.rdata {
                     let target = resources
@@ -162,7 +162,8 @@ pub(crate) fn build_reply<'b>(
                         .flatten()
                         .filter(|r| {
                             r.match_qtype(TYPE::A.into()) && r.match_qclass(question.qclass)
-                        });
+                        })
+                        .cloned();
 
                     additional_records.extend(target);
                 }
@@ -171,7 +172,7 @@ pub(crate) fn build_reply<'b>(
     }
 
     for additional_record in additional_records {
-        reply_packet.add_additional_record(additional_record).ok()?;
+        reply_packet.additional_records.push(additional_record);
     }
 
     let reply_addr = if unicast_response {
@@ -180,7 +181,7 @@ pub(crate) fn build_reply<'b>(
         *MULTICAST_IPV4_SOCKET
     };
 
-    if reply_packet.has_answers() {
+    if !reply_packet.answers.is_empty() {
         Some((reply_packet, reply_addr))
     } else {
         None
@@ -237,7 +238,7 @@ mod tests {
     fn test_build_reply_with_no_questions() {
         let resources = get_resources();
 
-        let packet = PacketBuf::new_query(true, 1);
+        let packet = Packet::new_query(1);
         assert!(build_reply(
             packet,
             SocketAddr::from_str("127.0.0.1:80").unwrap(),
@@ -250,15 +251,13 @@ mod tests {
     fn test_build_reply_without_valid_answers() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new_query(true, 1);
-        packet
-            .add_question(&Question::new(
-                "_res3._tcp.com".try_into().unwrap(),
-                simple_dns::QTYPE::ANY,
-                simple_dns::QCLASS::ANY,
-                false,
-            ))
-            .unwrap();
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res3._tcp.com".try_into().unwrap(),
+            simple_dns::QTYPE::ANY,
+            simple_dns::QCLASS::ANY,
+            false,
+        ));
 
         assert!(build_reply(
             packet,
@@ -272,15 +271,13 @@ mod tests {
     fn test_build_reply_with_valid_answer() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new_query(true, 1);
-        packet
-            .add_question(&Question::new(
-                "_res1._tcp.com".try_into().unwrap(),
-                simple_dns::TYPE::A.into(),
-                simple_dns::QCLASS::ANY,
-                true,
-            ))
-            .unwrap();
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res1._tcp.com".try_into().unwrap(),
+            simple_dns::TYPE::A.into(),
+            simple_dns::QCLASS::ANY,
+            true,
+        ));
 
         let (reply, addr) = build_reply(
             packet,
@@ -288,7 +285,6 @@ mod tests {
             &resources,
         )
         .unwrap();
-        let reply = reply.to_packet().unwrap();
 
         assert_eq!(addr, SocketAddr::from_str("127.0.0.1:80").unwrap());
         assert_eq!(2, reply.answers.len());
@@ -299,15 +295,13 @@ mod tests {
     fn test_build_reply_for_srv() {
         let resources = get_resources();
 
-        let mut packet = PacketBuf::new_query(true, 1);
-        packet
-            .add_question(&Question::new(
-                "_res1._tcp.com".try_into().unwrap(),
-                simple_dns::TYPE::SRV.into(),
-                simple_dns::QCLASS::ANY,
-                false,
-            ))
-            .unwrap();
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res1._tcp.com".try_into().unwrap(),
+            simple_dns::TYPE::SRV.into(),
+            simple_dns::QCLASS::ANY,
+            false,
+        ));
 
         let (reply, addr) = build_reply(
             packet,
@@ -315,7 +309,6 @@ mod tests {
             &resources,
         )
         .unwrap();
-        let reply = reply.to_packet().unwrap();
 
         assert_eq!(addr, *crate::MULTICAST_IPV4_SOCKET);
         assert_eq!(1, reply.answers.len());

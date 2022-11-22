@@ -1,6 +1,6 @@
 use std::net::{SocketAddr, UdpSocket};
 
-use simple_dns::PacketBuf;
+use simple_dns::Packet;
 
 use crate::{join_multicast, SimpleMdnsError, MULTICAST_IPV4_SOCKET};
 
@@ -21,10 +21,10 @@ impl DnsPacketReceiver {
         })
     }
 
-    pub fn recv_packet(&mut self) -> Result<(PacketBuf, SocketAddr), SimpleMdnsError> {
+    pub fn recv_packet(&mut self) -> Result<(Packet, SocketAddr), SimpleMdnsError> {
         let (count, addr) = self.recv_socket.recv_from(&mut self.recv_buffer)?;
 
-        let packet = PacketBuf::from(self.recv_buffer[..count].to_vec());
+        let packet = Packet::parse(&self.recv_buffer[..count])?.to_owned();
 
         Ok((packet, addr))
     }
