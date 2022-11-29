@@ -50,7 +50,9 @@ pub fn join_multicast(network_scope: NetworkScope) -> io::Result<UdpSocket> {
         }
         NetworkScope::V6 => {
             let socket = create_socket(Domain::IPV6)?;
-            socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 0)?;
+            if socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 0).is_err() {
+                socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 6)?;
+            }
             socket.set_only_v6(true)?;
 
             bind_multicast(socket, &IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT)
