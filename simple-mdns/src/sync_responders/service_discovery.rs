@@ -85,14 +85,12 @@ impl ServiceDiscovery {
             service_name,
             resource_manager: Arc::new(RwLock::new(resource_manager)),
             resource_ttl,
-            sender_socket: dbg!(crate::socket_helper::sender_socket(network_scope.is_v4()))?,
+            sender_socket: crate::socket_helper::sender_socket(network_scope.is_v4())?,
             network_scope,
         };
 
-        println!("service created");
-
-        dbg!(service_discovery.receive_packets_loop()?);
-        dbg!(service_discovery.refresh_known_instances()?);
+        service_discovery.receive_packets_loop()?;
+        service_discovery.refresh_known_instances()?;
 
         if let Err(err) = query_service_instances(
             service_discovery.service_name.clone(),
@@ -264,8 +262,8 @@ impl ServiceDiscovery {
         let resources = self.resource_manager.clone();
         let multicast_address = self.network_scope.socket_address();
 
-        let sender_socket = dbg!(self.sender_socket.try_clone())?;
-        let recv_socket = dbg!(crate::socket_helper::join_multicast(self.network_scope))?;
+        let sender_socket = self.sender_socket.try_clone()?;
+        let recv_socket = crate::socket_helper::join_multicast(self.network_scope)?;
         recv_socket.set_read_timeout(None)?;
 
         std::thread::spawn(move || loop {

@@ -78,30 +78,29 @@ fn create_socket(domain: Domain) -> io::Result<Socket> {
     Ok(socket)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
     // FIXME: this should not be necessary, why is it not possible to bind on the address for ipv6?
+
+    if socket
+        .bind(&SockAddr::from(SocketAddr::new(*address, port)))
+        .is_err()
+    {
+        let addr = match address {
+            IpAddr::V4(_) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port)),
+            IpAddr::V6(_) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port)),
+        };
+        socket.bind(&addr)?;
+    }
+
+    Ok(socket)
+}
+
+#[cfg(windows)]
+fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
     let addr = match address {
-        IpAddr::V4(_) => SockAddr::from(SocketAddr::new(*address, port)),
+        IpAddr::V4(_) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port)),
         IpAddr::V6(_) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port)),
-    };
-
-    socket.bind(&addr)?;
-
-    Ok(socket)
-}
-
-#[cfg(target_os = "macos")]
-fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
-    socket.bind(&SockAddr::from(SocketAddr::new(*address, port)))?;
-    Ok(socket)
-}
-
-#[cfg(target_os = "windows")]
-fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
-    let addr = match address {
-        IpAddr::V4(addr) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port)),
-        IpAddr::V6(addr) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port)),
     };
 
     socket.bind(&addr)?;
