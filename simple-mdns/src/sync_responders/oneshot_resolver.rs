@@ -1,10 +1,14 @@
-use crate::{join_multicast, sender_socket, SimpleMdnsError, UNICAST_RESPONSE};
+use crate::{
+    socket_helper::{join_multicast, sender_socket},
+    NetworkScope, SimpleMdnsError, UNICAST_RESPONSE,
+};
 use simple_dns::{header_buffer, rdata::RData, Name, Packet, Question, CLASS, TYPE};
 
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
     time::{Duration, Instant},
 };
+
 /// Provides One Shot queries (legacy mDNS)
 ///
 /// Every query will timeout after `query_timeout` elapses (defaults to 3 seconds)
@@ -32,16 +36,23 @@ pub struct OneShotMdnsResolver {
     unicast_response: bool,
     receiver_socket: UdpSocket,
     sender_socket: UdpSocket,
+    network_scope: NetworkScope,
 }
 
 impl OneShotMdnsResolver {
-    /// Creates a new OneShotMdnsResolver
+    /// Creates a new OneShotMdnsResolver using IP V4 with unspecified interface
     pub fn new() -> Result<Self, SimpleMdnsError> {
+        Self::new_with_scope(NetworkScope::V4)
+    }
+
+    /// Creates a new OneShotMdnsResolver with the specified scope
+    pub fn new_with_scope(network_scope: NetworkScope) -> Result<Self, SimpleMdnsError> {
         Ok(Self {
             query_timeout: Duration::from_secs(3),
             unicast_response: UNICAST_RESPONSE,
-            receiver_socket: join_multicast(&super::MULTICAST_IPV4_SOCKET)?,
-            sender_socket: sender_socket(&super::MULTICAST_IPV4_SOCKET)?,
+            sender_socket: sender_socket(network_scope.is_v4())?,
+            network_scope,
+            receiver_socket: join_multicast(network_scope)?,
         })
     }
 
@@ -49,7 +60,7 @@ impl OneShotMdnsResolver {
     pub fn query_packet(&self, packet: Packet) -> Result<Option<Vec<u8>>, SimpleMdnsError> {
         self.sender_socket.send_to(
             &packet.build_bytes_vec_compressed()?,
-            *super::MULTICAST_IPV4_SOCKET,
+            self.network_scope.socket_address(),
         )?;
         let deadline = Instant::now() + self.query_timeout;
         self.get_next_response(packet.id(), deadline)
@@ -71,7 +82,7 @@ impl OneShotMdnsResolver {
 
         self.sender_socket.send_to(
             &packet.build_bytes_vec_compressed()?,
-            *super::MULTICAST_IPV4_SOCKET,
+            self.network_scope.socket_address(),
         )?;
 
         let deadline = Instant::now() + self.query_timeout;
@@ -123,8 +134,10 @@ impl OneShotMdnsResolver {
             self.unicast_response,
         ));
 
-        self.sender_socket
-            .send_to(&packet.build_bytes_vec()?, *super::MULTICAST_IPV4_SOCKET)?;
+        self.sender_socket.send_to(
+            &packet.build_bytes_vec()?,
+            self.network_scope.socket_address(),
+        )?;
 
         let deadline = Instant::now() + self.query_timeout;
         loop {

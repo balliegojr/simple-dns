@@ -1,111 +1,183 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs)]
-#[macro_use]
 extern crate lazy_static;
 
-use std::{
-    io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
-    time::Duration,
-};
+use std::collections::HashSet;
 
-use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use simple_dns::{rdata::RData, Packet, TYPE};
 
 pub mod conversion_utils;
-mod dns_packet_receiver;
-mod oneshot_resolver;
-mod resource_record_manager;
-mod service_discovery;
-mod simple_mdns_error;
-mod simple_responder;
 
-pub use oneshot_resolver::OneShotMdnsResolver;
-pub use service_discovery::{InstanceInformation, ServiceDiscovery};
+mod network_scope;
+pub use network_scope::NetworkScope;
+
+mod resource_record_manager;
+
+mod simple_mdns_error;
 pub use simple_mdns_error::SimpleMdnsError;
-pub use simple_responder::SimpleMdnsResponder;
+
+mod socket_helper;
+
+mod sync_responders;
+pub use sync_responders::*;
 
 const UNICAST_RESPONSE: bool = cfg!(not(test));
 
-const MULTICAST_PORT: u16 = 5353;
-const MULTICAST_ADDR_IPV4: Ipv4Addr = Ipv4Addr::new(224, 0, 0, 251);
-const MULTICAST_ADDR_IPV6: Ipv6Addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0xFB);
+pub(crate) fn build_reply<'b>(
+    packet: simple_dns::Packet,
+    resources: &'b resource_record_manager::ResourceRecordManager<'b>,
+) -> Option<(Packet<'b>, bool)> {
+    let mut reply_packet = Packet::new_reply(packet.id());
 
-lazy_static! {
-    pub(crate) static ref MULTICAST_IPV4_SOCKET: SocketAddr =
-        SocketAddr::new(IpAddr::V4(MULTICAST_ADDR_IPV4), MULTICAST_PORT);
-    pub(crate) static ref MULTICAST_IPV6_SOCKET: SocketAddr =
-        SocketAddr::new(IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT);
-}
-fn create_socket(addr: &SocketAddr) -> io::Result<Socket> {
-    let domain = if addr.is_ipv4() {
-        Domain::IPV4
-    } else {
-        Domain::IPV6
-    };
+    let mut unicast_response = false;
+    let mut additional_records = HashSet::new();
 
-    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
-    socket.set_read_timeout(Some(Duration::from_millis(100)))?;
-    socket.set_reuse_address(true)?;
-
-    #[cfg(not(windows))]
-    socket.set_reuse_port(true)?;
-
-    Ok(socket)
-}
-
-fn join_multicast(addr: &SocketAddr) -> io::Result<UdpSocket> {
-    let ip_addr = addr.ip();
-
-    let socket = create_socket(addr)?;
-
-    // depending on the IP protocol we have slightly different work
-    match ip_addr {
-        IpAddr::V4(ref mdns_v4) => {
-            socket.join_multicast_v4(mdns_v4, &Ipv4Addr::UNSPECIFIED)?;
+    // TODO: fill the questions for the response
+    // TODO: filter out questions with known answers
+    for question in packet.questions.iter() {
+        if question.unicast_response {
+            unicast_response = question.unicast_response
         }
-        IpAddr::V6(ref mdns_v6) => {
-            socket.join_multicast_v6(mdns_v6, 0)?;
-            socket.set_only_v6(true)?;
+
+        for d_resources in resources.get_domain_resources(&question.qname, true, true) {
+            for answer in d_resources
+                .filter(|r| r.match_qclass(question.qclass) && r.match_qtype(question.qtype))
+            {
+                reply_packet.answers.push(answer.clone());
+
+                if let RData::SRV(srv) = &answer.rdata {
+                    let target = resources
+                        .get_domain_resources(&srv.target, false, true)
+                        .flatten()
+                        .filter(|r| {
+                            r.match_qtype(TYPE::A.into()) && r.match_qclass(question.qclass)
+                        })
+                        .cloned();
+
+                    additional_records.extend(target);
+                }
+            }
         }
-    };
-
-    let socket = bind_multicast(socket, addr)?;
-    Ok(socket.into())
-}
-
-#[cfg(unix)]
-fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
-    socket.bind(&SockAddr::from(*addr))?;
-    Ok(socket)
-}
-
-#[cfg(windows)]
-fn bind_multicast(socket: Socket, addr: &SocketAddr) -> io::Result<Socket> {
-    let addr = match addr {
-        SocketAddr::V4(addr) => {
-            SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), addr.port()))
-        }
-        SocketAddr::V6(addr) => {
-            SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), addr.port()))
-        }
-    };
-
-    socket.bind(&addr)?;
-    Ok(socket)
-}
-
-fn sender_socket(addr: &SocketAddr) -> io::Result<UdpSocket> {
-    let socket = create_socket(addr)?;
-    if addr.is_ipv4() {
-        socket.bind(&SockAddr::from(SocketAddr::new(
-            Ipv4Addr::UNSPECIFIED.into(),
-            0,
-        )))?;
-    } else {
-        socket.bind(&SockAddr::from(SocketAddr::new(
-            Ipv6Addr::UNSPECIFIED.into(),
-            0,
-        )))?;
     }
-    Ok(socket.into())
+
+    for additional_record in additional_records {
+        reply_packet.additional_records.push(additional_record);
+    }
+
+    if !reply_packet.answers.is_empty() {
+        Some((reply_packet, unicast_response))
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use simple_dns::Name;
+    use std::{
+        convert::TryInto,
+        net::{Ipv4Addr, Ipv6Addr},
+    };
+
+    use simple_dns::Question;
+
+    use crate::{
+        build_reply,
+        conversion_utils::{ip_addr_to_resource_record, port_to_srv_record},
+        resource_record_manager::ResourceRecordManager,
+    };
+
+    use super::*;
+
+    fn get_resources() -> ResourceRecordManager<'static> {
+        let mut resources = ResourceRecordManager::new();
+        resources.add_owned_resource(port_to_srv_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            8080,
+            0,
+        ));
+        resources.add_owned_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            Ipv4Addr::LOCALHOST.into(),
+            0,
+        ));
+        resources.add_owned_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res1._tcp.com"),
+            Ipv6Addr::LOCALHOST.into(),
+            0,
+        ));
+
+        resources.add_owned_resource(port_to_srv_record(
+            &Name::new_unchecked("_res2._tcp.com"),
+            8080,
+            0,
+        ));
+        resources.add_owned_resource(ip_addr_to_resource_record(
+            &Name::new_unchecked("_res2._tcp.com"),
+            Ipv4Addr::LOCALHOST.into(),
+            0,
+        ));
+        resources
+    }
+
+    #[test]
+    fn test_build_reply_with_no_questions() {
+        let resources = get_resources();
+
+        let packet = Packet::new_query(1);
+        assert!(build_reply(packet, &resources,).is_none());
+    }
+
+    #[test]
+    fn test_build_reply_without_valid_answers() {
+        let resources = get_resources();
+
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res3._tcp.com".try_into().unwrap(),
+            simple_dns::QTYPE::ANY,
+            simple_dns::QCLASS::ANY,
+            false,
+        ));
+
+        assert!(build_reply(packet, &resources,).is_none());
+    }
+
+    #[test]
+    fn test_build_reply_with_valid_answer() {
+        let resources = get_resources();
+
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res1._tcp.com".try_into().unwrap(),
+            simple_dns::TYPE::A.into(),
+            simple_dns::QCLASS::ANY,
+            true,
+        ));
+
+        let (reply, unicast_response) = build_reply(packet, &resources).unwrap();
+
+        assert!(unicast_response);
+        assert_eq!(2, reply.answers.len());
+        assert_eq!(0, reply.additional_records.len());
+    }
+
+    #[test]
+    fn test_build_reply_for_srv() {
+        let resources = get_resources();
+
+        let mut packet = Packet::new_query(1);
+        packet.questions.push(Question::new(
+            "_res1._tcp.com".try_into().unwrap(),
+            simple_dns::TYPE::SRV.into(),
+            simple_dns::QCLASS::ANY,
+            false,
+        ));
+
+        let (reply, unicast_response) = build_reply(packet, &resources).unwrap();
+
+        assert!(!unicast_response);
+        assert_eq!(1, reply.answers.len());
+        assert_eq!(2, reply.additional_records.len());
+    }
 }

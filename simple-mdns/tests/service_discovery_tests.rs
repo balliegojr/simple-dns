@@ -115,3 +115,95 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
+
+#[test]
+fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>> {
+    // init_log();
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let mut service_discovery_a = ServiceDiscovery::new_with_scope(
+        "a",
+        "_srv3._tcp.local",
+        60,
+        simple_mdns::NetworkScope::V6,
+    )?;
+    let mut service_discovery_b = ServiceDiscovery::new_with_scope(
+        "b",
+        "_srv3._tcp.local",
+        60,
+        simple_mdns::NetworkScope::V6,
+    )?;
+    let mut service_discovery_c = ServiceDiscovery::new_with_scope(
+        "c",
+        "_srv3._tcp.local",
+        60,
+        simple_mdns::NetworkScope::V6,
+    )?;
+
+    service_discovery_a
+        .add_service_info(SocketAddr::from_str("[fe80::26fc:f50f:6755:7d67]:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_b
+        .add_service_info(SocketAddr::from_str("[fe80::26fc:f50f:6755:7d68]:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_c
+        .add_service_info(SocketAddr::from_str("[fe80::26fc:f50f:6755:7d69]:8080")?.into())
+        .expect("Failed to add service info");
+
+    std::thread::sleep(Duration::from_secs(2));
+
+    let mut from_a: Vec<SocketAddr> = service_discovery_a
+        .get_known_services()
+        .iter()
+        .flat_map(|x| x.get_socket_addresses())
+        .collect();
+
+    let mut from_b: Vec<SocketAddr> = service_discovery_b
+        .get_known_services()
+        .iter()
+        .flat_map(|x| x.get_socket_addresses())
+        .collect();
+
+    let mut from_c: Vec<SocketAddr> = service_discovery_c
+        .get_known_services()
+        .iter()
+        .flat_map(|x| x.get_socket_addresses())
+        .collect();
+
+    from_a.sort();
+    from_b.sort();
+    from_c.sort();
+
+    assert_eq!(2, from_a.len());
+    assert_eq!(2, from_b.len());
+    assert_eq!(2, from_c.len());
+
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d68]:8080".parse::<SocketAddr>()?),
+        &from_a[0]
+    );
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d69]:8080".parse::<SocketAddr>()?),
+        &from_a[1]
+    );
+
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d67]:8080".parse::<SocketAddr>()?),
+        &from_b[0]
+    );
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d69]:8080".parse::<SocketAddr>()?),
+        &from_b[1]
+    );
+
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d67]:8080".parse::<SocketAddr>()?),
+        &from_c[0]
+    );
+    assert_eq!(
+        &("[fe80::26fc:f50f:6755:7d68]:8080".parse::<SocketAddr>()?),
+        &from_c[1]
+    );
+    Ok(())
+}

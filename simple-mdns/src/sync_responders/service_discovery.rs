@@ -3,21 +3,15 @@ use simple_dns::{rdata::RData, Name, Packet, Question, ResourceRecord, CLASS, TY
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc, RwLock,
-    },
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 
 use crate::{
     conversion_utils::{hashmap_to_txt, ip_addr_to_resource_record, port_to_srv_record},
-    dns_packet_receiver::DnsPacketReceiver,
     resource_record_manager::ResourceRecordManager,
-    sender_socket,
-    simple_responder::build_reply,
-    SimpleMdnsError,
+    NetworkScope, SimpleMdnsError,
 };
 
 /// Service Discovery implementation using DNS-SD.
@@ -41,10 +35,26 @@ pub struct ServiceDiscovery {
     service_name: Name<'static>,
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     resource_ttl: u32,
-    packets_sender: Sender<(Vec<u8>, SocketAddr)>,
+    sender_socket: UdpSocket,
+    network_scope: NetworkScope,
 }
 
 impl ServiceDiscovery {
+    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
+    ///
+    /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
+    ///
+    /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
+    /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
+    /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
+    pub fn new(
+        instance_name: &str,
+        service_name: &str,
+        resource_ttl: u32,
+    ) -> Result<Self, SimpleMdnsError> {
+        Self::new_with_scope(instance_name, service_name, resource_ttl, NetworkScope::V4)
+    }
+
     /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl` and loopback activation.
     /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
     ///
@@ -52,10 +62,11 @@ impl ServiceDiscovery {
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
-    pub fn new(
+    pub fn new_with_scope(
         instance_name: &str,
         service_name: &str,
         resource_ttl: u32,
+        network_scope: NetworkScope,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
         let full_name = Name::new(&full_name)?.into_owned();
@@ -69,21 +80,25 @@ impl ServiceDiscovery {
             RData::PTR(service_name.clone().into()),
         ));
 
-        let (tx, rx) = channel();
         let service_discovery = Self {
             full_name,
             service_name,
             resource_manager: Arc::new(RwLock::new(resource_manager)),
             resource_ttl,
-            packets_sender: tx.clone(),
+            sender_socket: dbg!(crate::socket_helper::sender_socket(network_scope.is_v4()))?,
+            network_scope,
         };
 
-        send_packages_loop(rx);
+        println!("service created");
 
-        service_discovery.receive_packets_loop(tx.clone())?;
-        service_discovery.refresh_known_instances(tx.clone());
+        dbg!(service_discovery.receive_packets_loop()?);
+        dbg!(service_discovery.refresh_known_instances()?);
 
-        if let Err(err) = query_service_instances(service_discovery.service_name.clone(), &tx) {
+        if let Err(err) = query_service_instances(
+            service_discovery.service_name.clone(),
+            &service_discovery.sender_socket,
+            &service_discovery.network_scope.socket_address(),
+        ) {
             log::error!("There was an error queruing service instances: {err}");
         }
 
@@ -102,13 +117,13 @@ impl ServiceDiscovery {
             }
         }
 
-        self.advertise_service(&self.packets_sender, false);
+        self.advertise_service(false);
         Ok(())
     }
 
     /// Remove all addresses from service discovery
     pub fn remove_service_from_discovery(&mut self) {
-        self.advertise_service(&self.packets_sender, true);
+        self.advertise_service(true);
         self.resource_manager.write().unwrap().clear();
     }
 
@@ -146,16 +161,18 @@ impl ServiceDiscovery {
             .collect()
     }
 
-    fn refresh_known_instances(&self, packet_sender: Sender<(Vec<u8>, SocketAddr)>) {
+    fn refresh_known_instances(&self) -> std::io::Result<()> {
         let service_name = self.service_name.clone();
         let resource_manager = self.resource_manager.clone();
+
+        let sender = self.sender_socket.try_clone()?;
+        let address = self.network_scope.socket_address();
 
         std::thread::spawn(move || {
             let service_name = service_name;
             loop {
-                let now = Instant::now();
                 log::info!("Refreshing known services");
-
+                let now = Instant::now();
                 let next_expiration = resource_manager.read().unwrap().get_next_expiration();
 
                 log::trace!("next expiration: {:?}", next_expiration);
@@ -163,7 +180,7 @@ impl ServiceDiscovery {
                     Some(expiration) => {
                         if expiration <= now {
                             if let Err(err) =
-                                query_service_instances(service_name.clone(), &packet_sender)
+                                query_service_instances(service_name.clone(), &sender, &address)
                             {
                                 log::error!("There was an error querying service instances. {err}");
                             }
@@ -178,9 +195,11 @@ impl ServiceDiscovery {
                 }
             }
         });
+
+        Ok(())
     }
 
-    fn advertise_service(&self, packet_sender: &Sender<(Vec<u8>, SocketAddr)>, cache_flush: bool) {
+    fn advertise_service(&self, cache_flush: bool) {
         log::info!("Advertising service");
         let mut packet = Packet::new_reply(1);
         let resource_manager = self.resource_manager.read().unwrap();
@@ -226,56 +245,76 @@ impl ServiceDiscovery {
         if !packet.answers.is_empty()
             && packet
                 .build_bytes_vec_compressed()
-                .map(|bytes| packet_sender.send((bytes, *super::MULTICAST_IPV4_SOCKET)))
+                .map(|bytes| {
+                    send_packet(
+                        &self.sender_socket,
+                        &bytes,
+                        &self.network_scope.socket_address(),
+                    )
+                })
                 .is_err()
         {
             log::info!("Failed to advertise service");
         }
     }
 
-    fn receive_packets_loop(
-        &self,
-        packet_sender: Sender<(Vec<u8>, SocketAddr)>,
-    ) -> Result<(), SimpleMdnsError> {
+    fn receive_packets_loop(&self) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
         let full_name = self.full_name.clone();
         let resources = self.resource_manager.clone();
+        let multicast_address = self.network_scope.socket_address();
 
-        let mut receiver = DnsPacketReceiver::new()?;
+        let sender_socket = dbg!(self.sender_socket.try_clone())?;
+        let recv_socket = dbg!(crate::socket_helper::join_multicast(self.network_scope))?;
+        recv_socket.set_read_timeout(None)?;
 
         std::thread::spawn(move || loop {
-            match receiver.recv_packet() {
-                Ok((packet, addr)) => {
-                    if !packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
-                        match build_reply(packet, addr, &resources.read().unwrap()) {
-                            Some(reply_packet) => {
-                                log::debug!("sending reply");
-                                if packet_sender
-                                    .send((
-                                        // FIXME:
-                                        reply_packet.0.build_bytes_vec_compressed().unwrap(),
-                                        reply_packet.1,
-                                    ))
-                                    .is_err()
-                                {
-                                    log::error!("Failed to send reply");
-                                }
-                            }
-                            None => {
-                                log::debug!("No reply to send");
-                            }
-                        }
-                    } else {
+            let mut recv_buffer = [0u8; 9000];
+            let (count, addr) = match recv_socket.recv_from(&mut recv_buffer) {
+                Ok(received) => received,
+                Err(err) => {
+                    log::error!("Failed to read network information {err}");
+                    continue;
+                }
+            };
+
+            match Packet::parse(&recv_buffer[..count]) {
+                Ok(packet) => {
+                    if packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
                         add_response_to_resources(
                             packet,
                             &service_name,
                             &full_name,
                             &mut resources.write().unwrap(),
                         )
+                    } else {
+                        match crate::build_reply(packet, &resources.read().unwrap()) {
+                            Some((reply_packet, unicast_response)) => {
+                                let reply = match reply_packet.build_bytes_vec_compressed() {
+                                    Ok(reply) => reply,
+                                    Err(err) => {
+                                        log::error!("Failed to build reply {err}");
+                                        continue;
+                                    }
+                                };
+
+                                let reply_addr = if unicast_response {
+                                    addr
+                                } else {
+                                    multicast_address
+                                };
+
+                                log::debug!("sending reply");
+                                send_packet(&sender_socket, &reply, &reply_addr);
+                            }
+                            None => {
+                                log::debug!("No reply to send");
+                            }
+                        }
                     }
                 }
-                Err(_) => {
-                    log::error!("Received Invalid Packet");
+                Err(err) => {
+                    log::error!("Received Invalid Packet {err}");
                 }
             }
         });
@@ -286,7 +325,8 @@ impl ServiceDiscovery {
 
 fn query_service_instances(
     service_name: Name,
-    packet_sender: &Sender<(Vec<u8>, SocketAddr)>,
+    socket: &UdpSocket,
+    address: &SocketAddr,
 ) -> Result<(), Box<dyn Error>> {
     log::trace!("probing service instances");
     let mut packet = Packet::new_query(0);
@@ -303,22 +343,15 @@ fn query_service_instances(
         false,
     ));
 
-    packet_sender.send((
-        packet.build_bytes_vec_compressed()?,
-        *super::MULTICAST_IPV4_SOCKET,
-    ))?;
+    send_packet(socket, &packet.build_bytes_vec_compressed()?, address);
+
     Ok(())
 }
 
-fn send_packages_loop(receiver: Receiver<(Vec<u8>, SocketAddr)>) {
-    let socket = sender_socket(&super::MULTICAST_IPV4_SOCKET).unwrap();
-    std::thread::spawn(move || {
-        while let Ok((packet, address)) = receiver.recv() {
-            if let Err(err) = socket.send_to(&packet, address) {
-                log::error!("There was an error sending the question packet: {}", err);
-            }
-        }
-    });
+fn send_packet(socket: &UdpSocket, packet_bytes: &[u8], address: &SocketAddr) {
+    if let Err(err) = socket.send_to(packet_bytes, address) {
+        log::error!("There was an error sending the  packet: {err}");
+    }
 }
 
 fn add_response_to_resources(
