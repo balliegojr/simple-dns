@@ -50,9 +50,7 @@ pub fn join_multicast(network_scope: NetworkScope) -> io::Result<UdpSocket> {
         }
         NetworkScope::V6 => {
             let socket = create_socket(Domain::IPV6)?;
-            if socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 0).is_err() {
-                socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 6)?;
-            }
+            socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 0)?;
             socket.set_only_v6(true)?;
 
             bind_multicast(socket, &IpAddr::V6(MULTICAST_ADDR_IPV6), MULTICAST_PORT)
@@ -83,17 +81,12 @@ fn create_socket(domain: Domain) -> io::Result<Socket> {
 #[cfg(unix)]
 fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
     // FIXME: this should not be necessary, why is it not possible to bind on the address for ipv6?
+    let addr = match address {
+        IpAddr::V4(_) => SockAddr::from(SocketAddr::new(*address, port)),
+        IpAddr::V6(_) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port)),
+    };
 
-    if socket
-        .bind(&SockAddr::from(SocketAddr::new(*address, port)))
-        .is_err()
-    {
-        let addr = match address {
-            IpAddr::V4(_) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port)),
-            IpAddr::V6(_) => SockAddr::from(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port)),
-        };
-        socket.bind(&addr)?;
-    }
+    socket.bind(&addr)?;
 
     Ok(socket)
 }
@@ -114,6 +107,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(target_os = "macos"))]
     pub fn test_can_bind_multicast() {
         join_multicast(NetworkScope::V4).expect("Failed to join IPV4 multicast");
         join_multicast(NetworkScope::V6).expect("Failed to join IPV6 multicast");

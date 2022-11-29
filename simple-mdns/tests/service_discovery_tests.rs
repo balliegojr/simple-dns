@@ -117,6 +117,7 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(not(target_os = "macos"))]
 fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>> {
     // init_log();
 
