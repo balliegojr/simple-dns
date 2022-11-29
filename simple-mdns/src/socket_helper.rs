@@ -78,7 +78,7 @@ fn create_socket(domain: Domain) -> io::Result<Socket> {
     Ok(socket)
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
     // FIXME: this should not be necessary, why is it not possible to bind on the address for ipv6?
     let addr = match address {
@@ -91,7 +91,13 @@ fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Soc
     Ok(socket)
 }
 
-#[cfg(windows)]
+#[cfg(target_os = "macos")]
+fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
+    socket.bind(&SockAddr::from(SocketAddr::new(*address, port)))?;
+    Ok(socket)
+}
+
+#[cfg(target_os = "windows")]
 fn bind_multicast(socket: Socket, address: &IpAddr, port: u16) -> io::Result<Socket> {
     let addr = match address {
         IpAddr::V4(addr) => SockAddr::from(SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port)),
