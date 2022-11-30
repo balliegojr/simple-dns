@@ -9,7 +9,10 @@ license = "MIT"
 keywords = ["dns", "dns-sd", "mdns", "service-discovery", "zeroconf"]
 categories = ["network-programming"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["sync"] 
+sync = []
+async-tokio = ["dep:tokio"]
 
 [dependencies]
 simple-dns = { path = "../simple-dns", version = "0.4" }
@@ -17,6 +20,8 @@ socket2 = { version = "^0.4", features = ["all"] }
 log = "^0.4"
 lazy_static = "^1.4.0"
 radix_trie = "^0.2.1"
+tokio = { version = "^1.22", features = ["net", "sync", "rt"], optional = true, default-features=false }
 
 [dev-dependencies]
 stderrlog = "^0.5"
+tokio = { version = "^1.22", features = ["full"] }

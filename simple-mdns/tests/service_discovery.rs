@@ -1,4 +1,6 @@
-use simple_mdns::{InstanceInformation, ServiceDiscovery};
+#![cfg(feature = "sync")]
+
+use simple_mdns::{sync_discovery::ServiceDiscovery, InstanceInformation};
 use std::{collections::HashMap, error::Error, net::SocketAddr, str::FromStr, time::Duration};
 
 // fn init_log() {

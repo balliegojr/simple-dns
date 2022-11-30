@@ -9,6 +9,8 @@ pub enum SimpleMdnsError {
     UdpSocketError(std::io::Error),
     /// Simple-dns error related, usually packet parsing
     DnsParsing(SimpleDnsError),
+    /// Service discovery is no longer running
+    ServiceDiscoveryStopped,
 }
 
 impl Error for SimpleMdnsError {}
@@ -21,6 +23,9 @@ impl Display for SimpleMdnsError {
             }
             SimpleMdnsError::DnsParsing(err) => {
                 write!(f, "Failed to parse dns packet: {}", err)
+            }
+            SimpleMdnsError::ServiceDiscoveryStopped => {
+                write!(f, "Service discovery is no longer running")
             }
         }
     }

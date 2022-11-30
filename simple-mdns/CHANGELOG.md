@@ -1,4 +1,10 @@
 # Simple MDNS
+## 0.4.0
+- Add support for IPV6 queries and network interface choice
+- Add async service discovery (tokio runtime)
+- Moves **sync** structs to module `sync_discovery`
+- Add **sync** and **async-tokio** features
+
 ## 0.3.10
 - Update dependencies 
 - Remove thiserror

@@ -1,5 +1,12 @@
 # Simple DNS
 
+## 0.5.0
+- Add RFC 6891 (EDNS0 support)
+- Removes PacketBuf struct
+
+The `PacketBuf` was removed due to how EDNS0 packets are constructed.  
+It is necessary to parse the whole packet to be able to construct the header information, which renders the PacketBuf *on the fly* approach unreliable
+
 ## 0.4.7
 - Remove `thiserror` dependency
 - Add RFC 2136

@@ -8,6 +8,9 @@ use simple_dns::{rdata::RData, Packet, TYPE};
 
 pub mod conversion_utils;
 
+mod instance_information;
+pub use instance_information::InstanceInformation;
+
 mod network_scope;
 pub use network_scope::NetworkScope;
 
@@ -18,8 +21,11 @@ pub use simple_mdns_error::SimpleMdnsError;
 
 mod socket_helper;
 
-mod sync_responders;
-pub use sync_responders::*;
+#[cfg(feature = "async-tokio")]
+pub mod async_discovery;
+
+#[cfg(feature = "sync")]
+pub mod sync_discovery;
 
 const UNICAST_RESPONSE: bool = cfg!(not(test));
 

@@ -15,7 +15,7 @@ use std::{
 ///
 /// One Shot queries returns only the first valid response to arrive
 /// ```
-///     use simple_mdns::OneShotMdnsResolver;
+///     use simple_mdns::sync_discovery::OneShotMdnsResolver;
 ///     use std::time::Duration;
 ///     
 ///     let mut resolver = OneShotMdnsResolver::new().expect("Can't create one shot resolver");
@@ -30,7 +30,7 @@ use std::{
 ///     println!("{:?}", answer);
 ///     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
 /// ```
-
+#[derive(Debug)]
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     unicast_response: bool,
@@ -88,7 +88,7 @@ impl OneShotMdnsResolver {
         let deadline = Instant::now() + self.query_timeout;
         loop {
             let buffer = match self.get_next_response(packet.id(), deadline) {
-                Ok(Some(packet)) => packet,
+                Ok(Some(buffer)) => buffer,
                 Ok(None) => break,
                 Err(err) => {
                     log::error!("Received invalid packet: {}", err);
@@ -222,58 +222,5 @@ impl OneShotMdnsResolver {
                 }
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{str::FromStr, thread};
-
-    use crate::{conversion_utils::socket_addr_to_srv_and_address, SimpleMdnsResponder};
-
-    use super::*;
-
-    fn get_oneshot_responder(srv_name: Name<'static>) -> SimpleMdnsResponder {
-        let mut responder = SimpleMdnsResponder::default();
-        let (r1, r2) = socket_addr_to_srv_and_address(
-            &srv_name,
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 8080),
-            0,
-        );
-        responder.add_resource(r1);
-        responder.add_resource(r2);
-        responder
-    }
-
-    #[test]
-    fn one_shot_resolver_address_query() {
-        let _responder = get_oneshot_responder(Name::new_unchecked("_srv._tcp.local"));
-        thread::sleep(Duration::from_millis(500));
-
-        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
-        let answer = resolver.query_service_address("_srv._tcp.local");
-
-        assert!(answer.is_ok());
-        let answer = answer.unwrap();
-        assert!(answer.is_some());
-        assert_eq!(Ipv4Addr::LOCALHOST, answer.unwrap());
-
-        let answer = resolver.query_service_address_and_port("_srv._tcp.local");
-        assert!(answer.is_ok());
-        let answer = answer.unwrap();
-        assert!(answer.is_some());
-        assert_eq!(
-            SocketAddr::from_str("127.0.0.1:8080").unwrap(),
-            answer.unwrap()
-        )
-    }
-
-    #[test]
-    fn one_shot_resolver_timeout() {
-        let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
-        let answer = resolver.query_service_address("_srv_miss._tcp.local");
-        assert!(answer.is_ok());
-        let answer = answer.unwrap();
-        assert!(answer.is_none());
     }
 }

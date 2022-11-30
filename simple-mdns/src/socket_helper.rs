@@ -67,6 +67,12 @@ pub fn join_multicast(network_scope: NetworkScope) -> io::Result<UdpSocket> {
     }
 }
 
+#[cfg(feature = "async-tokio")]
+pub fn nonblocking(socket: UdpSocket) -> io::Result<tokio::net::UdpSocket> {
+    socket.set_nonblocking(true)?;
+    tokio::net::UdpSocket::from_std(socket)
+}
+
 fn create_socket(domain: Domain) -> io::Result<Socket> {
     let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_read_timeout(Some(Duration::from_millis(100)))?;

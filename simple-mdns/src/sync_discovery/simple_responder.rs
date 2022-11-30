@@ -17,7 +17,7 @@ const FIVE_MINUTES: u32 = 60 * 5;
 /// This responder will list for any mDNS query in the network via Multicast and will reply only to the resources that were added.
 ///
 /// ```
-///     use simple_mdns::SimpleMdnsResponder;
+///     use simple_mdns::sync_discovery::SimpleMdnsResponder;
 ///     use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
 ///     use std::net::Ipv4Addr;
 ///
@@ -46,6 +46,7 @@ const FIVE_MINUTES: u32 = 60 * 5;
 /// ```
 ///
 /// This struct heavily relies on [`simple_dns`] crate and the same must be added as a dependency
+#[derive(Debug)]
 pub struct SimpleMdnsResponder {
     resources: Arc<RwLock<ResourceRecordManager<'static>>>,
     rr_ttl: u32,

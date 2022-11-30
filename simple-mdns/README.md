@@ -2,12 +2,14 @@
 
 Pure Rust implementation for mDNS and DNS-SD protocols
 
+This crate provides two versions of service discovery, the sync version is located in the module `sync_discovery` and the async counterpart in `async_discovery`.  
+
 ## ServiceDiscovery
 Advertise registered addresses and query for available instances on the same network.  
 It is necessary to provide instance and service name
 
 ```rust  
-    use simple_mdns::ServiceDiscovery;
+    use simple_mdns::sync_discovery::ServiceDiscovery;
     use std::net::SocketAddr;
     use std::str::FromStr;
 
@@ -28,7 +30,7 @@ Since mDNS is a well known protocol, you can register your service in any mDNS r
 
 Query example:
 ```rust  
-    use simple_mdns::OneShotMdnsResolver;
+    use simple_mdns::sync_discovery::OneShotMdnsResolver;
     let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     // querying for IP Address
     let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");
@@ -48,7 +50,7 @@ This responder will list for any mDNS query in the network via Multicast and wil
 This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate and the same must be added as a dependency
 
 ```rust  
-    use simple_mdns::SimpleMdnsResponder;
+    use simple_mdns::sync_discovery::SimpleMdnsResponder;
     use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
     use std::net::Ipv4Addr;
 
@@ -76,6 +78,23 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
     ));
 ```
 
+# Features
 
-# TODOs
-- IPv6 queries
+- sync: Provides `sync_discovery` module (enabled by default)
+- async-tokio: Provides `async_discovery` module using tokio runtime
+
+# IPV6
+
+IPV6 is now supported by using the `NetworkScope` enum.  
+
+```rust  
+    use simple_mdns::sync_discovery::ServiceDiscovery;
+    use simple_mdns::NetworkScope;
+    use std::net::SocketAddr;
+    use std::str::FromStr;
+
+    let mut discovery = ServiceDiscovery::new_with_scope("a", "_mysrv._tcp.local", 60, NetworkScope::V4).expect("Invalid Service Name");
+```
+
+
+Note: It is not tested on MacOS.
