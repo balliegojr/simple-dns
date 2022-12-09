@@ -9,8 +9,11 @@ license = "MIT"
 keywords = ["dns", "dns-sd", "mdns", "service-discovery", "zeroconf"]
 categories = ["network-programming"]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
-default = ["sync"] 
+default = [] 
 sync = []
 async-tokio = ["dep:tokio"]
 
