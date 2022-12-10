@@ -1,4 +1,5 @@
-# 0.4.0 (Unreleased)
+# 0.4.0 (2022-12-10)
+
 ### Breaking changes
 - Moves **sync** structs to module `sync_discovery` behind `sync` feature
 
