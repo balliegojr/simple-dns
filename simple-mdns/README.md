@@ -2,17 +2,29 @@
 
 Pure Rust implementation for mDNS and DNS-SD protocols
 
+This crate provides two versions of service discovery, the sync version is located in the module `sync_discovery` and the async counterpart in `async_discovery`.  
+
+
+# Features
+
+It is necessary to enable at least one of the features to use service discovery
+
+- sync: Provides `sync_discovery` module 
+- async-tokio: Provides `async_discovery` module using tokio runtime
+
 ## ServiceDiscovery
 Advertise registered addresses and query for available instances on the same network.  
 It is necessary to provide instance and service name
 
 ```rust  
-    use simple_mdns::ServiceDiscovery;
+    # #[cfg(feature = "sync")] {
+    use simple_mdns::sync_discovery::ServiceDiscovery;
     use std::net::SocketAddr;
     use std::str::FromStr;
 
     let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
     discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
+    # }
 ```
 
 
@@ -28,7 +40,8 @@ Since mDNS is a well known protocol, you can register your service in any mDNS r
 
 Query example:
 ```rust  
-    use simple_mdns::OneShotMdnsResolver;
+    # #[cfg(feature = "sync")] {
+    use simple_mdns::sync_discovery::OneShotMdnsResolver;
     let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     // querying for IP Address
     let answer = resolver.query_service_address("_myservice._tcp.local").expect("Failed to query service address");
@@ -38,6 +51,7 @@ Query example:
     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").expect("Failed to query service address and port");
     println!("{:?}", answer);
     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
+    # }
 ```
 
 ## SimpleMdnsResponder
@@ -48,7 +62,8 @@ This responder will list for any mDNS query in the network via Multicast and wil
 This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate and the same must be added as a dependency
 
 ```rust  
-    use simple_mdns::SimpleMdnsResponder;
+    # #[cfg(feature = "sync")] {
+    use simple_mdns::sync_discovery::SimpleMdnsResponder;
     use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
     use std::net::Ipv4Addr;
 
@@ -74,8 +89,23 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
             target: srv_name
         })
     ));
+    # }
+```
+
+# IPV6
+
+IPV6 is now supported by using the `NetworkScope` enum.  
+
+```rust  
+    # #[cfg(feature = "sync")] {
+    use simple_mdns::sync_discovery::ServiceDiscovery;
+    use simple_mdns::NetworkScope;
+    use std::net::SocketAddr;
+    use std::str::FromStr;
+
+    let mut discovery = ServiceDiscovery::new_with_scope("a", "_mysrv._tcp.local", 60, NetworkScope::V4).expect("Invalid Service Name");
+    # }
 ```
 
 
-# TODOs
-- IPv6 queries
+Note: It is not tested on MacOS.
