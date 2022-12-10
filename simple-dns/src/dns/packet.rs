@@ -115,7 +115,7 @@ impl<'a> Packet<'a> {
         let mut additional_records: Vec<ResourceRecord> =
             Self::parse_section(data, &mut offset, header_buffer::additional_records(data)?)?;
 
-        header.incorporate_opt_rr(
+        header.extract_info_from_opt_rr(
             additional_records
                 .iter()
                 .position(|rr| rr.rdata.type_code() == crate::TYPE::OPT)
@@ -155,7 +155,7 @@ impl<'a> Packet<'a> {
         Self::add_section(&mut out, &self.answers, &mut None)?;
         Self::add_section(&mut out, &self.name_servers, &mut None)?;
 
-        if let Some(rr) = self.header.get_opt_rr() {
+        if let Some(rr) = self.header.opt_rr() {
             rr.append_to_vec(&mut out, &mut None)?;
         }
 
@@ -175,7 +175,7 @@ impl<'a> Packet<'a> {
         Self::add_section(&mut out, &self.answers, &mut Some(&mut name_refs))?;
         Self::add_section(&mut out, &self.name_servers, &mut Some(&mut name_refs))?;
 
-        if let Some(rr) = self.header.get_opt_rr() {
+        if let Some(rr) = self.header.opt_rr() {
             rr.append_to_vec(&mut out, &mut None)?;
         }
 

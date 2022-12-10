@@ -36,7 +36,6 @@ const MAX_NULL_LENGTH: usize = 65535;
 
 bitflags! {
     /// Possible Packet Flags
-    // #[derive(Debug, Clone)]
     pub struct PacketFlag: u16 {
         /// Indicates if this packet is a query or a response. This is the QR flag in the DNS
         /// specifications, this flag is called Response here to be more ergonomic
@@ -55,7 +54,9 @@ bitflags! {
         /// Recursion Available is set or cleared in a response.
         /// It denotes whether recursive query support is available in the name server.
         const RECURSION_AVAILABLE = 0b0000_0000_1000_0000;
+        #[allow(missing_docs)]
         const AUTHENTIC_DATA = 0b0000_0000_0010_0000;
+        #[allow(missing_docs)]
         const CHECKING_DISABLED = 0b0000_0000_0001_0000;
     }
 }

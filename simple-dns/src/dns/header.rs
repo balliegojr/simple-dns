@@ -97,7 +97,7 @@ impl<'a> Header<'a> {
         flags
     }
 
-    pub(crate) fn get_opt_rr(&self) -> Option<ResourceRecord> {
+    pub(crate) fn opt_rr(&self) -> Option<ResourceRecord> {
         self.opt.as_ref().map(|opt| {
             ResourceRecord::new(
                 crate::Name::new_unchecked("."),
@@ -108,7 +108,7 @@ impl<'a> Header<'a> {
         })
     }
 
-    pub(crate) fn incorporate_opt_rr(&mut self, opt_rr: Option<ResourceRecord<'a>>) {
+    pub(crate) fn extract_info_from_opt_rr(&mut self, opt_rr: Option<ResourceRecord<'a>>) {
         if let Some(opt) = opt_rr {
             self.response_code = OPT::extract_rcode_from_ttl(opt.ttl, self);
             self.opt = match opt.rdata {

@@ -75,6 +75,7 @@ pub(crate) fn set_additional_records(buffer: &mut [u8], additional_records_count
     buffer[10..12].copy_from_slice(&additional_records_count.to_be_bytes());
 }
 
+#[allow(dead_code)]
 /// Sets the flags in the buffer
 pub(crate) fn set_flags(buffer: &mut [u8], flags: PacketFlag) -> crate::Result<()> {
     let mut current_flags = buffer[2..4]
@@ -89,6 +90,7 @@ pub(crate) fn set_flags(buffer: &mut [u8], flags: PacketFlag) -> crate::Result<(
     Ok(())
 }
 
+#[allow(dead_code)]
 /// Removes the flags from the buffer
 pub(crate) fn remove_flags(buffer: &mut [u8], flags: PacketFlag) -> crate::Result<()> {
     let mut current_flags = buffer[2..4]

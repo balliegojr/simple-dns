@@ -19,6 +19,7 @@ pub mod masks {
 /// If a query message with more than one OPT RR is received, a FORMERR (RCODE=1) MUST be returned.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct OPT<'a> {
+    /// The variable part of this OPT RR
     pub opt_codes: Vec<OPTCode<'a>>,
     /// UDP packet size supported by the responder
     pub udp_packet_size: u16,
@@ -118,9 +119,13 @@ impl<'a> OPT<'a> {
     }
 }
 
+/// Represents the variable part of an OPT rr
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct OPTCode<'a> {
-    pub code: u16, // NOTE: include an OPT_CODE enum???
+    // TODO: include an OPT_CODE enum???
+    /// Assigned by the Expert Review process as defined by the DNSEXT working group and the IESG.
+    pub code: u16,
+    /// Varies per OPTION-CODE.  MUST be treated as a bit field.
     pub data: Cow<'a, [u8]>,
 }
 
