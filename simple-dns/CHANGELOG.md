@@ -1,4 +1,4 @@
-# 0.5.0 (Unreleased)
+# 0.5.0 (2022-12-10)
 
 ### Fixed
 - Fixes parsing for Name, CharacterString and SOA types 
