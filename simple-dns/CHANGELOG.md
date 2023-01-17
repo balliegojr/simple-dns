@@ -1,3 +1,8 @@
+# 0.5.1 (2023-01-17)
+
+### Fixed
+- Prevent panic! when trying to parse an empty slice
+
 # 0.5.0 (2022-12-10)
 
 ### Fixed

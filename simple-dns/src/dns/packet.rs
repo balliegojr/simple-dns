@@ -105,7 +105,7 @@ impl<'a> Packet<'a> {
 
     /// Parses a packet from a slice of bytes
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
-        let mut header = Header::parse(&data[..12])?;
+        let mut header = Header::parse(data)?;
 
         let mut offset = 12;
         let questions = Self::parse_section(data, &mut offset, header_buffer::questions(data)?)?;
@@ -225,10 +225,18 @@ impl<'a> Packet<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{dns::CLASS, dns::TYPE};
+    use crate::{dns::CLASS, dns::TYPE, SimpleDnsError};
 
     use super::*;
     use std::convert::TryInto;
+
+    #[test]
+    fn parse_without_data_should_not_panic() {
+        assert!(matches!(
+            Packet::parse(&[]),
+            Err(SimpleDnsError::InsufficientData)
+        ));
+    }
 
     #[test]
     fn build_query_correct() {
