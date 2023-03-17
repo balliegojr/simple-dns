@@ -2,7 +2,7 @@ macro_rules! rr_wrapper {
     (#[doc=$doc:expr] $t:ident: $w:ident = $c:literal) => {
         #[derive(Debug, PartialEq, Eq, Hash, Clone)]
         #[doc = $doc]
-        pub struct $t<'a>($w<'a>);
+        pub struct $t<'a>(pub $w<'a>);
 
         impl<'a> RR for $t<'a> {
             const TYPE_CODE: u16 = $c;
@@ -39,6 +39,20 @@ macro_rules! rr_wrapper {
 
             fn len(&self) -> usize {
                 self.0.len()
+            }
+        }
+
+        impl<'a> std::ops::Deref for $t<'a> {
+            type Target = $w<'a>;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl<'a> std::ops::DerefMut for $t<'a> {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
             }
         }
     };
