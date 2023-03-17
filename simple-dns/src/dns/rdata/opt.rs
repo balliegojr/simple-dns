@@ -67,7 +67,7 @@ impl<'a> PacketPart<'a> for OPT<'a> {
                 data: inner_data,
             });
 
-            position += 4 + length as usize;
+            position += 4 + length;
         }
 
         Ok(Self {
