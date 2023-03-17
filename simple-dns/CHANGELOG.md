@@ -1,3 +1,6 @@
+# 0.5.2 (2023-03-17)
+- Add DeRef and DerefMut implemetations for the ResourceRecord wrapper macro
+
 # 0.5.1 (2023-01-17)
 
 ### Fixed
