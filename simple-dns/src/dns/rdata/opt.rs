@@ -2,7 +2,7 @@ use crate::{
     dns::{header::Header, PacketPart},
     RCODE,
 };
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -77,15 +77,11 @@ impl<'a> PacketPart<'a> for OPT<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         for code in self.opt_codes.iter() {
-            out.extend(code.code.to_be_bytes());
-            out.extend((code.data.len() as u16).to_be_bytes());
-            out.extend(&code.data[..]);
+            out.write_all(&code.code.to_be_bytes())?;
+            out.write_all(&(code.data.len() as u16).to_be_bytes())?;
+            out.write_all(&code.data)?;
         }
 
         Ok(())
@@ -163,7 +159,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(opt_rr.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(opt_rr.write_to(&mut data).is_ok());
 
         let opt = match ResourceRecord::parse(&data, 0)
             .expect("failed to parse")
@@ -207,7 +203,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(opt_rr.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(opt_rr.write_to(&mut data).is_ok());
 
         let mut opt = match ResourceRecord::parse(&data, 0)
             .expect("failed to parse")

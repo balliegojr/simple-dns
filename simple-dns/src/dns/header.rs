@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, io::Write};
 
 use crate::{rdata::OPT, ResourceRecord};
 
@@ -81,11 +81,22 @@ impl<'a> Header<'a> {
     }
 
     /// Writes this header to a buffer of 12 bytes
-    pub fn write_to(&self, buffer: &mut [u8]) {
-        assert_eq!(12, buffer.len(), "Header buffer must have length of 12");
+    pub fn write_to<T: Write>(
+        &self,
+        buffer: &mut T,
+        questions: u16,
+        answers: u16,
+        name_servers: u16,
+        additional_records: u16,
+    ) -> crate::Result<()> {
+        buffer.write_all(&self.id.to_be_bytes())?;
+        buffer.write_all(&self.get_flags().to_be_bytes())?;
+        buffer.write_all(&questions.to_be_bytes())?;
+        buffer.write_all(&answers.to_be_bytes())?;
+        buffer.write_all(&name_servers.to_be_bytes())?;
+        buffer.write_all(&additional_records.to_be_bytes())?;
 
-        buffer[0..2].copy_from_slice(&self.id.to_be_bytes());
-        buffer[2..4].copy_from_slice(&self.get_flags().to_be_bytes());
+        Ok(())
     }
 
     fn get_flags(&self) -> u16 {
@@ -131,10 +142,13 @@ mod tests {
 
         header.set_flags(PacketFlag::TRUNCATION | PacketFlag::RECURSION_DESIRED);
 
-        let mut buf = [0u8; 12];
-        header.write_to(&mut buf);
+        let mut buf = vec![];
+        header.write_to(&mut buf, 0, 0, 0, 0).unwrap();
 
-        assert_eq!(b"\xff\xff\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00", &buf);
+        assert_eq!(
+            b"\xff\xff\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            &buf[..]
+        );
     }
 
     #[test]
@@ -190,8 +204,8 @@ mod tests {
         let mut header = Header::new_reply(1, OPCODE::StandardQuery);
         header.response_code = RCODE::BADVERS;
 
-        let mut buffer = [0u8; 12];
-        header.write_to(&mut buffer[..]);
+        let mut buffer = vec![];
+        header.write_to(&mut buffer, 0, 0, 0, 0).unwrap();
 
         assert_ne!(RCODE::BADVERS, header_buffer::rcode(&buffer[..]).unwrap());
 

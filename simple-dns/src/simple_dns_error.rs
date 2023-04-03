@@ -2,6 +2,7 @@ use std::{array::TryFromSliceError, error::Error, fmt::Display};
 
 /// Error types for SimpleDns
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SimpleDnsError {
     /// Invalid value for CLASS type
     InvalidClass(u16),
@@ -23,11 +24,19 @@ pub enum SimpleDnsError {
     AttemptedInvalidOperation,
     /// Incomplete dns packet, should try again after more data available
     InsufficientData,
+    /// Failed to write the packet to the provided buffer
+    FailedToWrite,
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
     fn from(_: TryFromSliceError) -> Self {
         Self::InvalidDnsPacket
+    }
+}
+
+impl From<std::io::Error> for SimpleDnsError {
+    fn from(_value: std::io::Error) -> Self {
+        Self::FailedToWrite
     }
 }
 
@@ -62,6 +71,9 @@ impl Display for SimpleDnsError {
                 write!(f, "Attempted to perform an invalid operation")
             }
             SimpleDnsError::InsufficientData => write!(f, "Incomplete dns packet"),
+            SimpleDnsError::FailedToWrite => {
+                write!(f, "Failed to write the packet to provided buffer")
+            }
         }
     }
 }

@@ -74,20 +74,16 @@ impl<'a> PacketPart<'a> for NSAP {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut std::collections::HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.push(self.afi.to_be());
-        out.extend(self.idi.to_be_bytes());
-        out.push(self.dfi.to_be());
-        out.extend(&self.aa.to_be_bytes()[1..4]);
-        out.extend(self.rsvd.to_be_bytes());
-        out.extend(self.rd.to_be_bytes());
-        out.extend(self.area.to_be_bytes());
-        out.extend(&self.id.to_be_bytes()[2..8]);
-        out.push(self.sel.to_be());
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&[self.afi.to_be()])?;
+        out.write_all(&self.idi.to_be_bytes())?;
+        out.write_all(&[self.dfi.to_be()])?;
+        out.write_all(&self.aa.to_be_bytes()[1..4])?;
+        out.write_all(&self.rsvd.to_be_bytes())?;
+        out.write_all(&self.rd.to_be_bytes())?;
+        out.write_all(&self.area.to_be_bytes())?;
+        out.write_all(&self.id.to_be_bytes()[2..8])?;
+        out.write_all(&[self.sel.to_be()])?;
 
         Ok(())
     }
@@ -118,7 +114,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(nsap.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(nsap.write_to(&mut data).is_ok());
 
         let nsap = NSAP::parse(&data, 0);
         assert!(nsap.is_ok());

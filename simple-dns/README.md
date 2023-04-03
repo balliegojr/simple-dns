@@ -4,8 +4,8 @@ Pure Rust implementation to work with DNS packets
 You can parse or write a DNS packet by using [Packet](`Packet`) 
 
 ## Packet
-Packet holds references for the original data and it is more suitable for situations where
-you need to manipulate the packet before generating the final bytes buffer
+
+A `Packet` represents a dns packet, it is the main structure to construct and manipulate a packet before writing it into wire format.
 
 ```rust
 use simple_dns::*;
@@ -19,14 +19,20 @@ packet.questions.push(question);
 let resource = ResourceRecord::new(Name::new_unchecked("_srv._udp.local"), CLASS::IN, 10, RData::A(A { address: 10 }));
 packet.additional_records.push(resource);
 
+// Write the packet in the provided buffer;
+let mut bytes = [0u8; 200];
+assert!(packet.write_to(&mut &mut bytes[..]).is_ok());
+
+// Same as above, but allocates and returns a Vec<u8>
 let bytes = packet.build_bytes_vec();
 assert!(bytes.is_ok());
 
 // Same as above, but Names are compressed
 let bytes = packet.build_bytes_vec_compressed();
 assert!(bytes.is_ok());
+
 ```
-It doesn't matter what order the resources are added, the packet will be built only when `build_bytes_vec` is called
+It doesn't matter what order the resources are added, the packet will be built only when `build_bytes_vec` or `write_to` is called
 
 To parse the contents of a buffer into a packet, you need call call [Packet::parse]
 ```rust

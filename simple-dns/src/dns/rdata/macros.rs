@@ -29,12 +29,16 @@ macro_rules! rr_wrapper {
                 $w::parse(data, position).map(|n| $t(n))
             }
 
-            fn append_to_vec(
+            fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+                self.0.write_to(out)
+            }
+
+            fn write_compressed_to<T: std::io::Write + std::io::Seek>(
                 &self,
-                out: &mut Vec<u8>,
-                name_refs: &mut Option<&mut std::collections::HashMap<u64, usize>>,
+                out: &mut T,
+                name_refs: &mut std::collections::HashMap<u64, usize>,
             ) -> crate::Result<()> {
-                self.0.append_to_vec(out, name_refs)
+                self.0.write_compressed_to(out, name_refs)
             }
 
             fn len(&self) -> usize {
@@ -90,17 +94,30 @@ macro_rules! rdata_enum {
                 parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)
             }
 
-            fn append_to_vec(
+            fn write_to<T: std::io::Write>(
                 &self,
-                out: &mut Vec<u8>,
-                name_refs: &mut Option<&mut HashMap<u64, usize>>,
+                out: &mut T,
             ) -> crate::Result<()> {
                 match &self {
                     $(
-                        RData::$i(data) => data.append_to_vec(out, name_refs),
+                        RData::$i(data) => data.write_to(out),
                     )+
 
-                    RData::NULL(_, data) => data.append_to_vec(out, name_refs),
+                    RData::NULL(_, data) => data.write_to(out),
+                }
+            }
+
+            fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+                &self,
+                out: &mut T,
+                name_refs: &mut  HashMap<u64, usize>,
+            ) -> crate::Result<()> {
+                match &self {
+                    $(
+                        RData::$i(data) => data.write_compressed_to(out, name_refs),
+                    )+
+
+                    RData::NULL(_, data) => data.write_compressed_to(out, name_refs),
                 }
             }
 

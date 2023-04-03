@@ -1,3 +1,8 @@
+# 0.5.3 (Unreleased)
+
+### Added
+- `write_to` and `write_compressed_to` functions to `Packet`
+
 # 0.5.2 (2023-03-17)
 - Add DeRef and DerefMut implemetations for the ResourceRecord wrapper macro
 

@@ -66,22 +66,20 @@ impl<'a> PacketPart<'a> for LOC {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut std::collections::HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         if self.version != 0 {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
 
-        out.push(self.version.to_be());
-        out.push(self.size.to_be());
-        out.push(self.horizontal_precision.to_be());
-        out.push(self.vertical_precision.to_be());
-        out.extend(self.latitude.to_be_bytes());
-        out.extend(self.longitude.to_be_bytes());
-        out.extend(self.altitude.to_be_bytes());
+        out.write_all(&[
+            self.version.to_be(),
+            self.size.to_be(),
+            self.horizontal_precision.to_be(),
+            self.vertical_precision.to_be(),
+        ])?;
+        out.write_all(&self.latitude.to_be_bytes())?;
+        out.write_all(&self.longitude.to_be_bytes())?;
+        out.write_all(&self.altitude.to_be_bytes())?;
 
         Ok(())
     }
@@ -110,7 +108,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(loc.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(loc.write_to(&mut data).is_ok());
 
         let loc = LOC::parse(&data, 0);
         assert!(loc.is_ok());

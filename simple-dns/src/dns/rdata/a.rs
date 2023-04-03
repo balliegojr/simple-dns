@@ -1,5 +1,5 @@
 use crate::dns::PacketPart;
-use std::{collections::HashMap, convert::TryInto, net::Ipv4Addr};
+use std::{convert::TryInto, net::Ipv4Addr};
 
 use super::RR;
 
@@ -23,13 +23,9 @@ impl<'a> PacketPart<'a> for A {
         Ok(Self { address })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.extend(self.address.to_be_bytes());
-        Ok(())
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.address.to_be_bytes())
+            .map_err(crate::SimpleDnsError::from)
     }
 
     fn len(&self) -> usize {
@@ -65,7 +61,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(a.append_to_vec(&mut bytes, &mut None).is_ok());
+        assert!(a.write_to(&mut bytes).is_ok());
 
         let a = A::parse(&bytes, 0);
         assert!(a.is_ok());

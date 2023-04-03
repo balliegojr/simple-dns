@@ -39,13 +39,18 @@ impl<'a> PacketPart<'a> for MINFO<'a> {
         Ok(Self { rmailbox, emailbox })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.rmailbox.write_to(out)?;
+        self.emailbox.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.rmailbox.append_to_vec(out, name_refs)?;
-        self.emailbox.append_to_vec(out, name_refs)
+        self.rmailbox.write_compressed_to(out, name_refs)?;
+        self.emailbox.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -65,7 +70,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(minfo.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(minfo.write_to(&mut data).is_ok());
 
         let minfo = MINFO::parse(&data, 0);
         assert!(minfo.is_ok());

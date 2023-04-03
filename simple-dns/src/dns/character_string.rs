@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display};
+use std::{borrow::Cow, convert::TryFrom, fmt::Display};
 
 use crate::SimpleDnsError;
 
@@ -53,15 +53,10 @@ impl<'a> PacketPart<'a> for CharacterString<'a> {
         }
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.push(self.data.len() as u8);
-        out.extend(self.data.iter());
-
-        Ok(())
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&[self.data.len() as u8])?;
+        out.write_all(&self.data)
+            .map_err(crate::SimpleDnsError::from)
     }
 
     fn len(&self) -> usize {
@@ -133,7 +128,7 @@ mod tests {
     fn append_to_vec() {
         let mut out = Vec::new();
         let c_string = CharacterString::new("some_long_text".as_bytes()).unwrap();
-        c_string.append_to_vec(&mut out, &mut None).unwrap();
+        c_string.write_to(&mut out).unwrap();
 
         assert_eq!(b"\x0esome_long_text", &out[..]);
     }

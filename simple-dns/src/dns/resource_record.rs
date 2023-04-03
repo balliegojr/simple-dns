@@ -82,6 +82,26 @@ impl<'a> ResourceRecord<'a> {
             cache_flush: self.cache_flush,
         }
     }
+
+    fn write_common<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&u16::from(self.rdata.type_code()).to_be_bytes())?;
+
+        if let RData::OPT(ref opt) = self.rdata {
+            out.write_all(&opt.udp_packet_size.to_be_bytes())?;
+        } else {
+            let class = if self.cache_flush {
+                ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
+            } else {
+                (self.class as u16).to_be_bytes()
+            };
+
+            out.write_all(&class)?;
+        }
+
+        out.write_all(&self.ttl.to_be_bytes())?;
+        out.write_all(&(self.rdata.len() as u16).to_be_bytes())
+            .map_err(crate::SimpleDnsError::from)
+    }
 }
 
 impl<'a> PacketPart<'a> for ResourceRecord<'a> {
@@ -122,35 +142,24 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
         }
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        self.name.append_to_vec(out, name_refs)?;
-
-        out.extend(u16::from(self.rdata.type_code()).to_be_bytes());
-
-        if let RData::OPT(ref opt) = self.rdata {
-            out.extend(opt.udp_packet_size.to_be_bytes());
-        } else {
-            let class = if self.cache_flush {
-                ((self.class as u16) | flag::CACHE_FLUSH).to_be_bytes()
-            } else {
-                (self.class as u16).to_be_bytes()
-            };
-
-            out.extend(class);
-        }
-
-        out.extend(self.ttl.to_be_bytes());
-        out.extend((self.rdata.len() as u16).to_be_bytes());
-
-        self.rdata.append_to_vec(out, name_refs)
-    }
-
     fn len(&self) -> usize {
         self.name.len() + self.rdata.len() + 10
+    }
+
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.name.write_to(out)?;
+        self.write_common(out)?;
+        self.rdata.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+        &self,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.name.write_compressed_to(out, name_refs)?;
+        self.write_common(out)?;
+        self.rdata.write_compressed_to(out, name_refs)
     }
 }
 
@@ -173,6 +182,7 @@ mod tests {
     use std::{
         collections::hash_map::DefaultHasher,
         hash::{Hash, Hasher},
+        io::Cursor,
     };
 
     use crate::{dns::rdata::NULL, rdata::TXT};
@@ -206,8 +216,8 @@ mod tests {
     }
 
     #[test]
-    fn test_append_to_vec() {
-        let mut out = Vec::new();
+    fn test_write() {
+        let mut out = Cursor::new(Vec::new());
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -218,17 +228,17 @@ mod tests {
             cache_flush: false,
         };
 
-        assert!(rr.append_to_vec(&mut out, &mut None).is_ok());
+        assert!(rr.write_to(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
-            &out[..]
+            &out.get_ref()[..]
         );
-        assert_eq!(out.len(), rr.len());
+        assert_eq!(out.get_ref().len(), rr.len());
     }
 
     #[test]
     fn test_append_to_vec_cache_flush() {
-        let mut out = Vec::new();
+        let mut out = Cursor::new(Vec::new());
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -239,12 +249,12 @@ mod tests {
             cache_flush: true,
         };
 
-        assert!(rr.append_to_vec(&mut out, &mut None).is_ok());
+        assert!(rr.write_to(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
-            &out[..]
+            &out.get_ref()[..]
         );
-        assert_eq!(out.len(), rr.len());
+        assert_eq!(out.get_ref().len(), rr.len());
     }
 
     #[test]

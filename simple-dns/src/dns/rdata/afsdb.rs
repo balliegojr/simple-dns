@@ -38,13 +38,18 @@ impl<'a> PacketPart<'a> for AFSDB<'a> {
         Ok(Self { subtype, hostname })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.subtype.to_be_bytes())?;
+        self.hostname.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        out.extend(self.subtype.to_be_bytes());
-        self.hostname.append_to_vec(out, name_refs)
+        out.write_all(&self.subtype.to_be_bytes())?;
+        self.hostname.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -66,7 +71,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(afsdb.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(afsdb.write_to(&mut data).is_ok());
 
         let afsdb = AFSDB::parse(&data, 0);
         assert!(afsdb.is_ok());

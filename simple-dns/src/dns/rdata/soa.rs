@@ -41,6 +41,16 @@ impl<'a> SOA<'a> {
             minimum: self.minimum,
         }
     }
+
+    fn write_common<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.serial.to_be_bytes())?;
+        out.write_all(&self.refresh.to_be_bytes())?;
+        out.write_all(&self.retry.to_be_bytes())?;
+        out.write_all(&self.expire.to_be_bytes())?;
+        out.write_all(&self.minimum.to_be_bytes())?;
+
+        Ok(())
+    }
 }
 
 impl<'a> PacketPart<'a> for SOA<'a> {
@@ -69,21 +79,20 @@ impl<'a> PacketPart<'a> for SOA<'a> {
         })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.mname.write_to(out)?;
+        self.rname.write_to(out)?;
+        self.write_common(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.mname.append_to_vec(out, name_refs)?;
-        self.rname.append_to_vec(out, name_refs)?;
-
-        out.extend(self.serial.to_be_bytes());
-        out.extend(self.refresh.to_be_bytes());
-        out.extend(self.retry.to_be_bytes());
-        out.extend(self.expire.to_be_bytes());
-        out.extend(self.minimum.to_be_bytes());
-
-        Ok(())
+        self.mname.write_compressed_to(out, name_refs)?;
+        self.rname.write_compressed_to(out, name_refs)?;
+        self.write_common(out)
     }
 
     fn len(&self) -> usize {
@@ -109,7 +118,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(soa.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(soa.write_to(&mut data).is_ok());
 
         let soa = SOA::parse(&data, 0);
         assert!(soa.is_ok());

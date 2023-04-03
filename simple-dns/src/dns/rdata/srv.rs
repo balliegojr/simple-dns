@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::convert::TryInto;
 
 use crate::dns::PacketPart;
@@ -57,16 +56,12 @@ impl<'a> PacketPart<'a> for SRV<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.extend(self.priority.to_be_bytes());
-        out.extend(self.weight.to_be_bytes());
-        out.extend(self.port.to_be_bytes());
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.priority.to_be_bytes())?;
+        out.write_all(&self.weight.to_be_bytes())?;
+        out.write_all(&self.port.to_be_bytes())?;
 
-        self.target.append_to_vec(out, &mut None)
+        self.target.write_to(out)
     }
 
     fn len(&self) -> usize {
@@ -76,6 +71,8 @@ impl<'a> PacketPart<'a> for SRV<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::HashMap, io::Cursor};
+
     use crate::{rdata::RData, ResourceRecord};
 
     use super::*;
@@ -90,7 +87,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(srv.append_to_vec(&mut bytes, &mut None).is_ok());
+        assert!(srv.write_to(&mut bytes).is_ok());
 
         let srv = SRV::parse(&bytes, 0);
         assert!(srv.is_ok());
@@ -112,20 +109,13 @@ mod tests {
         };
 
         let mut plain = Vec::new();
-        let mut compressed = Vec::new();
+        let mut compressed = Cursor::new(Vec::new());
         let mut names = HashMap::new();
 
-        assert!(srv.append_to_vec(&mut plain, &mut None).is_ok());
-        assert!(srv.append_to_vec(&mut plain, &mut None).is_ok());
+        assert!(srv.write_to(&mut plain).is_ok());
+        assert!(srv.write_compressed_to(&mut compressed, &mut names).is_ok());
 
-        assert!(srv
-            .append_to_vec(&mut compressed, &mut Some(&mut names))
-            .is_ok());
-        assert!(srv
-            .append_to_vec(&mut compressed, &mut Some(&mut names))
-            .is_ok());
-
-        assert_eq!(plain, compressed);
+        assert_eq!(plain, compressed.into_inner());
     }
 
     #[test]
