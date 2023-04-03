@@ -38,13 +38,18 @@ impl<'a> PacketPart<'a> for ISDN<'a> {
         Ok(Self { address, sa })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.address.write_to(out)?;
+        self.sa.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.address.append_to_vec(out, name_refs)?;
-        self.sa.append_to_vec(out, name_refs)
+        self.address.write_compressed_to(out, name_refs)?;
+        self.sa.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -66,7 +71,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(isdn.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(isdn.write_to(&mut data).is_ok());
 
         let isdn = ISDN::parse(&data, 0);
         assert!(isdn.is_ok());

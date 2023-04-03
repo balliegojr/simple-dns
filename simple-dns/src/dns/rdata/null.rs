@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap};
+use std::borrow::Cow;
 
 use crate::dns::{PacketPart, MAX_NULL_LENGTH};
 
@@ -50,13 +50,9 @@ impl<'a> PacketPart<'a> for NULL<'a> {
         Self::new(&data[position..])
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.extend(self.data.iter());
-        Ok(())
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.data)
+            .map_err(crate::SimpleDnsError::from)
     }
 
     fn len(&self) -> usize {

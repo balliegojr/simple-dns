@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::{Seek, Write},
+};
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub(crate) trait PacketPart<'a> {
@@ -8,12 +11,16 @@ pub(crate) trait PacketPart<'a> {
     where
         Self: Sized;
 
-    /// Append the bytes of this content to a given vector
-    fn append_to_vec(
+    /// Write this part bytes to the writer
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()>;
+
+    fn write_compressed_to<T: Write + Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()>;
+        out: &mut T,
+        _name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.write_to(out)
+    }
 
     /// Returns the length in bytes of this content
     fn len(&self) -> usize;

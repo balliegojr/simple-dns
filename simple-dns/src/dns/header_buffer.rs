@@ -31,6 +31,7 @@ pub fn questions(buffer: &[u8]) -> crate::Result<u16> {
         .map_err(|_| crate::SimpleDnsError::InvalidHeaderData)
 }
 
+#[cfg(test)]
 /// Writes the questions count in the header buffer
 pub(crate) fn set_questions(buffer: &mut [u8], question_count: u16) {
     buffer[4..6].copy_from_slice(&question_count.to_be_bytes());
@@ -44,6 +45,7 @@ pub fn answers(buffer: &[u8]) -> crate::Result<u16> {
         .map_err(|_| crate::SimpleDnsError::InvalidHeaderData)
 }
 
+#[cfg(test)]
 /// Writes the answers count in the header buffer
 pub(crate) fn set_answers(buffer: &mut [u8], answers_count: u16) {
     buffer[6..8].copy_from_slice(&answers_count.to_be_bytes());
@@ -57,6 +59,7 @@ pub fn name_servers(buffer: &[u8]) -> crate::Result<u16> {
         .map_err(|_| crate::SimpleDnsError::InvalidHeaderData)
 }
 
+#[cfg(test)]
 /// Writes the name servers count in the header buffer
 pub(crate) fn set_name_servers(buffer: &mut [u8], name_servers_count: u16) {
     buffer[8..10].copy_from_slice(&name_servers_count.to_be_bytes());
@@ -70,6 +73,7 @@ pub fn additional_records(buffer: &[u8]) -> crate::Result<u16> {
         .map_err(|_| crate::SimpleDnsError::InvalidHeaderData)
 }
 
+#[cfg(test)]
 /// Writes the additional records count in the header buffer
 pub(crate) fn set_additional_records(buffer: &mut [u8], additional_records_count: u16) {
     buffer[10..12].copy_from_slice(&additional_records_count.to_be_bytes());

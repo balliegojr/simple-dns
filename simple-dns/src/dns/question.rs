@@ -39,6 +39,17 @@ impl<'a> Question<'a> {
             unicast_response: self.unicast_response,
         }
     }
+
+    fn write_common<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        let qclass: u16 = match self.unicast_response {
+            true => Into::<u16>::into(self.qclass) | 0x8000,
+            false => self.qclass.into(),
+        };
+
+        out.write_all(&Into::<u16>::into(self.qtype).to_be_bytes())?;
+        out.write_all(&qclass.to_be_bytes())
+            .map_err(crate::SimpleDnsError::from)
+    }
 }
 
 impl<'a> PacketPart<'a> for Question<'a> {
@@ -60,25 +71,22 @@ impl<'a> PacketPart<'a> for Question<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        self.qname.append_to_vec(out, name_refs)?;
-
-        let qclass: u16 = match self.unicast_response {
-            true => Into::<u16>::into(self.qclass) | 0x8000,
-            false => self.qclass.into(),
-        };
-
-        out.extend(Into::<u16>::into(self.qtype).to_be_bytes());
-        out.extend(qclass.to_be_bytes());
-        Ok(())
-    }
-
     fn len(&self) -> usize {
         self.qname.len() + 4
+    }
+
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.qname.write_to(out)?;
+        self.write_common(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+        &self,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
+    ) -> crate::Result<()> {
+        self.qname.write_compressed_to(out, name_refs)?;
+        self.write_common(out)
     }
 }
 
@@ -111,7 +119,7 @@ mod tests {
             false,
         );
         let mut bytes = Vec::new();
-        question.append_to_vec(&mut bytes, &mut None).unwrap();
+        question.write_to(&mut bytes).unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01", &bytes[..]);
         assert_eq!(bytes.len(), question.len());
@@ -126,7 +134,7 @@ mod tests {
             CLASS::IN.into(),
             true,
         )
-        .append_to_vec(&mut bytes, &mut None)
+        .write_to(&mut bytes)
         .unwrap();
         let parsed = Question::parse(&bytes, 0).unwrap();
 

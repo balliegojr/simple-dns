@@ -11,7 +11,7 @@ use super::{PacketPart, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 
-// NOTE: there are not extend labels implemented today
+// NOTE: there are no extend labels implemented today
 // const EXTENDED_LABEL: u8 = 0b0100_0000;
 // const EXTENDED_LABEL_U16: u16 = 0b0100_0000_0000_0000;
 
@@ -94,22 +94,19 @@ impl<'a> Name<'a> {
         &self.labels[..]
     }
 
-    fn plain_append(&self, out: &mut Vec<u8>) -> crate::Result<()> {
+    fn plain_append<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         for label in self.iter() {
-            out.push(label.len() as u8);
-            out.extend(label.data.iter());
+            out.write_all(&[label.len() as u8])?;
+            out.write_all(&label.data)?;
         }
 
-        if out[out.len() - 1] != 0 {
-            out.push(0);
-        }
-
+        out.write_all(&[0])?;
         Ok(())
     }
 
-    fn compress_append(
+    fn compress_append<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
+        out: &mut T,
         name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
         for label in self.iter() {
@@ -118,21 +115,18 @@ impl<'a> Name<'a> {
             let key = h.finish();
 
             if let std::collections::hash_map::Entry::Vacant(e) = name_refs.entry(key) {
-                e.insert(out.len());
-                out.push(label.len() as u8);
-                out.extend(label.data.iter());
+                e.insert(out.stream_position()? as usize);
+                out.write_all(&[label.len() as u8])?;
+                out.write_all(&label.data)?;
             } else {
                 let p = name_refs[&key] as u16;
-                out.extend((p | POINTER_MASK_U16).to_be_bytes());
+                out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
 
                 return Ok(());
             }
         }
 
-        if out[out.len() - 1] != 0 {
-            out.push(0);
-        }
-
+        out.write_all(&[0])?;
         Ok(())
     }
 }
@@ -206,15 +200,16 @@ impl<'a> PacketPart<'a> for Name<'a> {
         Ok(Self { labels, total_size })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.plain_append(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        match name_refs {
-            Some(name_refs) => self.compress_append(out, name_refs),
-            None => self.plain_append(out),
-        }
+        self.compress_append(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -372,6 +367,7 @@ impl<'a> std::fmt::Debug for Label<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
     use super::*;
@@ -429,71 +425,72 @@ mod tests {
     }
 
     #[test]
-    fn append_to_vec() {
-        let mut bytes = Vec::with_capacity(30);
+    fn test_write() {
+        let mut bytes = Cursor::new(Vec::with_capacity(30));
 
         Name::new_unchecked("_srv._udp.local")
-            .append_to_vec(&mut bytes, &mut None)
+            .write_to(&mut bytes)
             .unwrap();
 
-        assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
+        assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes.get_ref()[..]);
 
-        let mut bytes = Vec::with_capacity(30);
+        let mut bytes = Cursor::new(Vec::with_capacity(30));
         Name::new_unchecked("_srv._udp.local2.")
-            .append_to_vec(&mut bytes, &mut None)
+            .write_to(&mut bytes)
             .unwrap();
 
-        assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes[..]);
+        assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes.get_ref()[..]);
     }
 
     #[test]
     fn append_to_vec_with_compression() {
-        let mut buf = vec![0, 0, 0];
+        let mut buf = Cursor::new(vec![0, 0, 0]);
+        buf.set_position(3);
 
         let mut name_refs = HashMap::new();
 
         Name::new_unchecked("F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("FOO.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
 
         let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
-        assert_eq!(data[..], buf[..]);
+        assert_eq!(data[..], buf.get_ref()[..]);
     }
 
     #[test]
     fn append_to_vec_with_compression_mult_names() {
-        let mut buf = vec![];
+        let mut buf = Cursor::new(vec![]);
         let mut name_refs = HashMap::new();
 
         Name::new_unchecked("ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add ISI.ARPA");
         Name::new_unchecked("F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("FOO.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
-            .append_to_vec(&mut buf, &mut Some(&mut name_refs))
+            .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
 
         let expected = b"\x03ISI\x04ARPA\x00\x01F\xc0\x00\x03FOO\xc0\x0a\x03BAR\xc0\x0a";
-        assert_eq!(expected[..], buf[..]);
+        assert_eq!(expected[..], buf.get_ref()[..]);
 
-        let first = Name::parse(&buf, 0).unwrap();
+        let first = Name::parse(buf.get_ref(), 0).unwrap();
         assert_eq!("ISI.ARPA", first.to_string());
-        let second = Name::parse(&buf, first.len()).unwrap();
+        let second = Name::parse(buf.get_ref(), first.len()).unwrap();
         assert_eq!("F.ISI.ARPA", second.to_string());
-        let third = Name::parse(&buf, first.len() + second.len()).unwrap();
+        let third = Name::parse(buf.get_ref(), first.len() + second.len()).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", third.to_string());
-        let fourth = Name::parse(&buf, first.len() + second.len() + third.len()).unwrap();
+        let fourth = Name::parse(buf.get_ref(), first.len() + second.len() + third.len()).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", fourth.to_string());
     }
 
@@ -512,20 +509,20 @@ mod tests {
 
     #[test]
     fn len() -> crate::Result<()> {
-        let mut bytes = Vec::new();
+        let mut bytes = Cursor::new(Vec::new());
         let name_one = Name::new_unchecked("ex.com.");
-        name_one.append_to_vec(&mut bytes, &mut None)?;
+        name_one.write_to(&mut bytes)?;
 
-        assert_eq!(8, bytes.len());
-        assert_eq!(bytes.len(), name_one.len());
-        assert_eq!(8, Name::parse(&bytes, 0)?.len());
+        assert_eq!(8, bytes.get_ref().len());
+        assert_eq!(bytes.get_ref().len(), name_one.len());
+        assert_eq!(8, Name::parse(bytes.get_ref(), 0)?.len());
 
         let mut name_refs = HashMap::new();
-        let mut bytes = Vec::new();
-        name_one.append_to_vec(&mut bytes, &mut Some(&mut name_refs))?;
-        name_one.append_to_vec(&mut bytes, &mut Some(&mut name_refs))?;
+        let mut bytes = Cursor::new(Vec::new());
+        name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
+        name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
 
-        assert_eq!(10, bytes.len());
+        assert_eq!(10, bytes.get_ref().len());
         Ok(())
     }
 

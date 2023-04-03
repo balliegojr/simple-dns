@@ -1,5 +1,5 @@
 use crate::dns::PacketPart;
-use std::{collections::HashMap, convert::TryInto, net::Ipv6Addr};
+use std::{convert::TryInto, net::Ipv6Addr};
 
 use super::RR;
 
@@ -23,17 +23,13 @@ impl<'a> PacketPart<'a> for AAAA {
         Ok(Self { address })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.extend(self.address.to_be_bytes());
-        Ok(())
-    }
-
     fn len(&self) -> usize {
         16
+    }
+
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.address.to_be_bytes())
+            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -66,7 +62,7 @@ mod tests {
         };
 
         let mut bytes = Vec::new();
-        assert!(aaaa.append_to_vec(&mut bytes, &mut None).is_ok());
+        assert!(aaaa.write_to(&mut bytes).is_ok());
 
         let aaaa = AAAA::parse(&bytes, 0);
         assert!(aaaa.is_ok());

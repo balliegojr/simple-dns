@@ -40,13 +40,18 @@ impl<'a> PacketPart<'a> for HINFO<'a> {
         Ok(Self { cpu, os })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.cpu.write_to(out)?;
+        self.os.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.cpu.append_to_vec(out, name_refs)?;
-        self.os.append_to_vec(out, name_refs)
+        self.cpu.write_compressed_to(out, name_refs)?;
+        self.os.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -68,7 +73,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(hinfo.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(hinfo.write_to(&mut data).is_ok());
 
         let hinfo = HINFO::parse(&data, 0);
         assert!(hinfo.is_ok());

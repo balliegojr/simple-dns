@@ -1,4 +1,8 @@
-use std::{collections::HashMap, usize};
+use std::{
+    collections::HashMap,
+    io::{Cursor, Seek, Write},
+    usize,
+};
 
 use crate::{header_buffer, rdata::OPT, RCODE};
 
@@ -147,79 +151,89 @@ impl<'a> Packet<'a> {
         Ok(section_items)
     }
 
-    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package, ready to be sent
+    /// Creates a new [Vec`<u8>`](`Vec<T>`) and write the contents of this package in wire format
+    ///
+    /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
     pub fn build_bytes_vec(&self) -> crate::Result<Vec<u8>> {
-        let mut out = vec![0u8; 12];
+        let mut out = Cursor::new(Vec::with_capacity(900));
 
-        Self::add_section(&mut out, &self.questions, &mut None)?;
-        Self::add_section(&mut out, &self.answers, &mut None)?;
-        Self::add_section(&mut out, &self.name_servers, &mut None)?;
+        self.write_to(&mut out)?;
 
-        if let Some(rr) = self.header.opt_rr() {
-            rr.append_to_vec(&mut out, &mut None)?;
-        }
-
-        Self::add_section(&mut out, &self.additional_records, &mut None)?;
-
-        self.write_header(&mut out);
-
-        Ok(out)
+        Ok(out.into_inner())
     }
 
-    /// Creates a new [Vec`<u8>`](`Vec<T>`) from the contents of this package with [Name](`crate::Name`) compression
+    /// Creates a new [Vec`<u8>`](`Vec<T>`) and write the contents of this package in wire format
+    /// with compression enabled
+    ///
+    /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
-        let mut out = vec![0u8; 12];
-        let mut name_refs = HashMap::new();
+        let mut out = Cursor::new(Vec::with_capacity(900));
+        self.write_compressed_to(&mut out)?;
 
-        Self::add_section(&mut out, &self.questions, &mut Some(&mut name_refs))?;
-        Self::add_section(&mut out, &self.answers, &mut Some(&mut name_refs))?;
-        Self::add_section(&mut out, &self.name_servers, &mut Some(&mut name_refs))?;
+        Ok(out.into_inner())
+    }
+
+    /// Write the contents of this package in wire format into the provided writer
+    pub fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.write_header(out)?;
+
+        for e in &self.questions {
+            e.write_to(out)?;
+        }
+        for e in &self.answers {
+            e.write_to(out)?;
+        }
+        for e in &self.name_servers {
+            e.write_to(out)?;
+        }
 
         if let Some(rr) = self.header.opt_rr() {
-            rr.append_to_vec(&mut out, &mut None)?;
+            rr.write_to(out)?;
         }
 
-        Self::add_section(
-            &mut out,
-            &self.additional_records,
-            &mut Some(&mut name_refs),
-        )?;
-        self.write_header(&mut out);
+        for e in &self.additional_records {
+            e.write_to(out)?;
+        }
 
-        Ok(out)
+        out.flush()?;
+        Ok(())
     }
 
-    fn write_header(&self, out: &mut [u8]) {
-        self.header.write_to(&mut out[0..12]);
-        if !self.questions.is_empty() {
-            header_buffer::set_questions(out, self.questions.len() as u16)
+    /// Write the contents of this package in wire format with enabled compression into the provided writer
+    pub fn write_compressed_to<T: Write + Seek>(&self, out: &mut T) -> crate::Result<()> {
+        self.write_header(out)?;
+
+        let mut name_refs = HashMap::new();
+        for e in &self.questions {
+            e.write_compressed_to(out, &mut name_refs)?;
+        }
+        for e in &self.answers {
+            e.write_compressed_to(out, &mut name_refs)?;
+        }
+        for e in &self.name_servers {
+            e.write_compressed_to(out, &mut name_refs)?;
         }
 
-        if !self.answers.is_empty() {
-            header_buffer::set_answers(out, self.answers.len() as u16)
+        if let Some(rr) = self.header.opt_rr() {
+            rr.write_to(out)?;
         }
 
-        if !self.name_servers.is_empty() {
-            header_buffer::set_name_servers(out, self.name_servers.len() as u16)
+        for e in &self.additional_records {
+            e.write_compressed_to(out, &mut name_refs)?;
         }
-
-        let additional_records_len =
-            self.additional_records.len() + usize::from(self.header.opt.is_some());
-        if additional_records_len > 0 {
-            header_buffer::set_additional_records(out, additional_records_len as u16)
-        }
-    }
-
-    fn add_section<'b, T: PacketPart<'b>>(
-        out: &mut Vec<u8>,
-        section: &[T],
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        for item in section {
-            item.append_to_vec(out, name_refs)?;
-        }
+        out.flush()?;
 
         Ok(())
+    }
+
+    fn write_header<T: Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.header.write_to(
+            out,
+            self.questions.len() as u16,
+            self.answers.len() as u16,
+            self.name_servers.len() as u16,
+            self.additional_records.len() as u16 + u16::from(self.header.opt.is_some()),
+        )
     }
 }
 

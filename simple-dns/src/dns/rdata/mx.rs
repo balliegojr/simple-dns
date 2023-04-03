@@ -43,13 +43,18 @@ impl<'a> PacketPart<'a> for MX<'a> {
         })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.preference.to_be_bytes())?;
+        self.exchange.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        out.extend(self.preference.to_be_bytes());
-        self.exchange.append_to_vec(out, name_refs)
+        out.write_all(&self.preference.to_be_bytes())?;
+        self.exchange.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -71,7 +76,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(mx.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(mx.write_to(&mut data).is_ok());
 
         let mx = MX::parse(&data, 0);
         assert!(mx.is_ok());

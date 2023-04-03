@@ -37,13 +37,18 @@ impl<'a> PacketPart<'a> for RP<'a> {
         Ok(RP { mbox, txt })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        self.mbox.write_to(out)?;
+        self.txt.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        self.mbox.append_to_vec(out, name_refs)?;
-        self.txt.append_to_vec(out, name_refs)
+        self.mbox.write_compressed_to(out, name_refs)?;
+        self.txt.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -65,7 +70,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(rp.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(rp.write_to(&mut data).is_ok());
 
         let rp = RP::parse(&data, 0);
         assert!(rp.is_ok());

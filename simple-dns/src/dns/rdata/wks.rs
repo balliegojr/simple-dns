@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, convert::TryInto};
+use std::{borrow::Cow, convert::TryInto};
 
 use crate::dns::PacketPart;
 
@@ -43,14 +43,10 @@ impl<'a> PacketPart<'a> for WKS<'a> {
         })
     }
 
-    fn append_to_vec(
-        &self,
-        out: &mut Vec<u8>,
-        _name_refs: &mut Option<&mut HashMap<u64, usize>>,
-    ) -> crate::Result<()> {
-        out.extend(self.address.to_be_bytes());
-        out.push(self.protocol);
-        out.extend(self.bit_map.iter());
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.address.to_be_bytes())?;
+        out.write_all(&[self.protocol])?;
+        out.write_all(&self.bit_map)?;
 
         Ok(())
     }

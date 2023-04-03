@@ -43,13 +43,18 @@ impl<'a> PacketPart<'a> for RouteThrough<'a> {
         })
     }
 
-    fn append_to_vec(
+    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+        out.write_all(&self.preference.to_be_bytes())?;
+        self.intermediate_host.write_to(out)
+    }
+
+    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
         &self,
-        out: &mut Vec<u8>,
-        name_refs: &mut Option<&mut HashMap<u64, usize>>,
+        out: &mut T,
+        name_refs: &mut HashMap<u64, usize>,
     ) -> crate::Result<()> {
-        out.extend(self.preference.to_be_bytes());
-        self.intermediate_host.append_to_vec(out, name_refs)
+        out.write_all(&self.preference.to_be_bytes())?;
+        self.intermediate_host.write_compressed_to(out, name_refs)
     }
 
     fn len(&self) -> usize {
@@ -71,7 +76,7 @@ mod tests {
         };
 
         let mut data = Vec::new();
-        assert!(rt.append_to_vec(&mut data, &mut None).is_ok());
+        assert!(rt.write_to(&mut data).is_ok());
 
         let rt = RouteThrough::parse(&data, 0);
         assert!(rt.is_ok());
