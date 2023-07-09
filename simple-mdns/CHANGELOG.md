@@ -1,3 +1,8 @@
+# 0.4.1 (2023-07-09)
+
+### Fixed
+- Resources not being properly refreshed
+
 # 0.4.0 (2022-12-10)
 
 ### Breaking changes

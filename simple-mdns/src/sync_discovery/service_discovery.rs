@@ -170,7 +170,7 @@ impl ServiceDiscovery {
             loop {
                 log::info!("Refreshing known services");
                 let now = Instant::now();
-                let next_expiration = resource_manager.read().unwrap().get_next_expiration();
+                let next_expiration = resource_manager.read().unwrap().get_next_refresh();
 
                 log::trace!("next expiration: {:?}", next_expiration);
                 match next_expiration {

@@ -70,12 +70,12 @@ impl<'a> ResourceRecordManager<'a> {
         self.resources = Trie::new();
     }
 
-    pub fn get_next_expiration(&self) -> Option<Instant> {
+    pub fn get_next_refresh(&self) -> Option<Instant> {
         self.resources
             .iter()
             .flat_map(|(_, resources)| {
                 resources.values().filter_map(|resource_type| {
-                    if resource_type.should_refresh() {
+                    if !resource_type.should_refresh() {
                         return None;
                     }
                     match resource_type {
