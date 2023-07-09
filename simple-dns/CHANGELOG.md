@@ -1,4 +1,4 @@
-# 0.5.3 (Unreleased)
+# 0.5.3 (2023-07-09)
 
 ### Added
 - `write_to` and `write_compressed_to` functions to `Packet`
