@@ -22,7 +22,7 @@ pub struct SRV<'a> {
     pub target: Name<'a>,
 }
 
-impl<'a> RR for SRV<'a> {
+impl<'a> RR<'a> for SRV<'a> {
     const TYPE_CODE: u16 = 33;
 }
 

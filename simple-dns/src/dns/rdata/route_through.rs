@@ -15,7 +15,7 @@ pub struct RouteThrough<'a> {
     pub intermediate_host: Name<'a>,
 }
 
-impl<'a> RR for RouteThrough<'a> {
+impl<'a> RR<'a> for RouteThrough<'a> {
     const TYPE_CODE: u16 = 21;
 }
 

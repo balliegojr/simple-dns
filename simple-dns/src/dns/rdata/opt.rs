@@ -28,7 +28,7 @@ pub struct OPT<'a> {
     pub version: u8,
 }
 
-impl<'a> RR for OPT<'a> {
+impl<'a> RR<'a> for OPT<'a> {
     const TYPE_CODE: u16 = 41;
 }
 

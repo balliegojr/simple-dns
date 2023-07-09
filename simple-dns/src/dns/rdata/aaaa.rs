@@ -1,4 +1,4 @@
-use crate::dns::PacketPart;
+use crate::{dns::PacketPart, master::ParseError};
 use std::{convert::TryInto, net::Ipv6Addr};
 
 use super::RR;
@@ -10,8 +10,19 @@ pub struct AAAA {
     pub address: u128,
 }
 
-impl RR for AAAA {
+impl<'a> RR<'a> for AAAA {
     const TYPE_CODE: u16 = 28;
+
+    fn try_build(tokens: &[&str], _origin: &crate::Name) -> Result<Self, ParseError> {
+        let address = tokens.first().ok_or(ParseError::UnexpectedEndOfInput)?;
+
+        address
+            .parse()
+            .map(|address: Ipv6Addr| AAAA {
+                address: address.into(),
+            })
+            .map_err(|_| ParseError::InvalidToken(address.to_string()))
+    }
 }
 
 impl<'a> PacketPart<'a> for AAAA {
@@ -50,7 +61,7 @@ impl From<Ipv6Addr> for AAAA {
 mod tests {
     use std::{net::Ipv6Addr, str::FromStr};
 
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{rdata::RData, Name, ResourceRecord};
 
     use super::*;
 
@@ -84,5 +95,13 @@ mod tests {
 
         assert_eq!(sample_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn test_try_build() {
+        assert_eq!(
+            Ok(AAAA { address: 1 }),
+            AAAA::try_build(&["::1"], &Name::new_unchecked("domain.com"))
+        )
     }
 }

@@ -4,8 +4,18 @@ macro_rules! rr_wrapper {
         #[doc = $doc]
         pub struct $t<'a>(pub $w<'a>);
 
-        impl<'a> RR for $t<'a> {
+        impl<'a> RR<'a> for $t<'a> {
             const TYPE_CODE: u16 = $c;
+
+            fn try_build(
+                tokens: &[&'a str],
+                origin: &crate::Name,
+            ) -> Result<Self, crate::master::ParseError> {
+                tokens
+                    .get(0)
+                    .map(|token| $w::new_from_token(token, origin).map($t))
+                    .ok_or_else(|| crate::master::ParseError::UnexpectedEndOfInput)?
+            }
         }
 
         impl<'a> From<$w<'a>> for $t<'a> {
@@ -156,6 +166,20 @@ macro_rules! rdata_enum {
                     RData::NULL(rdatatype, data) => RData::NULL(rdatatype, data.into_owned()),
                 }
             }
+
+            pub(crate) fn try_build_from_tokens<'b>(rr_type: TYPE, tokens: & [&'b str], origin: &Name) -> Result<RData<'b>, crate::master::ParseError> {
+                match rr_type {
+                    $(
+                        TYPE::$i => $i::try_build(tokens, origin).map(RData::$i),
+                    )+
+                    TYPE::NULL => {
+                        NULL::try_build(tokens, origin).map(|null| RData::NULL(rr_type.into(), null))
+                    }
+                    TYPE::Unknown(rr_code) => {
+                        Err(crate::master::ParseError::UnsupportedResourceRecord(rr_code.to_string()))
+                    }
+                }
+            }
         }
 
         fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
@@ -206,6 +230,20 @@ macro_rules! rdata_enum {
 
                     NULL::TYPE_CODE => TYPE::NULL,
                     v => TYPE::Unknown(v),
+                }
+            }
+        }
+
+
+        impl std::str::FromStr for TYPE {
+            type Err = crate::master::ParseError;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $(
+                        stringify!($i) => Ok(TYPE::$i),
+                    )+
+                    _ => Err(Self::Err::UnsupportedResourceRecord(s.to_string())),
                 }
             }
         }

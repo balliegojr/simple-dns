@@ -13,7 +13,7 @@ pub struct RP<'a> {
     pub txt: Name<'a>,
 }
 
-impl<'a> RR for RP<'a> {
+impl<'a> RR<'a> for RP<'a> {
     const TYPE_CODE: u16 = 17;
 }
 

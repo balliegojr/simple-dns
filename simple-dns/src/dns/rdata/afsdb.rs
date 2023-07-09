@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{Name, PacketPart};
+use crate::{
+    dns::{Name, PacketPart},
+    master::ParseError,
+};
 
 use super::RR;
 
@@ -13,8 +16,23 @@ pub struct AFSDB<'a> {
     pub hostname: Name<'a>,
 }
 
-impl<'a> RR for AFSDB<'a> {
+impl<'a> RR<'a> for AFSDB<'a> {
     const TYPE_CODE: u16 = 18;
+
+    fn try_build(tokens: &[&'a str], origin: &Name) -> Result<Self, ParseError>
+    where
+        Self: Sized + 'a,
+    {
+        let subtype = tokens.first().ok_or(ParseError::UnexpectedEndOfInput)?;
+        let hostname = tokens.get(1).ok_or(ParseError::UnexpectedEndOfInput)?;
+
+        Ok(AFSDB {
+            subtype: subtype
+                .parse()
+                .map_err(|_| ParseError::InvalidToken(subtype.to_string()))?,
+            hostname: Name::new_from_token(hostname, origin)?,
+        })
+    }
 }
 
 impl<'a> AFSDB<'a> {

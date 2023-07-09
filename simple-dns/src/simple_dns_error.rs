@@ -26,6 +26,9 @@ pub enum SimpleDnsError {
     InsufficientData,
     /// Failed to write the packet to the provided buffer
     FailedToWrite,
+
+    /// Failed to parse master file
+    MasterFileParse(crate::master::ParseError),
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
@@ -37,6 +40,12 @@ impl From<TryFromSliceError> for SimpleDnsError {
 impl From<std::io::Error> for SimpleDnsError {
     fn from(_value: std::io::Error) -> Self {
         Self::FailedToWrite
+    }
+}
+
+impl From<crate::master::ParseError> for SimpleDnsError {
+    fn from(value: crate::master::ParseError) -> Self {
+        Self::MasterFileParse(value)
     }
 }
 
@@ -73,6 +82,10 @@ impl Display for SimpleDnsError {
             SimpleDnsError::InsufficientData => write!(f, "Incomplete dns packet"),
             SimpleDnsError::FailedToWrite => {
                 write!(f, "Failed to write the packet to provided buffer")
+            }
+
+            SimpleDnsError::MasterFileParse(reason) => {
+                write!(f, "Failed to parse master file: {reason}")
             }
         }
     }

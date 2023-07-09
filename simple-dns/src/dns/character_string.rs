@@ -21,6 +21,14 @@ impl<'a> CharacterString<'a> {
         Self::internal_new(Cow::Borrowed(data))
     }
 
+    pub(crate) fn new_from_token(
+        token: &'a str,
+        _origin: &crate::Name,
+    ) -> Result<Self, crate::master::ParseError> {
+        Self::new(token.as_bytes())
+            .map_err(|_| crate::master::ParseError::InvalidToken(token.to_string()))
+    }
+
     fn internal_new(data: Cow<'a, [u8]>) -> crate::Result<Self> {
         if data.len() > MAX_CHARACTER_STRING_LENGTH {
             return Err(SimpleDnsError::InvalidCharacterString);

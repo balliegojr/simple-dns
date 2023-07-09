@@ -60,8 +60,15 @@ pub use txt::TXT;
 mod wks;
 pub use wks::WKS;
 
-pub(crate) trait RR {
+pub(crate) trait RR<'a> {
     const TYPE_CODE: u16;
+
+    fn try_build(_tokens: &[&'a str], _origin: &Name) -> Result<Self, crate::master::ParseError>
+    where
+        Self: Sized + 'a,
+    {
+        todo!()
+    }
 }
 
 macros::rr_wrapper! {

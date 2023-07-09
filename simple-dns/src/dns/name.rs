@@ -45,6 +45,13 @@ impl<'a> Name<'a> {
         }
     }
 
+    pub(crate) fn new_from_token(
+        token: &'a str,
+        _origin: &Name,
+    ) -> Result<Self, crate::master::ParseError> {
+        Self::new(token).map_err(|_| crate::master::ParseError::InvalidToken(token.to_string()))
+    }
+
     /// Create a new Name without checking for size limits
     pub fn new_unchecked(name: &'a str) -> Self {
         let mut total_size = 1;

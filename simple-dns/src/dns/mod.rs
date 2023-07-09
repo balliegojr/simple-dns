@@ -27,7 +27,7 @@ mod resource_record;
 pub use resource_record::ResourceRecord;
 
 use bitflags::bitflags;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, str::FromStr};
 
 const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;
@@ -148,6 +148,23 @@ impl TryFrom<u16> for CLASS {
             4 => Ok(HS),
             254 => Ok(NONE),
             v => Err(Self::Error::InvalidClass(v)),
+        }
+    }
+}
+
+impl FromStr for CLASS {
+    type Err = crate::master::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use CLASS::*;
+
+        match s {
+            "IN" => Ok(IN),
+            "CS" => Ok(CS),
+            "CH" => Ok(CH),
+            "HS" => Ok(HS),
+            "NONE" => Ok(NONE),
+            _ => Err(Self::Err::InvalidToken(s.to_string())),
         }
     }
 }

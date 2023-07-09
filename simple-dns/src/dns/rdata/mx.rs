@@ -1,6 +1,9 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{Name, PacketPart};
+use crate::{
+    dns::{Name, PacketPart},
+    master::ParseError,
+};
 
 use super::RR;
 
@@ -15,8 +18,23 @@ pub struct MX<'a> {
     pub exchange: Name<'a>,
 }
 
-impl<'a> RR for MX<'a> {
+impl<'a> RR<'a> for MX<'a> {
     const TYPE_CODE: u16 = 15;
+
+    fn try_build(tokens: &[&'a str], origin: &Name) -> Result<Self, ParseError>
+    where
+        Self: Sized + 'a,
+    {
+        let preference = tokens.first().ok_or(ParseError::UnexpectedEndOfInput)?;
+        let exchange = tokens.get(1).ok_or(ParseError::UnexpectedEndOfInput)?;
+
+        Ok(Self {
+            preference: preference
+                .parse()
+                .map_err(|_| ParseError::InvalidToken(preference.to_string()))?,
+            exchange: Name::new_from_token(exchange, origin)?,
+        })
+    }
 }
 
 impl<'a> MX<'a> {

@@ -26,7 +26,7 @@ pub struct NSAP {
     pub sel: u8,
 }
 
-impl RR for NSAP {
+impl<'a> RR<'a> for NSAP {
     const TYPE_CODE: u16 = 22;
 }
 

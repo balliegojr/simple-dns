@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{CharacterString, PacketPart};
+use crate::{
+    dns::{CharacterString, PacketPart},
+    master::ParseError,
+};
 
 use super::RR;
 
@@ -15,8 +18,24 @@ pub struct HINFO<'a> {
     pub os: CharacterString<'a>,
 }
 
-impl<'a> RR for HINFO<'a> {
+impl<'a> RR<'a> for HINFO<'a> {
     const TYPE_CODE: u16 = 13;
+
+    fn try_build(
+        tokens: &[&'a str],
+        origin: &crate::Name,
+    ) -> Result<Self, crate::master::ParseError>
+    where
+        Self: Sized + 'a,
+    {
+        let cpu = tokens.first().ok_or(ParseError::UnexpectedEndOfInput)?;
+        let os = tokens.get(1).ok_or(ParseError::UnexpectedEndOfInput)?;
+
+        Ok(HINFO {
+            cpu: CharacterString::new_from_token(cpu, origin)?,
+            os: CharacterString::new_from_token(os, origin)?,
+        })
+    }
 }
 
 impl<'a> HINFO<'a> {
@@ -96,5 +115,17 @@ mod tests {
         assert_eq!(sample_rdata.cpu, "Generic PC clone".try_into()?);
         assert_eq!(sample_rdata.os, "NetBSD-1.4".try_into()?);
         Ok(())
+    }
+
+    #[test]
+    fn test_try_build() {
+        let hinfo = HINFO::try_build(
+            &["Generic PC clone", "NetBSD-1.4"],
+            &crate::Name::new_unchecked(""),
+        )
+        .expect("Failed to parse");
+
+        assert_eq!(hinfo.os.to_string(), "NetBSD-1.4");
+        assert_eq!(hinfo.cpu.to_string(), "Generic PC clone");
     }
 }

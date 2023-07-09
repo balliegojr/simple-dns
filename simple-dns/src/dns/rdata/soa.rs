@@ -1,6 +1,9 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{Name, PacketPart};
+use crate::{
+    dns::{Name, PacketPart},
+    master::ParseError,
+};
 
 use super::RR;
 
@@ -24,8 +27,39 @@ pub struct SOA<'a> {
     pub minimum: u32,
 }
 
-impl<'a> RR for SOA<'a> {
+impl<'a> RR<'a> for SOA<'a> {
     const TYPE_CODE: u16 = 6;
+
+    fn try_build(tokens: &[&'a str], origin: &Name) -> Result<Self, ParseError> {
+        use ParseError::InvalidToken;
+        use ParseError::UnexpectedEndOfInput;
+
+        let mname = tokens.first().ok_or(UnexpectedEndOfInput)?;
+        let rname = tokens.get(1).ok_or(UnexpectedEndOfInput)?;
+        let serial = tokens.get(2).ok_or(UnexpectedEndOfInput)?;
+        let refresh = tokens.get(3).ok_or(UnexpectedEndOfInput)?;
+        let retry = tokens.get(4).ok_or(UnexpectedEndOfInput)?;
+        let expire = tokens.get(5).ok_or(UnexpectedEndOfInput)?;
+        let minimum = tokens.get(6).ok_or(UnexpectedEndOfInput)?;
+
+        Ok(SOA {
+            mname: Name::new_from_token(mname, origin)?,
+            rname: Name::new_from_token(rname, origin)?,
+            serial: serial
+                .parse()
+                .map_err(|_| InvalidToken(serial.to_string()))?,
+            refresh: refresh
+                .parse()
+                .map_err(|_| InvalidToken(refresh.to_string()))?,
+            retry: retry.parse().map_err(|_| InvalidToken(retry.to_string()))?,
+            expire: expire
+                .parse()
+                .map_err(|_| InvalidToken(expire.to_string()))?,
+            minimum: minimum
+                .parse()
+                .map_err(|_| InvalidToken(minimum.to_string()))?,
+        })
+    }
 }
 
 impl<'a> SOA<'a> {
@@ -145,5 +179,35 @@ mod tests {
         assert_eq!(sample_rdata.minimum, 60);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_try_build() {
+        let soa = SOA::try_build(
+            &[
+                "VENERA",
+                "Action\\.domains",
+                "20",
+                "7200",
+                "600",
+                "3600000",
+                "60",
+            ],
+            &Name::new_unchecked("domain.com"),
+        )
+        .expect("failed to build soa");
+
+        assert_eq!(
+            SOA {
+                mname: Name::new("VENERA").unwrap(),
+                rname: Name::new("Action\\.domains").unwrap(),
+                serial: 20,
+                refresh: 7200,
+                retry: 600,
+                expire: 3600000,
+                minimum: 60
+            },
+            soa
+        );
     }
 }

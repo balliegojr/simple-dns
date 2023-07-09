@@ -14,7 +14,7 @@ pub struct TXT<'a> {
     size: usize,
 }
 
-impl<'a> RR for TXT<'a> {
+impl<'a> RR<'a> for TXT<'a> {
     const TYPE_CODE: u16 = 16;
 }
 

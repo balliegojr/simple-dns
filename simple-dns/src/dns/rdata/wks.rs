@@ -15,7 +15,7 @@ pub struct WKS<'a> {
     pub bit_map: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for WKS<'a> {
+impl<'a> RR<'a> for WKS<'a> {
     const TYPE_CODE: u16 = 11;
 }
 

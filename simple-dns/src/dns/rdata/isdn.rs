@@ -13,7 +13,7 @@ pub struct ISDN<'a> {
     pub sa: CharacterString<'a>,
 }
 
-impl<'a> RR for ISDN<'a> {
+impl<'a> RR<'a> for ISDN<'a> {
     const TYPE_CODE: u16 = 20;
 }
 

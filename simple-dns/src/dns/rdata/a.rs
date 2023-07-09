@@ -1,4 +1,4 @@
-use crate::dns::PacketPart;
+use crate::{dns::PacketPart, master::ParseError};
 use std::{convert::TryInto, net::Ipv4Addr};
 
 use super::RR;
@@ -10,8 +10,19 @@ pub struct A {
     pub address: u32,
 }
 
-impl RR for A {
+impl<'a> RR<'a> for A {
     const TYPE_CODE: u16 = 1;
+
+    fn try_build(tokens: &[&str], _origin: &crate::Name) -> Result<Self, ParseError> {
+        let address = tokens.first().ok_or(ParseError::UnexpectedEndOfInput)?;
+
+        address
+            .parse()
+            .map(|address: Ipv4Addr| A {
+                address: address.into(),
+            })
+            .map_err(|_| ParseError::InvalidToken(address.to_string()))
+    }
 }
 
 impl<'a> PacketPart<'a> for A {
@@ -50,7 +61,7 @@ impl From<Ipv4Addr> for A {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{rdata::RData, Name, ResourceRecord};
 
     use super::*;
 
@@ -83,5 +94,13 @@ mod tests {
 
         assert_eq!(sample_a_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn test_try_build() {
+        assert_eq!(
+            Ok(A { address: 0 }),
+            A::try_build(&["0.0.0.0"], &Name::new_unchecked("domain.com"))
+        )
     }
 }

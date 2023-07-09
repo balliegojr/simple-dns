@@ -14,7 +14,7 @@ pub struct MINFO<'a> {
     pub emailbox: Name<'a>,
 }
 
-impl<'a> RR for MINFO<'a> {
+impl<'a> RR<'a> for MINFO<'a> {
     const TYPE_CODE: u16 = 14;
 }
 

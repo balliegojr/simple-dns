@@ -21,7 +21,7 @@ pub struct LOC {
     pub altitude: i32,
 }
 
-impl RR for LOC {
+impl<'a> RR<'a> for LOC {
     const TYPE_CODE: u16 = 29;
 }
 
