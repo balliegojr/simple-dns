@@ -231,7 +231,7 @@ impl ServiceDiscoveryExecutor {
             .resource_manager
             .read()
             .await
-            .get_next_expiration()
+            .get_next_refresh()
             .map(Instant::from_std);
 
         log::trace!("next expiration: {:?}", next_expiration);
