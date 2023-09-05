@@ -18,6 +18,9 @@ pub use aaaa::AAAA;
 mod afsdb;
 pub use afsdb::AFSDB;
 
+mod caa;
+pub use caa::CAA;
+
 mod hinfo;
 pub use hinfo::HINFO;
 
@@ -140,4 +143,5 @@ macros::rdata_enum! {
     NSAP_PTR<'a>,
     LOC,
     OPT<'a>,
+    CAA<'a>,
 }

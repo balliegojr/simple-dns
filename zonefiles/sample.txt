@@ -16,7 +16,9 @@ VAXA    A       10.2.0.27
 
 @       AAAA    fd92:7065:b8e:ffff::5
 
-        AFSDB	  0   hostname
+        AFSDB	  0   hostname  
+
+        CAA	0 issuewild    "example.com"
 
         HINFO	"Generic PC clone" "NetBSD-1.4"
 ;        MINFO	rmailbx emailbx
@@ -39,3 +41,4 @@ VAXA    A       10.2.0.27
         TXT	"\"foo\010bar\""
 
         WKS	10.0.0.1 tcp telnet ftp 0 1 2
+

@@ -43,6 +43,7 @@ impl<'a> PacketPart<'a> for CharacterString<'a> {
         Self: Sized,
     {
         let length = data[position] as usize;
+        println!("{} {} {}", length, position, data.len());
 
         if length < MAX_CHARACTER_STRING_LENGTH && length + position < data.len() {
             Ok(Self {
