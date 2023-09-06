@@ -4,6 +4,7 @@ use super::RR;
 
 // RFC 8659: Allow domain name holders to indicate whether they are authorized to issue digital certificates for particular domain name
 // Used as a security policy for certificate authorities
+// This implementation does not validate the tag or value; it splits based on packet byte sturcture
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CAA<'a> {
     // Critical or noncritical indicator
@@ -19,7 +20,7 @@ impl<'a> RR for CAA<'a> {
 }
 
 impl<'a> CAA<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into it owned type
     pub fn into_owned<'b>(self) -> CAA<'b> {
         CAA {
             flag: self.flag,
