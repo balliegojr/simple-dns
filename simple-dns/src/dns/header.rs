@@ -74,7 +74,7 @@ impl<'a> Header<'a> {
             id: u16::from_be_bytes(data[..2].try_into()?),
             opcode: ((flags & masks::OPCODE_MASK) >> masks::OPCODE_MASK.trailing_zeros()).into(),
             response_code: (flags & masks::RESPONSE_CODE_MASK).into(),
-            z_flags: PacketFlag { bits: flags },
+            z_flags: PacketFlag::from_bits_truncate(flags),
             opt: None,
         };
         Ok(header)

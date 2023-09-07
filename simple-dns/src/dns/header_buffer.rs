@@ -115,7 +115,7 @@ pub fn has_flags(buffer: &[u8], flags: PacketFlag) -> crate::Result<bool> {
     buffer[2..4]
         .try_into()
         .map(u16::from_be_bytes)
-        .map(|bits| PacketFlag { bits }.contains(flags))
+        .map(|bits| PacketFlag::from_bits_truncate(bits).contains(flags))
         .map_err(|_| crate::SimpleDnsError::InvalidHeaderData)
 }
 

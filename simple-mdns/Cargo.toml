@@ -13,18 +13,22 @@ categories = ["network-programming"]
 all-features = true
 
 [features]
-default = [] 
+default = []
 sync = []
 async-tokio = ["dep:tokio"]
 
 [dependencies]
 simple-dns = { path = "../simple-dns", version = "0.5" }
-socket2 = { version = "^0.4", features = ["all"] }
+socket2 = { version = "0.5", features = ["all"] }
 log = "^0.4"
 lazy_static = "^1.4.0"
 radix_trie = "^0.2.1"
-tokio = { version = "^1.22", features = ["net", "sync", "rt"], optional = true, default-features=false }
+tokio = { version = "1.32", features = [
+    "net",
+    "sync",
+    "rt",
+], optional = true, default-features = false }
 
 [dev-dependencies]
 stderrlog = "^0.5"
-tokio = { version = "^1.22", features = ["full"] }
+tokio = { version = "1.32", features = ["full"] }
