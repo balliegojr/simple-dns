@@ -1,3 +1,8 @@
+# 0.5.4 (2023-09-07)
+
+### Added
+- Support to parse CAA records
+
 # 0.5.3 (2023-07-09)
 
 ### Added
