@@ -20,7 +20,7 @@ impl<'a> RR for HINFO<'a> {
 }
 
 impl<'a> HINFO<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> HINFO<'b> {
         HINFO {
             cpu: self.cpu.into_owned(),

@@ -20,7 +20,7 @@ impl<'a> RR for RouteThrough<'a> {
 }
 
 impl<'a> RouteThrough<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> RouteThrough<'b> {
         RouteThrough {
             preference: self.preference,

@@ -20,7 +20,7 @@ impl<'a> RR for MX<'a> {
 }
 
 impl<'a> MX<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> MX<'b> {
         MX {
             preference: self.preference,

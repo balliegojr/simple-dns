@@ -20,7 +20,7 @@ impl<'a> RR for WKS<'a> {
 }
 
 impl<'a> WKS<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> WKS<'b> {
         WKS {
             address: self.address,

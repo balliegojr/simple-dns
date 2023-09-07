@@ -18,7 +18,7 @@ impl<'a> RR for ISDN<'a> {
 }
 
 impl<'a> ISDN<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> ISDN<'b> {
         ISDN {
             address: self.address.into_owned(),

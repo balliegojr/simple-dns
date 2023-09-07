@@ -18,7 +18,7 @@ impl<'a> RR for RP<'a> {
 }
 
 impl<'a> RP<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> RP<'b> {
         RP {
             mbox: self.mbox.into_owned(),

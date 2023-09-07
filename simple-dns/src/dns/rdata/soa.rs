@@ -29,7 +29,7 @@ impl<'a> RR for SOA<'a> {
 }
 
 impl<'a> SOA<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> SOA<'b> {
         SOA {
             mname: self.mname.into_owned(),

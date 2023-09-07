@@ -27,7 +27,7 @@ impl<'a> RR for SRV<'a> {
 }
 
 impl<'a> SRV<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> SRV<'b> {
         SRV {
             priority: self.priority,

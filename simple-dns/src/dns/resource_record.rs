@@ -72,7 +72,7 @@ impl<'a> ResourceRecord<'a> {
         }
     }
 
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> ResourceRecord<'b> {
         ResourceRecord {
             name: self.name.into_owned(),

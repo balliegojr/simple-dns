@@ -29,7 +29,7 @@ impl<'a> CharacterString<'a> {
         Ok(Self { data })
     }
 
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> CharacterString<'b> {
         CharacterString {
             data: self.data.into_owned().into(),

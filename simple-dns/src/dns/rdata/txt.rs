@@ -91,7 +91,7 @@ impl<'a> TXT<'a> {
         attributes
     }
 
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> TXT<'b> {
         TXT {
             strings: self.strings.into_iter().map(|s| s.into_owned()).collect(),

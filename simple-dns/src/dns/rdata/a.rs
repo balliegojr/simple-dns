@@ -34,7 +34,7 @@ impl<'a> PacketPart<'a> for A {
 }
 
 impl A {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned(self) -> Self {
         self
     }

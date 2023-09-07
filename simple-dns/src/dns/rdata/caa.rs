@@ -2,16 +2,16 @@ use crate::dns::{CharacterString, PacketPart};
 
 use super::RR;
 
-// RFC 8659: Allow domain name holders to indicate whether they are authorized to issue digital certificates for particular domain name
-// Used as a security policy for certificate authorities
-// This implementation does not validate the tag or value; it splits based on packet byte sturcture
+/// RFC 8659: Allow domain name holders to indicate whether they are authorized to issue digital certificates for particular domain name
+/// Used as a security policy for certificate authorities
+/// This implementation does not validate the tag or value; it splits based on packet byte structure
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct CAA<'a> {
-    // Critical or noncritical indicator
+    /// Critical or noncritical indicator
     pub flag: u8,
-    // Property described in the VALUE field. One of `issue`, `issuewild`, or `iodef`
+    /// Property described in the VALUE field. One of `issue`, `issuewild`, or `iodef`
     pub tag: CharacterString<'a>,
-    // Value associated with property tag
+    /// Value associated with property tag
     pub value: CharacterString<'a>,
 }
 

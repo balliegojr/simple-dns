@@ -104,7 +104,7 @@ impl<'a> OPT<'a> {
         ttl |= (self.version as u32) << masks::VERSION_MASK.trailing_zeros();
         ttl
     }
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> OPT<'b> {
         OPT {
             // length: self.length,
@@ -126,7 +126,7 @@ pub struct OPTCode<'a> {
 }
 
 impl<'a> OPTCode<'a> {
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> OPTCode<'b> {
         OPTCode {
             code: self.code,

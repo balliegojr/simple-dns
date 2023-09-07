@@ -15,7 +15,7 @@ macro_rules! rr_wrapper {
         }
 
         impl<'a> $t<'a> {
-            /// Transforms the inner data into it's owned type
+            /// Transforms the inner data into its owned type
             pub fn into_owned<'b>(self) -> $t<'b> {
                 $t(self.0.into_owned())
             }
@@ -146,7 +146,7 @@ macro_rules! rdata_enum {
                 }
             }
 
-            /// Transforms the inner data into it's owned type
+            /// Transforms the inner data into its owned type
             pub fn into_owned<'b>(self) -> RData<'b> {
                 match self {
                     $(

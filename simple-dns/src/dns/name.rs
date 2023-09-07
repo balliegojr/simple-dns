@@ -81,7 +81,7 @@ impl<'a> Name<'a> {
             .all(|(o, s)| *o == *s)
     }
 
-    /// Transforms the inner data into it's owned type
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> Name<'b> {
         Name {
             labels: self.labels.into_iter().map(|l| l.into_owned()).collect(),
