@@ -36,7 +36,7 @@ const MAX_NULL_LENGTH: usize = 65535;
 
 bitflags! {
     /// Possible Packet Flags
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
     pub struct PacketFlag: u16 {
         /// Indicates if this packet is a query or a response. This is the QR flag in the DNS
         /// specifications, this flag is called Response here to be more ergonomic
