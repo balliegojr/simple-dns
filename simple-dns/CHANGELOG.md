@@ -1,3 +1,8 @@
+# 0.5.5 (2023-09-14)
+
+### Fix
+- Add derived traits to PacketFlag that where removed by the previous version
+
 # 0.5.4 (2023-09-07)
 
 ### Added
