@@ -25,8 +25,10 @@ impl<'a> CharacterString<'a> {
         if data.len() > MAX_CHARACTER_STRING_LENGTH {
             return Err(SimpleDnsError::InvalidCharacterString);
         }
-
-        Ok(Self { data })
+        match String::from_utf8(data.clone().into_owned()) {
+            Ok(_) => Ok(Self { data }),
+            Err(_) => Err(SimpleDnsError::InvalidCharacterString),
+        }
     }
 
     /// Transforms the inner data into its owned type
@@ -34,6 +36,12 @@ impl<'a> CharacterString<'a> {
         CharacterString {
             data: self.data.into_owned().into(),
         }
+    }
+}
+
+impl<'a> Into<String> for CharacterString<'a> {
+    fn into(self) -> String {
+        String::from_utf8(self.data.into_owned()).unwrap()
     }
 }
 
@@ -113,6 +121,9 @@ mod tests {
 
         let long_string = [0u8; 300];
         assert!(CharacterString::new(&long_string).is_err());
+
+        let invalid_utf8 = [0xe2, 0x28, 0xa1];
+        assert!(CharacterString::new(&invalid_utf8).is_err());
     }
 
     #[test]
