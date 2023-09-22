@@ -67,26 +67,26 @@ impl<'a> TXT<'a> {
     pub fn attributes(&self) -> HashMap<String, Option<String>> {
         let mut attributes = HashMap::new();
 
-        for char_str in &self.strings {
-            let mut splited = char_str.data.splitn(2, |c| *c == b'=');
-            let key = match splited.next() {
-                Some(key) => match std::str::from_utf8(key) {
-                    Ok(key) => key.to_owned(),
-                    Err(_) => continue,
-                },
-                None => continue,
-            };
+        let full_string: String = (*self).clone().into();
 
-            let value = match splited.next() {
-                Some(value) if !value.is_empty() => match std::str::from_utf8(value) {
-                    Ok(v) => Some(v.to_owned()),
-                    Err(_) => Some(String::new()),
-                },
-                Some(_) => Some(String::new()),
+        let parts = full_string.split(|c| (c as u8) == b';');
+
+        for part in parts {
+            let key_value = part
+                .splitn(2, |c| (c as u8) == b'=')
+                .into_iter()
+                .collect::<Vec<&str>>();
+
+            let key = key_value[0];
+
+            let value = match key_value.len() > 1 {
+                true => Some(key_value[1].to_owned()),
                 _ => None,
             };
 
-            attributes.entry(key).or_insert(value);
+            if key.len() > 0 {
+                attributes.entry(key.to_owned()).or_insert(value);
+            }
         }
 
         attributes
@@ -218,10 +218,10 @@ mod tests {
     #[test]
     pub fn get_attributes() -> Result<(), Box<dyn std::error::Error>> {
         let attributes = TXT::new()
-            .with_string("version=0.1")?
-            .with_string("flag")?
-            .with_string("with_eq=eq=")?
-            .with_string("version=dup")?
+            .with_string("version=0.1;")?
+            .with_string("flag;")?
+            .with_string("with_eq=eq=;")?
+            .with_string("version=dup;")?
             .with_string("empty=")?
             .attributes();
 
@@ -256,6 +256,18 @@ mod tests {
 
         let concatenated: String = txt.into();
         assert_eq!(concatenated, string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn write_and_parse_large_attributes() -> Result<(), Box<dyn std::error::Error>> {
+        let big_value = "f".repeat(1000);
+
+        let txt: TXT = (format!("foo={};;flag;bar={}", big_value, big_value)).try_into()?;
+        let attributes = txt.attributes();
+
+        assert_eq!(Some(big_value.to_owned()), attributes["bar"]);
 
         Ok(())
     }
