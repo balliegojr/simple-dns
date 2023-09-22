@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    convert::{Into, TryFrom, TryInto},
+    convert::{TryFrom, TryInto},
 };
 
 use crate::dns::{PacketPart, MAX_CHARACTER_STRING_LENGTH};
@@ -72,10 +72,7 @@ impl<'a> TXT<'a> {
         let parts = full_string.split(|c| (c as u8) == b';');
 
         for part in parts {
-            let key_value = part
-                .splitn(2, |c| (c as u8) == b'=')
-                .into_iter()
-                .collect::<Vec<&str>>();
+            let key_value = part.splitn(2, |c| (c as u8) == b'=').collect::<Vec<&str>>();
 
             let key = key_value[0];
 
@@ -84,7 +81,7 @@ impl<'a> TXT<'a> {
                 _ => None,
             };
 
-            if key.len() > 0 {
+            if !key.is_empty() {
                 attributes.entry(key.to_owned()).or_insert(value);
             }
         }
@@ -140,9 +137,9 @@ impl<'a> TryFrom<String> for TXT<'a> {
     }
 }
 
-impl<'a> Into<String> for TXT<'a> {
-    fn into(self) -> String {
-        self.strings
+impl<'a> From<TXT<'a>> for String {
+    fn from(val: TXT<'a>) -> Self {
+        val.strings
             .into_iter()
             .map(|s| s.into())
             .collect::<Vec<String>>()
