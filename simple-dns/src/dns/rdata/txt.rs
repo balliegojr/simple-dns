@@ -1,9 +1,10 @@
 use std::{
     collections::HashMap,
-    convert::{TryFrom, TryInto},
+    convert::{Into, TryFrom, TryInto},
 };
 
-use crate::{dns::PacketPart, CharacterString};
+use crate::dns::{PacketPart, MAX_CHARACTER_STRING_LENGTH};
+use crate::CharacterString;
 
 use super::RR;
 
@@ -117,6 +118,38 @@ impl<'a> TryFrom<HashMap<String, Option<String>>> for TXT<'a> {
     }
 }
 
+impl<'a> TryFrom<String> for TXT<'a> {
+    type Error = crate::SimpleDnsError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut txt = TXT::new();
+
+        let mut start_index = 0;
+        let full_length = value.len();
+
+        while start_index < full_length {
+            let end_index = (start_index + MAX_CHARACTER_STRING_LENGTH).min(full_length);
+
+            let slice = &value[start_index..end_index];
+            txt.add_char_string(slice.to_string().try_into()?);
+
+            start_index = end_index;
+        }
+
+        Ok(txt)
+    }
+}
+
+impl<'a> Into<String> for TXT<'a> {
+    fn into(self) -> String {
+        self.strings
+            .into_iter()
+            .map(|s| s.into())
+            .collect::<Vec<String>>()
+            .join("")
+    }
+}
+
 impl<'a> PacketPart<'a> for TXT<'a> {
     fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
     where
@@ -212,6 +245,17 @@ mod tests {
 
         let strings = vec!["\"foo\nbar\"".try_into()?];
         assert_eq!(sample_rdata.strings, strings);
+
+        Ok(())
+    }
+
+    #[test]
+    fn write_and_parse_large_txt() -> Result<(), Box<dyn std::error::Error>> {
+        let string = "foo ".repeat(1000);
+        let txt: TXT = string.clone().try_into()?;
+
+        let concatenated: String = txt.into();
+        assert_eq!(concatenated, string);
 
         Ok(())
     }
