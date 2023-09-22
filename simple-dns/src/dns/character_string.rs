@@ -39,9 +39,9 @@ impl<'a> CharacterString<'a> {
     }
 }
 
-impl<'a> Into<String> for CharacterString<'a> {
-    fn into(self) -> String {
-        String::from_utf8(self.data.into_owned()).unwrap()
+impl<'a> From<CharacterString<'a>> for String {
+    fn from(val: CharacterString<'a>) -> Self {
+        String::from_utf8(val.data.into_owned()).unwrap()
     }
 }
 
