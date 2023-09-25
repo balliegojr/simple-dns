@@ -36,9 +36,14 @@ impl<'a> CharacterString<'a> {
     }
 }
 
-impl<'a> From<CharacterString<'a>> for String {
-    fn from(val: CharacterString<'a>) -> Self {
-        String::from_utf8(val.data.into_owned()).unwrap()
+impl<'a> TryFrom<CharacterString<'a>> for String {
+    type Error = crate::SimpleDnsError;
+
+    fn try_from(val: CharacterString<'a>) -> Result<Self, Self::Error> {
+        match String::from_utf8(val.data.into()) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(SimpleDnsError::InvalidUtf8String(e)),
+        }
     }
 }
 
