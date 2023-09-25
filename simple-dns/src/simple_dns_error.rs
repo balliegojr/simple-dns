@@ -26,6 +26,8 @@ pub enum SimpleDnsError {
     InsufficientData,
     /// Failed to write the packet to the provided buffer
     FailedToWrite,
+    /// Invalid utf8 string
+    InvalidUtf8String(std::string::FromUtf8Error),
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
@@ -73,6 +75,9 @@ impl Display for SimpleDnsError {
             SimpleDnsError::InsufficientData => write!(f, "Incomplete dns packet"),
             SimpleDnsError::FailedToWrite => {
                 write!(f, "Failed to write the packet to provided buffer")
+            }
+            SimpleDnsError::InvalidUtf8String(e) => {
+                write!(f, "Invalid utf8 string: {}", e)
             }
         }
     }

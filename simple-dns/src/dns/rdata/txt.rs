@@ -67,7 +67,40 @@ impl<'a> TXT<'a> {
     pub fn attributes(&self) -> HashMap<String, Option<String>> {
         let mut attributes = HashMap::new();
 
-        let full_string: String = (*self).clone().into();
+        for char_str in &self.strings {
+            let mut splited = char_str.data.splitn(2, |c| *c == b'=');
+            let key = match splited.next() {
+                Some(key) => match std::str::from_utf8(key) {
+                    Ok(key) => key.to_owned(),
+                    Err(_) => continue,
+                },
+                None => continue,
+            };
+
+            let value = match splited.next() {
+                Some(value) if !value.is_empty() => match std::str::from_utf8(value) {
+                    Ok(v) => Some(v.to_owned()),
+                    Err(_) => Some(String::new()),
+                },
+                Some(_) => Some(String::new()),
+                _ => None,
+            };
+
+            attributes.entry(key).or_insert(value);
+        }
+
+        attributes
+    }
+
+    /// Similar to [`attributes()`](TXT::attributes) but it parses the full TXT record as a single string,
+    /// instead of expecting each attribute to be a separate [`CharacterString`](`CharacterString`)
+    pub fn long_attributes(self) -> crate::Result<HashMap<String, Option<String>>> {
+        let mut attributes = HashMap::new();
+
+        let full_string: String = match self.try_into() {
+            Ok(string) => string,
+            Err(err) => return Err(crate::SimpleDnsError::InvalidUtf8String(err)),
+        };
 
         let parts = full_string.split(|c| (c as u8) == b';');
 
@@ -86,7 +119,7 @@ impl<'a> TXT<'a> {
             }
         }
 
-        attributes
+        Ok(attributes)
     }
 
     /// Transforms the inner data into its owned type
@@ -115,35 +148,29 @@ impl<'a> TryFrom<HashMap<String, Option<String>>> for TXT<'a> {
     }
 }
 
-impl<'a> TryFrom<String> for TXT<'a> {
+impl<'a> TryFrom<&'a str> for TXT<'a> {
     type Error = crate::SimpleDnsError;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let mut txt = TXT::new();
-
-        let mut start_index = 0;
-        let full_length = value.len();
-
-        while start_index < full_length {
-            let end_index = (start_index + MAX_CHARACTER_STRING_LENGTH).min(full_length);
-
-            let slice = &value[start_index..end_index];
-            txt.add_char_string(slice.to_string().try_into()?);
-
-            start_index = end_index;
+        for v in value.as_bytes().chunks(MAX_CHARACTER_STRING_LENGTH) {
+            txt.add_char_string(CharacterString::new(v)?);
         }
-
         Ok(txt)
     }
 }
 
-impl<'a> From<TXT<'a>> for String {
-    fn from(val: TXT<'a>) -> Self {
-        val.strings
-            .into_iter()
-            .map(|s| s.into())
-            .collect::<Vec<String>>()
-            .join("")
+impl<'a> TryFrom<TXT<'a>> for String {
+    type Error = std::string::FromUtf8Error;
+
+    fn try_from(val: TXT<'a>) -> Result<Self, Self::Error> {
+        let init = Vec::with_capacity(val.len());
+
+        let bytes = val.strings.into_iter().fold(init, |mut acc, val| {
+            acc.extend(val.data.as_ref());
+            acc
+        });
+        String::from_utf8(bytes)
     }
 }
 
@@ -215,10 +242,10 @@ mod tests {
     #[test]
     pub fn get_attributes() -> Result<(), Box<dyn std::error::Error>> {
         let attributes = TXT::new()
-            .with_string("version=0.1;")?
-            .with_string("flag;")?
-            .with_string("with_eq=eq=;")?
-            .with_string("version=dup;")?
+            .with_string("version=0.1")?
+            .with_string("flag")?
+            .with_string("with_eq=eq=")?
+            .with_string("version=dup")?
             .with_string("empty=")?
             .attributes();
 
@@ -249,9 +276,9 @@ mod tests {
     #[test]
     fn write_and_parse_large_txt() -> Result<(), Box<dyn std::error::Error>> {
         let string = "foo ".repeat(1000);
-        let txt: TXT = string.clone().try_into()?;
+        let txt: TXT = string.as_str().try_into()?;
 
-        let concatenated: String = txt.into();
+        let concatenated: String = txt.try_into()?;
         assert_eq!(concatenated, string);
 
         Ok(())
@@ -261,8 +288,9 @@ mod tests {
     fn write_and_parse_large_attributes() -> Result<(), Box<dyn std::error::Error>> {
         let big_value = "f".repeat(1000);
 
-        let txt: TXT = (format!("foo={};;flag;bar={}", big_value, big_value)).try_into()?;
-        let attributes = txt.attributes();
+        let string = format!("foo={};;flag;bar={}", big_value, big_value);
+        let txt: TXT = string.as_str().try_into()?;
+        let attributes = txt.long_attributes()?;
 
         assert_eq!(Some(big_value.to_owned()), attributes["bar"]);
 
