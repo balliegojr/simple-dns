@@ -34,9 +34,9 @@ macro_rules! rr_wrapper {
             }
 
             fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-                &self,
+                &'a self,
                 out: &mut T,
-                name_refs: &mut std::collections::HashMap<u64, usize>,
+                name_refs: &mut std::collections::HashMap<&'a [crate::dns::name::Label<'a>], usize>,
             ) -> crate::Result<()> {
                 self.0.write_compressed_to(out, name_refs)
             }
@@ -108,9 +108,9 @@ macro_rules! rdata_enum {
             }
 
             fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-                &self,
+                &'a self,
                 out: &mut T,
-                name_refs: &mut  HashMap<u64, usize>,
+                name_refs: &mut  HashMap<&'a [crate::dns::name::Label<'a>], usize>,
             ) -> crate::Result<()> {
                 match &self {
                     $(

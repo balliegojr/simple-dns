@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dns::{CharacterString, PacketPart};
+use crate::dns::{name::Label, CharacterString, PacketPart};
 
 use super::RR;
 
@@ -46,9 +46,9 @@ impl<'a> PacketPart<'a> for HINFO<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.cpu.write_compressed_to(out, name_refs)?;
         self.os.write_compressed_to(out, name_refs)

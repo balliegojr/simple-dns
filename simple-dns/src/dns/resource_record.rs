@@ -1,6 +1,6 @@
 use crate::{QCLASS, QTYPE};
 
-use super::{rdata::RData, Name, PacketPart, CLASS, TYPE};
+use super::{name::Label, rdata::RData, Name, PacketPart, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
@@ -153,9 +153,9 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.name.write_compressed_to(out, name_refs)?;
         self.write_common(out)?;

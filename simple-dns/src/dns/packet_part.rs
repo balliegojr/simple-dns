@@ -3,6 +3,8 @@ use std::{
     io::{Seek, Write},
 };
 
+use super::name::Label;
+
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub(crate) trait PacketPart<'a> {
     /// Parse the contents of the data buffer begining in the given position
@@ -15,9 +17,9 @@ pub(crate) trait PacketPart<'a> {
     fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()>;
 
     fn write_compressed_to<T: Write + Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        _name_refs: &mut HashMap<u64, usize>,
+        _name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.write_to(out)
     }

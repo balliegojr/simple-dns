@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fmt::Display,
-    hash::{BuildHasher, Hash, Hasher},
+    hash::Hash,
 };
 
 use super::{PacketPart, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
@@ -105,24 +105,23 @@ impl<'a> Name<'a> {
     }
 
     fn compress_append<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
-        for label in self.iter() {
-            let mut h = name_refs.hasher().build_hasher();
-            label.hash(&mut h);
-            let key = h.finish();
+        for (i, label) in self.iter().enumerate() {
+            match name_refs.entry(&self.labels[i..]) {
+                std::collections::hash_map::Entry::Occupied(e) => {
+                    let p = *e.get() as u16;
+                    out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
 
-            if let std::collections::hash_map::Entry::Vacant(e) = name_refs.entry(key) {
-                e.insert(out.stream_position()? as usize);
-                out.write_all(&[label.len() as u8])?;
-                out.write_all(&label.data)?;
-            } else {
-                let p = name_refs[&key] as u16;
-                out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
-
-                return Ok(());
+                    return Ok(());
+                }
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(out.stream_position()? as usize);
+                    out.write_all(&[label.len() as u8])?;
+                    out.write_all(&label.data)?;
+                }
             }
         }
 
@@ -205,9 +204,9 @@ impl<'a> PacketPart<'a> for Name<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -449,12 +448,15 @@ mod tests {
 
         let mut name_refs = HashMap::new();
 
-        Name::new_unchecked("F.ISI.ARPA")
+        let f_isi_arpa = Name::new_unchecked("F.ISI.ARPA");
+        f_isi_arpa
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
-        Name::new_unchecked("FOO.F.ISI.ARPA")
+        let foo_f_isi_arpa = Name::new_unchecked("FOO.F.ISI.ARPA");
+        foo_f_isi_arpa
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
+
         Name::new_unchecked("BAR.F.ISI.ARPA")
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add FOO.F.ISI.ARPA");
@@ -468,13 +470,17 @@ mod tests {
         let mut buf = Cursor::new(vec![]);
         let mut name_refs = HashMap::new();
 
-        Name::new_unchecked("ISI.ARPA")
+        let isi_arpa = Name::new_unchecked("ISI.ARPA");
+        isi_arpa
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add ISI.ARPA");
-        Name::new_unchecked("F.ISI.ARPA")
+
+        let f_isi_arpa = Name::new_unchecked("F.ISI.ARPA");
+        f_isi_arpa
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
-        Name::new_unchecked("FOO.F.ISI.ARPA")
+        let foo_f_isi_arpa = Name::new_unchecked("FOO.F.ISI.ARPA");
+        foo_f_isi_arpa
             .write_compressed_to(&mut buf, &mut name_refs)
             .expect("failed to add F.ISI.ARPA");
         Name::new_unchecked("BAR.F.ISI.ARPA")
@@ -492,6 +498,29 @@ mod tests {
         assert_eq!("FOO.F.ISI.ARPA", third.to_string());
         let fourth = Name::parse(buf.get_ref(), first.len() + second.len() + third.len()).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", fourth.to_string());
+    }
+
+    #[test]
+    fn ensure_different_domains_are_not_compressed() {
+        let mut buf = Cursor::new(vec![]);
+        let mut name_refs = HashMap::new();
+
+        let foo_bar_baz = Name::new_unchecked("FOO.BAR.BAZ");
+        foo_bar_baz
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add FOO.BAR.BAZ");
+
+        let foo_bar_buz = Name::new_unchecked("FOO.BAR.BUZ");
+        foo_bar_buz
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add FOO.BAR.BUZ");
+
+        Name::new_unchecked("FOO.BAR")
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add FOO.BAR");
+
+        let expected = b"\x03FOO\x03BAR\x03BAZ\x00\x03FOO\x03BAR\x03BUZ\x00\x03FOO\x03BAR\x00";
+        assert_eq!(expected[..], buf.get_ref()[..]);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dns::{Name, PacketPart};
+use crate::dns::{name::Label, Name, PacketPart};
 
 use super::RR;
 
@@ -44,9 +44,9 @@ impl<'a> PacketPart<'a> for AFSDB<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         out.write_all(&self.subtype.to_be_bytes())?;
         self.hostname.write_compressed_to(out, name_refs)

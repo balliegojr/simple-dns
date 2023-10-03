@@ -1,6 +1,6 @@
 use std::{collections::HashMap, convert::TryInto};
 
-use crate::dns::{Name, PacketPart};
+use crate::dns::{name::Label, Name, PacketPart};
 
 use super::RR;
 
@@ -86,9 +86,9 @@ impl<'a> PacketPart<'a> for SOA<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.mname.write_compressed_to(out, name_refs)?;
         self.rname.write_compressed_to(out, name_refs)?;

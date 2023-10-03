@@ -3,7 +3,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use super::{Name, PacketPart, QCLASS, QTYPE};
+use super::{name::Label, Name, PacketPart, QCLASS, QTYPE};
 
 /// Question represents a query in the DNS Packet
 #[derive(Debug, Clone)]
@@ -81,9 +81,9 @@ impl<'a> PacketPart<'a> for Question<'a> {
     }
 
     fn write_compressed_to<T: std::io::Write + std::io::Seek>(
-        &self,
+        &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<u64, usize>,
+        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.qname.write_compressed_to(out, name_refs)?;
         self.write_common(out)
