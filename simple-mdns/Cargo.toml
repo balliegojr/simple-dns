@@ -27,6 +27,8 @@ tokio = { version = "1.32", features = [
     "net",
     "sync",
     "rt",
+    "time",
+    "macros",
 ], optional = true, default-features = false }
 
 [dev-dependencies]
