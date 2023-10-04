@@ -1,3 +1,7 @@
+# 0.4.2 (2023-10-04)
+### Fixed
+- Uses correct tokio features for worspace resolver 2
+
 # 0.4.1 (2023-07-09)
 
 ### Fixed
