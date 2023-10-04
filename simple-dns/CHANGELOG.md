@@ -1,3 +1,11 @@
+# 0.5.6 (2023-10-04)
+
+### Fix
+- Name compression now considers the full domain when creating pointers.
+
+### Added
+- Add TryFrom<'str> and TryInto<'str> for TXT records as a convenience to work with long TXT records
+
 # 0.5.5 (2023-09-14)
 
 ### Fix
