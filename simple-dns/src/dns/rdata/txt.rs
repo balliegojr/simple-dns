@@ -153,7 +153,7 @@ impl<'a> TryFrom<&'a str> for TXT<'a> {
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         let mut txt = TXT::new();
-        for v in value.as_bytes().chunks(MAX_CHARACTER_STRING_LENGTH) {
+        for v in value.as_bytes().chunks(MAX_CHARACTER_STRING_LENGTH - 1) {
             txt.add_char_string(CharacterString::new(v)?);
         }
         Ok(txt)
@@ -275,11 +275,16 @@ mod tests {
 
     #[test]
     fn write_and_parse_large_txt() -> Result<(), Box<dyn std::error::Error>> {
-        let string = "foo ".repeat(1000);
+        let string = "X".repeat(1000);
         let txt: TXT = string.as_str().try_into()?;
 
-        let concatenated: String = txt.try_into()?;
-        assert_eq!(concatenated, string);
+        let mut bytes = Vec::new();
+        assert!(txt.write_to(&mut bytes).is_ok());
+
+        let parsed_txt = TXT::parse(&bytes, 0)?;
+        let parsed_string: String = parsed_txt.try_into()?;
+
+        assert_eq!(parsed_string, string);
 
         Ok(())
     }
