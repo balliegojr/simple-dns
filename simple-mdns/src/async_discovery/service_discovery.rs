@@ -375,7 +375,7 @@ fn add_response_to_resources(
     let resources = packet
         .answers
         .into_iter()
-        .chain(packet.additional_records.into_iter())
+        .chain(packet.additional_records)
         .filter(|aw| {
             aw.name.ne(full_name)
                 && aw.name.is_subdomain_of(service_name)

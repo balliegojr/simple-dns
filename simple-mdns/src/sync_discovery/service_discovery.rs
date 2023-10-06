@@ -165,30 +165,27 @@ impl ServiceDiscovery {
         let sender = self.sender_socket.try_clone()?;
         let address = self.network_scope.socket_address();
 
-        std::thread::spawn(move || {
-            let service_name = service_name;
-            loop {
-                log::info!("Refreshing known services");
-                let now = Instant::now();
-                let next_expiration = resource_manager.read().unwrap().get_next_refresh();
+        std::thread::spawn(move || loop {
+            log::info!("Refreshing known services");
+            let now = Instant::now();
+            let next_expiration = resource_manager.read().unwrap().get_next_refresh();
 
-                log::trace!("next expiration: {:?}", next_expiration);
-                match next_expiration {
-                    Some(expiration) => {
-                        if expiration <= now {
-                            if let Err(err) =
-                                query_service_instances(service_name.clone(), &sender, &address)
-                            {
-                                log::error!("There was an error querying service instances. {err}");
-                            }
-                            std::thread::sleep(Duration::from_secs(5));
-                        } else {
-                            std::thread::sleep(expiration - now);
+            log::trace!("next expiration: {:?}", next_expiration);
+            match next_expiration {
+                Some(expiration) => {
+                    if expiration <= now {
+                        if let Err(err) =
+                            query_service_instances(service_name.clone(), &sender, &address)
+                        {
+                            log::error!("There was an error querying service instances. {err}");
                         }
-                    }
-                    None => {
                         std::thread::sleep(Duration::from_secs(5));
+                    } else {
+                        std::thread::sleep(expiration - now);
                     }
+                }
+                None => {
+                    std::thread::sleep(Duration::from_secs(5));
                 }
             }
         });
@@ -360,7 +357,7 @@ fn add_response_to_resources(
     let resources = packet
         .answers
         .into_iter()
-        .chain(packet.additional_records.into_iter())
+        .chain(packet.additional_records)
         .filter(|aw| {
             aw.name.ne(full_name)
                 && aw.name.is_subdomain_of(service_name)
