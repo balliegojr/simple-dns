@@ -1,3 +1,12 @@
+# 0.5.7 (Unreleased)
+
+### Fix
+- TryFrom<'str> for TXT generating invalid CharacterStrings
+- `Name::is_subdomain_of` no longer return true for the same domain
+
+### Added
+- `Name::without` to extract subdomains from a domain
+
 # 0.5.6 (2023-10-04)
 
 ### Fix
