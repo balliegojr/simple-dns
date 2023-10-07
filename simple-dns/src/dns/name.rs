@@ -74,11 +74,40 @@ impl<'a> Name<'a> {
 
     /// Returns true if self is a subdomain of other
     pub fn is_subdomain_of(&self, other: &Name) -> bool {
-        other
-            .iter()
-            .rev()
-            .zip(self.iter().rev())
-            .all(|(o, s)| *o == *s)
+        self.labels.len() > other.labels.len()
+            && other
+                .iter()
+                .rev()
+                .zip(self.iter().rev())
+                .all(|(o, s)| *o == *s)
+    }
+
+    /// Returns the subdomain part of self, based on `domain`.
+    /// If self is not a subdomain of `domain`, returns None
+    ///
+    /// Example:
+    /// ```
+    /// # use simple_dns::Name;
+    /// let name = Name::new_unchecked("sub.domain.local");
+    /// let domain = Name::new_unchecked("domain.local");
+    ///
+    /// assert!(domain.without(&name).is_none());
+    ///
+    /// let sub = name.without(&domain).unwrap();
+    /// assert_eq!(sub.to_string(), "sub")
+    /// ```
+    pub fn without(&self, domain: &Name) -> Option<Name> {
+        if self.is_subdomain_of(domain) {
+            let labels = self.labels[..self.labels.len() - domain.labels.len()].to_vec();
+            let mut total_size = 1;
+            for label in labels.iter() {
+                total_size += label.len() + 1;
+            }
+
+            Some(Name { labels, total_size })
+        } else {
+            None
+        }
     }
 
     /// Transforms the inner data into its owned type
@@ -580,18 +609,44 @@ mod tests {
 
     #[test]
     fn is_subdomain_of() {
-        assert!(
-            Name::new_unchecked("example.com").is_subdomain_of(&Name::new_unchecked("example.com"))
-        );
         assert!(Name::new_unchecked("sub.example.com")
             .is_subdomain_of(&Name::new_unchecked("example.com")));
+
+        assert!(!Name::new_unchecked("example.com")
+            .is_subdomain_of(&Name::new_unchecked("example.com")));
+
         assert!(Name::new_unchecked("foo.sub.example.com")
             .is_subdomain_of(&Name::new_unchecked("example.com")));
+
         assert!(!Name::new_unchecked("example.com")
             .is_subdomain_of(&Name::new_unchecked("example.xom")));
+
         assert!(!Name::new_unchecked("domain.com")
             .is_subdomain_of(&Name::new_unchecked("other.domain")));
+
         assert!(!Name::new_unchecked("domain.com")
             .is_subdomain_of(&Name::new_unchecked("domain.com.br")));
+    }
+
+    #[test]
+    fn subtract_domain() {
+        let domain = Name::new_unchecked("_srv3._tcp.local");
+        assert_eq!(
+            Name::new_unchecked("a._srv3._tcp.local")
+                .without(&domain)
+                .unwrap()
+                .to_string(),
+            "a"
+        );
+
+        assert!(Name::new_unchecked("unrelated").without(&domain).is_none(),);
+
+        assert_eq!(
+            Name::new_unchecked("some.longer.domain._srv3._tcp.local")
+                .without(&domain)
+                .unwrap()
+                .to_string(),
+            "some.longer.domain"
+        );
     }
 }
