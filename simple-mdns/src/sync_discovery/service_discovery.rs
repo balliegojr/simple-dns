@@ -125,7 +125,7 @@ impl ServiceDiscovery {
     }
 
     /// Return the addresses of all known services
-    pub fn get_known_services(&self) -> Vec<InstanceInformation> {
+    pub fn get_known_services(&self) -> HashMap<String, InstanceInformation> {
         self.resource_manager
             .read()
             .unwrap()
@@ -134,8 +134,17 @@ impl ServiceDiscovery {
                 let mut ip_addresses: Vec<IpAddr> = Vec::new();
                 let mut ports = Vec::new();
                 let mut attributes = HashMap::new();
+                let mut instance_name: Option<String> = Default::default();
 
                 for resource in domain_resources {
+                    if instance_name.is_none() {
+                        dbg!(&self.service_name, &resource.name);
+                        instance_name = resource
+                            .name
+                            .without(&self.service_name)
+                            .map(|sub_domain| sub_domain.to_string());
+                    }
+
                     match &resource.rdata {
                         simple_dns::rdata::RData::A(a) => {
                             ip_addresses.push(Ipv4Addr::from(a.address).into())
@@ -149,11 +158,14 @@ impl ServiceDiscovery {
                     }
                 }
 
-                InstanceInformation {
-                    ip_addresses,
-                    ports,
-                    attributes,
-                }
+                (
+                    instance_name.unwrap_or_default(),
+                    InstanceInformation {
+                        ip_addresses,
+                        ports,
+                        attributes,
+                    },
+                )
             })
             .collect()
     }

@@ -33,40 +33,36 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(2));
 
-    let mut from_a: Vec<SocketAddr> = service_discovery_a
+    let from_a: HashMap<String, SocketAddr> = service_discovery_a
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
 
-    let mut from_b: Vec<SocketAddr> = service_discovery_b
+    let from_b: HashMap<String, SocketAddr> = service_discovery_b
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
 
-    let mut from_c: Vec<SocketAddr> = service_discovery_c
+    let from_c: HashMap<String, SocketAddr> = service_discovery_c
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
-
-    from_a.sort();
-    from_b.sort();
-    from_c.sort();
 
     assert_eq!(2, from_a.len());
     assert_eq!(2, from_b.len());
     assert_eq!(2, from_c.len());
 
-    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_a[0]);
-    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_a[1]);
+    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_a["b"]);
+    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_a["c"]);
 
-    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_b[0]);
-    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_b[1]);
+    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_b["a"]);
+    assert_eq!(&("192.168.1.4:8080".parse::<SocketAddr>()?), &from_b["c"]);
 
-    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_c[0]);
-    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_c[1]);
+    assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_c["a"]);
+    assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_c["b"]);
     Ok(())
 }
 
@@ -100,13 +96,13 @@ fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
     let d_attr: HashMap<String, Option<String>> = service_discovery_d
         .get_known_services()
         .into_iter()
-        .flat_map(|x| x.attributes)
+        .flat_map(|(_, x)| x.attributes)
         .collect();
 
     let e_attr: HashMap<String, Option<String>> = service_discovery_e
         .get_known_services()
         .into_iter()
-        .flat_map(|x| x.attributes)
+        .flat_map(|(_, x)| x.attributes)
         .collect();
 
     assert_eq!(1, d_attr.len());
@@ -156,27 +152,23 @@ fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>> {
 
     std::thread::sleep(Duration::from_secs(2));
 
-    let mut from_a: Vec<SocketAddr> = service_discovery_a
+    let from_a: HashMap<String, SocketAddr> = service_discovery_a
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
 
-    let mut from_b: Vec<SocketAddr> = service_discovery_b
+    let from_b: HashMap<String, SocketAddr> = service_discovery_b
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
 
-    let mut from_c: Vec<SocketAddr> = service_discovery_c
+    let from_c: HashMap<String, SocketAddr> = service_discovery_c
         .get_known_services()
-        .iter()
-        .flat_map(|x| x.get_socket_addresses())
+        .into_iter()
+        .map(|(name, x)| (name, x.get_socket_addresses().next().unwrap()))
         .collect();
-
-    from_a.sort();
-    from_b.sort();
-    from_c.sort();
 
     assert_eq!(2, from_a.len());
     assert_eq!(2, from_b.len());
@@ -184,29 +176,29 @@ fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d68]:8080".parse::<SocketAddr>()?),
-        &from_a[0]
+        &from_a["b"]
     );
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d69]:8080".parse::<SocketAddr>()?),
-        &from_a[1]
+        &from_a["c"]
     );
 
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d67]:8080".parse::<SocketAddr>()?),
-        &from_b[0]
+        &from_b["a"]
     );
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d69]:8080".parse::<SocketAddr>()?),
-        &from_b[1]
+        &from_b["c"]
     );
 
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d67]:8080".parse::<SocketAddr>()?),
-        &from_c[0]
+        &from_c["a"]
     );
     assert_eq!(
         &("[fe80::26fc:f50f:6755:7d68]:8080".parse::<SocketAddr>()?),
-        &from_c[1]
+        &from_c["b"]
     );
     Ok(())
 }

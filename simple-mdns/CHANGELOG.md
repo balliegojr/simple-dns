@@ -1,3 +1,8 @@
+# 0.5.0 (Unreleased)
+
+### Breaking changes
+- Change `get_known_services` to return instance name
+
 # 0.4.2 (2023-10-04)
 ### Fixed
 - Uses correct tokio features for worspace resolver 2
