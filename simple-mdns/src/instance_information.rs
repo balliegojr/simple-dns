@@ -34,6 +34,32 @@ impl InstanceInformation {
         }
     }
 
+    pub(crate) fn from_records<'a>(records: impl Iterator<Item = &'a ResourceRecord<'a>>) -> Self {
+        let mut ip_addresses: Vec<IpAddr> = Vec::new();
+        let mut ports = Vec::new();
+        let mut attributes = HashMap::new();
+
+        for resource in records {
+            match &resource.rdata {
+                simple_dns::rdata::RData::A(a) => {
+                    ip_addresses.push(std::net::Ipv4Addr::from(a.address).into())
+                }
+                simple_dns::rdata::RData::AAAA(aaaa) => {
+                    ip_addresses.push(std::net::Ipv6Addr::from(aaaa.address).into())
+                }
+                simple_dns::rdata::RData::TXT(txt) => attributes.extend(txt.attributes()),
+                simple_dns::rdata::RData::SRV(srv) => ports.push(srv.port),
+                _ => {}
+            }
+        }
+
+        InstanceInformation {
+            ip_addresses,
+            ports,
+            attributes,
+        }
+    }
+
     /// Transform into a [Vec<ResourceRecord>](`Vec<ResourceRecord>`)
     pub fn into_records<'a>(
         self,

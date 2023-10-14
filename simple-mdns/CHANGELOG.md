@@ -2,6 +2,7 @@
 
 ### Breaking changes
 - Change `get_known_services` to return instance name
+- Add notification channel to service discovery
 
 # 0.4.2 (2023-10-04)
 ### Fixed

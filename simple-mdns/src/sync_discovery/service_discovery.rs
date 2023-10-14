@@ -3,7 +3,7 @@ use simple_dns::{rdata::RData, Name, Packet, Question, ResourceRecord, CLASS, TY
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    net::{SocketAddr, UdpSocket},
     sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
@@ -51,20 +51,29 @@ impl ServiceDiscovery {
         service_name: &str,
         resource_ttl: u32,
     ) -> Result<Self, SimpleMdnsError> {
-        Self::new_with_scope(instance_name, service_name, resource_ttl, NetworkScope::V4)
+        Self::new_with_scope(
+            instance_name,
+            service_name,
+            resource_ttl,
+            None,
+            NetworkScope::V4,
+        )
     }
 
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl` and loopback activation.
+    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
     /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
     ///
     /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
-    /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
+    /// `on_discovery` channel, if provided, will receive every instance information when
+    /// discovered
+    /// `network_scope` to be used
     pub fn new_with_scope(
         instance_name: &str,
         service_name: &str,
         resource_ttl: u32,
+        on_discovery: Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
         network_scope: NetworkScope,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
@@ -88,7 +97,7 @@ impl ServiceDiscovery {
             network_scope,
         };
 
-        service_discovery.receive_packets_loop()?;
+        service_discovery.receive_packets_loop(on_discovery)?;
         service_discovery.refresh_known_instances()?;
 
         if let Err(err) = query_service_instances(
@@ -131,41 +140,19 @@ impl ServiceDiscovery {
             .unwrap()
             .get_domain_resources(&self.service_name, true, false)
             .map(|domain_resources| {
-                let mut ip_addresses: Vec<IpAddr> = Vec::new();
-                let mut ports = Vec::new();
-                let mut attributes = HashMap::new();
                 let mut instance_name: Option<String> = Default::default();
 
-                for resource in domain_resources {
-                    if instance_name.is_none() {
-                        dbg!(&self.service_name, &resource.name);
-                        instance_name = resource
-                            .name
-                            .without(&self.service_name)
-                            .map(|sub_domain| sub_domain.to_string());
-                    }
-
-                    match &resource.rdata {
-                        simple_dns::rdata::RData::A(a) => {
-                            ip_addresses.push(Ipv4Addr::from(a.address).into())
+                let instance_information =
+                    InstanceInformation::from_records(domain_resources.inspect(|record| {
+                        if instance_name.is_none() {
+                            instance_name = record
+                                .name
+                                .without(&self.service_name)
+                                .map(|sub_domain| sub_domain.to_string());
                         }
-                        simple_dns::rdata::RData::AAAA(aaaa) => {
-                            ip_addresses.push(Ipv6Addr::from(aaaa.address).into())
-                        }
-                        simple_dns::rdata::RData::TXT(txt) => attributes.extend(txt.attributes()),
-                        simple_dns::rdata::RData::SRV(srv) => ports.push(srv.port),
-                        _ => {}
-                    }
-                }
+                    }));
 
-                (
-                    instance_name.unwrap_or_default(),
-                    InstanceInformation {
-                        ip_addresses,
-                        ports,
-                        attributes,
-                    },
-                )
+                (instance_name.unwrap_or_default(), instance_information)
             })
             .collect()
     }
@@ -264,7 +251,10 @@ impl ServiceDiscovery {
         }
     }
 
-    fn receive_packets_loop(&self) -> Result<(), SimpleMdnsError> {
+    fn receive_packets_loop(
+        &self,
+        mut on_discovery: Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
+    ) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
         let full_name = self.full_name.clone();
         let resources = self.resource_manager.clone();
@@ -292,6 +282,7 @@ impl ServiceDiscovery {
                             &service_name,
                             &full_name,
                             &mut resources.write().unwrap(),
+                            &mut on_discovery,
                         )
                     } else {
                         match crate::build_reply(packet, &resources.read().unwrap()) {
@@ -365,6 +356,7 @@ fn add_response_to_resources(
     service_name: &Name<'_>,
     full_name: &Name<'_>,
     owned_resources: &mut ResourceRecordManager,
+    on_discovery: &mut Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
 ) {
     let resources = packet
         .answers
@@ -377,9 +369,39 @@ fn add_response_to_resources(
                     || aw.match_qtype(TYPE::TXT.into())
                     || aw.match_qtype(TYPE::A.into())
                     || aw.match_qtype(TYPE::PTR.into()))
-        });
+        })
+        .map(|r| r.into_owned());
 
-    for resource in resources {
-        owned_resources.add_expirable_resource(resource.into_owned());
+    if let Some(channel) = on_discovery {
+        let resources: Vec<_> = resources.collect();
+        if resources.is_empty() {
+            return;
+        }
+
+        let mut instance_name: Option<String> = Default::default();
+        let instance_information =
+            InstanceInformation::from_records(resources.iter().inspect(|record| {
+                if instance_name.is_none() {
+                    instance_name = record
+                        .name
+                        .without(service_name)
+                        .map(|sub_domain| sub_domain.to_string());
+                }
+            }));
+
+        if channel
+            .send((instance_name.unwrap_or_default(), instance_information))
+            .is_err()
+        {
+            *on_discovery = None
+        }
+
+        for resource in resources {
+            owned_resources.add_expirable_resource(resource);
+        }
+    } else {
+        for resource in resources {
+            owned_resources.add_expirable_resource(resource);
+        }
     }
 }

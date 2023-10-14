@@ -24,16 +24,13 @@ async fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 
     service_discovery_a
         .add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into())
-        .await
-        .expect("Failed to add service info");
+        .await?;
     service_discovery_b
         .add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into())
-        .await
-        .expect("Failed to add service info");
+        .await?;
     service_discovery_c
         .add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into())
-        .await
-        .expect("Failed to add service info");
+        .await?;
 
     tokio::time::sleep(Duration::from_secs(2)).await;
 
@@ -70,6 +67,50 @@ async fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(&("192.168.1.2:8080".parse::<SocketAddr>()?), &from_c["a"]);
     assert_eq!(&("192.168.1.3:8080".parse::<SocketAddr>()?), &from_c["b"]);
+    Ok(())
+}
+
+#[tokio::test]
+async fn service_discovery_is_notified_on_discovery() -> Result<(), Box<dyn Error>> {
+    // init_log();
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+    let mut service_discovery_a = ServiceDiscovery::new_with_scope(
+        "a",
+        "_async_notify._tcp.local",
+        60,
+        Some(tx),
+        simple_mdns::NetworkScope::V4,
+    )?;
+    let mut service_discovery_b = ServiceDiscovery::new("b", "_async_notify._tcp.local", 60)?;
+    let mut service_discovery_c = ServiceDiscovery::new("c", "_async_notify._tcp.local", 60)?;
+
+    service_discovery_a
+        .add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into())
+        .await?;
+    service_discovery_b
+        .add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into())
+        .await?;
+    service_discovery_c
+        .add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into())
+        .await?;
+
+    for _ in 0..2 {
+        let Some((instance_name, service_info)) = rx.recv().await else {
+            panic!("Did not receive enough packets");
+        };
+
+        let addr = service_info.get_socket_addresses().next().unwrap();
+        match instance_name.as_str() {
+            "b" => assert_eq!(("192.168.1.3:8080".parse::<SocketAddr>()?), addr),
+            "c" => assert_eq!(("192.168.1.4:8080".parse::<SocketAddr>()?), addr),
+            _ => panic!("Received unexpected packet"),
+        }
+    }
+
     Ok(())
 }
 
@@ -136,18 +177,21 @@ async fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>
         "a",
         "_async3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
     let mut service_discovery_b = ServiceDiscovery::new_with_scope(
         "b",
         "_async3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
     let mut service_discovery_c = ServiceDiscovery::new_with_scope(
         "c",
         "_async3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
 

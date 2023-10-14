@@ -6,14 +6,12 @@ use simple_dns::{Name, ResourceRecord};
 
 #[derive(Debug)]
 pub struct ResourceRecordManager<'a> {
-    // resources: HashSet<ResourceRecord<'a>>,
     resources: Trie<Vec<u8>, HashMap<ResourceRecord<'a>, ResourceRecordType>>,
 }
 
 impl<'a> ResourceRecordManager<'a> {
     pub fn new() -> Self {
         Self {
-            // resources: HashSet::new(),
             resources: Trie::new(),
         }
     }

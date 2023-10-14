@@ -58,20 +58,29 @@ impl ServiceDiscovery {
         service_name: &str,
         resource_ttl: u32,
     ) -> Result<Self, SimpleMdnsError> {
-        Self::new_with_scope(instance_name, service_name, resource_ttl, NetworkScope::V4)
+        Self::new_with_scope(
+            instance_name,
+            service_name,
+            resource_ttl,
+            None,
+            NetworkScope::V4,
+        )
     }
 
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl` and loopback activation.
+    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
     /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
     ///
     /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
-    /// set `enable_loopback` to true if you may have more than one instance of your service running in the same machine
+    /// `on_discovery` channel, if provided, will receive every instance information when
+    /// discovered
+    /// `network_scope` to be used
     pub fn new_with_scope(
         instance_name: &str,
         service_name: &str,
         resource_ttl: u32,
+        on_discovery: Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
         network_scope: NetworkScope,
     ) -> Result<Self, SimpleMdnsError> {
         let full_name = format!("{}.{}", instance_name, service_name);
@@ -98,7 +107,10 @@ impl ServiceDiscovery {
 
         let (advertise_tx, advertise_rx) = channel(10);
         spawn(async {
-            if let Err(err) = service_discovery.execution_loop(advertise_rx).await {
+            if let Err(err) = service_discovery
+                .execution_loop(advertise_rx, on_discovery)
+                .await
+            {
                 log::error!("Service discovery failed {err}");
             }
         });
@@ -196,7 +208,11 @@ struct ServiceDiscoveryExecutor {
 }
 
 impl ServiceDiscoveryExecutor {
-    async fn execution_loop(self, mut advertise: Receiver<bool>) -> Result<(), SimpleMdnsError> {
+    async fn execution_loop(
+        self,
+        mut advertise: Receiver<bool>,
+        mut on_discovery: Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
+    ) -> Result<(), SimpleMdnsError> {
         let recv_socket =
             crate::socket_helper::join_multicast(self.network_scope).and_then(nonblocking)?;
 
@@ -209,7 +225,7 @@ impl ServiceDiscoveryExecutor {
             select! {
                 packet = recv_socket.recv_from(&mut recv_buffer) => {
                     let (count, addr) = packet?;
-                    if let Err(err) = self.process_packet(&recv_buffer[..count], addr).await {
+                    if let Err(err) = self.process_packet(&recv_buffer[..count], addr, &mut on_discovery).await {
                         log::error!("Failed to process received packet {err}");
                     }
                 }
@@ -262,6 +278,7 @@ impl ServiceDiscoveryExecutor {
         &self,
         buf: &[u8],
         origin_addr: SocketAddr,
+        on_discovery: &mut Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
     ) -> Result<(), SimpleMdnsError> {
         let packet = Packet::parse(buf)?;
         if packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
@@ -270,7 +287,9 @@ impl ServiceDiscoveryExecutor {
                 &self.service_name,
                 &self.full_name,
                 &mut *self.resource_manager.write().await,
-            );
+                on_discovery,
+            )
+            .await;
         } else {
             match crate::build_reply(packet, &*self.resource_manager.read().await) {
                 Some((reply_packet, unicast_response)) => {
@@ -376,11 +395,12 @@ impl ServiceDiscoveryExecutor {
     }
 }
 
-fn add_response_to_resources(
-    packet: Packet,
+async fn add_response_to_resources(
+    packet: Packet<'_>,
     service_name: &Name<'_>,
     full_name: &Name<'_>,
-    owned_resources: &mut ResourceRecordManager,
+    owned_resources: &mut ResourceRecordManager<'static>,
+    on_discovery: &mut Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
 ) {
     let resources = packet
         .answers
@@ -393,9 +413,40 @@ fn add_response_to_resources(
                     || aw.match_qtype(TYPE::TXT.into())
                     || aw.match_qtype(TYPE::A.into())
                     || aw.match_qtype(TYPE::PTR.into()))
-        });
+        })
+        .map(|r| r.into_owned());
 
-    for resource in resources {
-        owned_resources.add_expirable_resource(resource.into_owned());
+    if let Some(channel) = on_discovery {
+        let resources: Vec<_> = resources.collect();
+        if resources.is_empty() {
+            return;
+        }
+
+        let mut instance_name: Option<String> = Default::default();
+        let instance_information =
+            InstanceInformation::from_records(resources.iter().inspect(|record| {
+                if instance_name.is_none() {
+                    instance_name = record
+                        .name
+                        .without(service_name)
+                        .map(|sub_domain| sub_domain.to_string());
+                }
+            }));
+
+        if channel
+            .send((instance_name.unwrap_or_default(), instance_information))
+            .await
+            .is_err()
+        {
+            *on_discovery = None
+        }
+
+        for resource in resources {
+            owned_resources.add_expirable_resource(resource);
+        }
+    } else {
+        for resource in resources {
+            owned_resources.add_expirable_resource(resource);
+        }
     }
 }

@@ -67,6 +67,50 @@ fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn service_discovery_is_notified_on_discovery() -> Result<(), Box<dyn Error>> {
+    // init_log();
+
+    std::thread::sleep(Duration::from_secs(1));
+
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    let mut service_discovery_a = ServiceDiscovery::new_with_scope(
+        "a",
+        "_notify._tcp.local",
+        60,
+        Some(tx),
+        simple_mdns::NetworkScope::V4,
+    )?;
+    let mut service_discovery_b = ServiceDiscovery::new("b", "_notify._tcp.local", 60)?;
+    let mut service_discovery_c = ServiceDiscovery::new("c", "_notify._tcp.local", 60)?;
+
+    service_discovery_a
+        .add_service_info(SocketAddr::from_str("192.168.1.2:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_b
+        .add_service_info(SocketAddr::from_str("192.168.1.3:8080")?.into())
+        .expect("Failed to add service info");
+    service_discovery_c
+        .add_service_info(SocketAddr::from_str("192.168.1.4:8080")?.into())
+        .expect("Failed to add service info");
+
+    for _ in 0..2 {
+        let Ok((instance_name, service_info)) = rx.recv_timeout(Duration::from_secs(5)) else {
+            panic!("Did not receive enough packets");
+        };
+
+        let addr = service_info.get_socket_addresses().next().unwrap();
+        match instance_name.as_str() {
+            "b" => assert_eq!(("192.168.1.3:8080".parse::<SocketAddr>()?), addr),
+            "c" => assert_eq!(("192.168.1.4:8080".parse::<SocketAddr>()?), addr),
+            _ => panic!("Received unexpected packet"),
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
 fn service_discovery_receive_attributes() -> Result<(), Box<dyn Error>> {
     // init_log();
 
@@ -125,18 +169,21 @@ fn service_discovery_can_find_services_ipv6() -> Result<(), Box<dyn Error>> {
         "a",
         "_srv3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
     let mut service_discovery_b = ServiceDiscovery::new_with_scope(
         "b",
         "_srv3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
     let mut service_discovery_c = ServiceDiscovery::new_with_scope(
         "c",
         "_srv3._tcp.local",
         60,
+        None,
         simple_mdns::NetworkScope::V6,
     )?;
 
