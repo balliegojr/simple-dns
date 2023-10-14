@@ -103,7 +103,7 @@ IPV6 is now supported by using the `NetworkScope` enum.
     use std::net::SocketAddr;
     use std::str::FromStr;
 
-    let mut discovery = ServiceDiscovery::new_with_scope("a", "_mysrv._tcp.local", 60, NetworkScope::V4).expect("Invalid Service Name");
+    let mut discovery = ServiceDiscovery::new_with_scope("a", "_mysrv._tcp.local", 60, None, NetworkScope::V4).expect("Invalid Service Name");
     # }
 ```
 
