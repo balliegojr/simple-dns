@@ -1,4 +1,4 @@
-# 0.5.0 (Unreleased)
+# 0.5.0 (2023-10-17)
 
 ### Breaking changes
 - Change `get_known_services` to return instance name
