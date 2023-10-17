@@ -1,4 +1,4 @@
-# 0.5.7 (Unreleased)
+# 0.5.7 (2023-10-17)
 
 ### Fix
 - TryFrom<'str> for TXT generating invalid CharacterStrings
