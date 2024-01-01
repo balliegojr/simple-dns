@@ -92,6 +92,7 @@ The *Packet* structure provides parsing e building of a DNS packet, it aims to b
 - [RFC 2782](https://tools.ietf.org/html/rfc2782)
 - [RFC 3596](https://tools.ietf.org/html/rfc3596)
 - [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891)
+- [RFC 9460](https://datatracker.ietf.org/doc/html/rfc9460)
 
 Other Resource Records defined by other RFCs that are not in this list will be implemented over time
 
