@@ -63,6 +63,9 @@ pub use txt::TXT;
 mod wks;
 pub use wks::WKS;
 
+mod svcb;
+pub use svcb::{SvcParam, SVCB};
+
 pub(crate) trait RR {
     const TYPE_CODE: u16;
 }
@@ -117,6 +120,12 @@ macros::rr_wrapper! {
     NSAP_PTR:Name = 23
 }
 
+macros::rr_wrapper! {
+    #[doc = "HTTPS RR type is a [SVCB]-compatible RR type, specific to the \"https\" and \"http\" schemes. \
+        [RFC 9460](https://datatracker.ietf.org/doc/html/rfc9460#name-using-service-bindings-with)."]
+    HTTPS: SVCB = 65
+}
+
 macros::rdata_enum! {
     A,
     AAAA,
@@ -144,4 +153,6 @@ macros::rdata_enum! {
     LOC,
     OPT<'a>,
     CAA<'a>,
+    SVCB<'a>,
+    HTTPS<'a>,
 }
