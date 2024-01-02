@@ -64,7 +64,7 @@ mod wks;
 pub use wks::WKS;
 
 mod svcb;
-pub use svcb::{SvcParam, SVCB};
+pub use svcb::SVCB;
 
 pub(crate) trait RR {
     const TYPE_CODE: u16;
