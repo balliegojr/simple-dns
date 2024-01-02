@@ -1,4 +1,4 @@
-use std::{borrow::Cow, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
 
 use crate::dns::{PacketPart, MAX_SVC_PARAM_VALUE_LENGTH};
 use crate::{CharacterString, Name};
@@ -19,18 +19,14 @@ pub struct SVCB<'a> {
     pub target: Name<'a>,
 
     /// A list of key=value pairs describing the alternative endpoint at `target`.
-    pub params: Vec<SvcParam<'a>>,
+    params: BTreeMap<u16, Cow<'a, [u8]>>,
 }
 
-/// Parameters of a [`SVCB`] or [`HTTPS`](super::HTTPS) record.
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct SvcParam<'a> {
-    /// The SvcParamKey.
-    pub key: u16,
-    value: Cow<'a, [u8]>,
+impl<'a> RR for SVCB<'a> {
+    const TYPE_CODE: u16 = 64;
 }
 
-impl<'a> SvcParam<'a> {
+impl<'a> SVCB<'a> {
     /// Mandatory keys in this RR.
     pub const MANDATORY: u16 = 0;
 
@@ -52,93 +48,101 @@ impl<'a> SvcParam<'a> {
     /// IPv6 address hints.
     pub const IPV6HINT: u16 = 6;
 
-    fn internal_new(key: u16, value: Cow<'a, [u8]>) -> crate::Result<Self> {
+    /// Creates a new `SVCB` instance with no parameters.
+    pub fn new(priority: u16, target: Name<'a>) -> Self {
+        Self {
+            priority,
+            target,
+            params: BTreeMap::new(),
+        }
+    }
+
+    /// Sets an arbitrary key=value parameter.
+    ///
+    /// The format of `value` is not checked against the `key`.
+    ///
+    /// If a parameter of the given `key` already existed, the previous entry will be replaced.
+    pub fn set_param<V: Into<Cow<'a, [u8]>>>(&mut self, key: u16, value: V) -> crate::Result<()> {
+        let value = value.into();
         if value.len() > MAX_SVC_PARAM_VALUE_LENGTH {
             return Err(crate::SimpleDnsError::InvalidDnsPacket);
         }
-        Ok(Self { key, value })
+        self.params.insert(key, value);
+        Ok(())
     }
 
-    /// Creates a new arbitrary key=value pair.
+    /// Sets the "mandatory" parameter.
     ///
-    /// The format of `value` is not checked against the `key`.
-    pub fn new(key: u16, value: &'a [u8]) -> crate::Result<Self> {
-        Self::internal_new(key, Cow::Borrowed(value))
-    }
-
-    /// Creates a "mandatory" parameter.
-    ///
-    /// The list of keys MUST be listed in strictly increasing order.
-    pub fn mandatory<I: IntoIterator<Item = u16>>(keys: I) -> crate::Result<Self> {
+    /// The `keys` MUST not be empty and already in strictly increasing order.
+    pub fn set_mandatory<I: IntoIterator<Item = u16>>(&mut self, keys: I) -> crate::Result<()> {
         let value = keys.into_iter().map(u16::to_be_bytes).flatten().collect();
-        Self::internal_new(Self::MANDATORY, Cow::Owned(value))
+        self.set_param(Self::MANDATORY, Cow::Owned(value))
     }
 
-    /// Creates an "alpn" parameter.
-    pub fn alpn<'cs, I: IntoIterator<Item = CharacterString<'cs>>>(
+    /// Sets the "alpn" parameter.
+    ///
+    /// The `alpn_ids` MUST not be empty.
+    pub fn set_alpn<'cs, I: IntoIterator<Item = CharacterString<'cs>>>(
+        &mut self,
         alpn_ids: I,
-    ) -> crate::Result<Self> {
+    ) -> crate::Result<()> {
         let mut value = Vec::new();
         for alpn_id in alpn_ids {
             alpn_id.write_to(&mut value)?;
         }
-        Self::internal_new(Self::ALPN, Cow::Owned(value))
+        self.set_param(Self::ALPN, value)
     }
 
-    /// Creates a "no-default-alpn" parameter.
-    pub const fn no_default_alpn() -> Self {
-        Self {
-            key: Self::NO_DEFAULT_ALPN,
-            value: Cow::Borrowed(b""),
-        }
+    /// Sets the "no-default-alpn" parameter.
+    pub fn set_no_default_alpn(&mut self) {
+        self.set_param(Self::NO_DEFAULT_ALPN, &b""[..]).unwrap();
     }
 
-    /// Creates a "port" parameter.
-    pub fn port(port: u16) -> Self {
-        Self {
-            key: Self::PORT,
-            value: Cow::Owned(port.to_be_bytes().to_vec()),
-        }
+    /// Sets the "port" parameter.
+    pub fn set_port(&mut self, port: u16) {
+        self.set_param(Self::PORT, port.to_be_bytes().to_vec())
+            .unwrap();
     }
 
-    /// Creates an "ipv4hint" parameter.
-    pub fn ipv4hint<I: IntoIterator<Item = u32>>(ips: I) -> crate::Result<Self> {
+    /// Sets the "ipv4hint" parameter.
+    ///
+    /// The `ips` MUST not be empty.
+    pub fn set_ipv4hint<I: IntoIterator<Item = u32>>(&mut self, ips: I) -> crate::Result<()> {
         let value = ips.into_iter().map(u32::to_be_bytes).flatten().collect();
-        Self::internal_new(Self::IPV4HINT, Cow::Owned(value))
+        self.set_param(Self::IPV4HINT, Cow::Owned(value))
     }
 
-    /// Creates an "ipv6hint" parameter.
-    pub fn ipv6hint<I: IntoIterator<Item = u128>>(ips: I) -> crate::Result<Self> {
+    /// Sets the "ipv6hint" parameter.
+    ///
+    /// The `ips` MUST not be empty.
+    pub fn set_ipv6hint<I: IntoIterator<Item = u128>>(&mut self, ips: I) -> crate::Result<()> {
         let value = ips.into_iter().map(u128::to_be_bytes).flatten().collect();
-        Self::internal_new(Self::IPV6HINT, Cow::Owned(value))
+        self.set_param(Self::IPV6HINT, Cow::Owned(value))
     }
 
-    /// Gets a read-only reference to the SvcParamValue in wire format.
+    /// Gets a read-only reference to the SvcParamValue of a given key in wire format.
+    ///
+    /// Returns `None` if the key does not exist.
     // TODO actually parse the SvcParamValue?
-    pub fn value(&'_ self) -> &'_ [u8] {
-        &self.value
+    pub fn get_param(&self, key: u16) -> Option<&[u8]> {
+        self.params.get(&key).map(|v| &**v)
     }
 
-    /// Transforms the inner data into its owned type
-    pub fn into_owned<'b>(self) -> SvcParam<'b> {
-        SvcParam {
-            key: self.key,
-            value: self.value.into_owned().into(),
-        }
+    /// Iterates over all parameters.
+    pub fn iter_params(&self) -> impl Iterator<Item = (u16, &[u8])> {
+        self.params.iter().map(|(k, v)| (*k, &**v))
     }
-}
 
-impl<'a> RR for SVCB<'a> {
-    const TYPE_CODE: u16 = 64;
-}
-
-impl<'a> SVCB<'a> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> SVCB<'b> {
         SVCB {
             priority: self.priority,
             target: self.target.into_owned(),
-            params: self.params.into_iter().map(SvcParam::into_owned).collect(),
+            params: self
+                .params
+                .into_iter()
+                .map(|(k, v)| (k, v.into_owned().into()))
+                .collect(),
         }
     }
 }
@@ -151,16 +155,21 @@ impl<'a> PacketPart<'a> for SVCB<'a> {
         let priority = u16::from_be_bytes(data[position..position + 2].try_into()?);
         let target = Name::parse(data, position + 2)?;
         position += 2 + target.len();
-        let mut params = Vec::new();
+        let mut params = BTreeMap::new();
+        let mut previous_key = -1;
         while position < data.len() {
             let key = u16::from_be_bytes(data[position..position + 2].try_into()?);
             let value_length = usize::from(u16::from_be_bytes(
                 data[position + 2..position + 4].try_into()?,
             ));
-            params.push(SvcParam {
+            if i32::from(key) <= previous_key {
+                return Err(crate::SimpleDnsError::InvalidDnsPacket);
+            }
+            previous_key = i32::from(key);
+            params.insert(
                 key,
-                value: Cow::Borrowed(&data[position + 4..position + 4 + value_length]),
-            });
+                Cow::Borrowed(&data[position + 4..position + 4 + value_length]),
+            );
             position += 4 + value_length;
         }
         Ok(Self {
@@ -173,11 +182,11 @@ impl<'a> PacketPart<'a> for SVCB<'a> {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.priority.to_be_bytes())?;
         self.target.write_to(out)?;
-        for param in &self.params {
-            out.write_all(&param.key.to_be_bytes())?;
-            let value_length = param.value.len() as u16;
+        for (key, value) in &self.params {
+            out.write_all(&key.to_be_bytes())?;
+            let value_length = value.len() as u16;
             out.write_all(&value_length.to_be_bytes())?;
-            out.write_all(&param.value)?;
+            out.write_all(&value)?;
         }
         Ok(())
     }
@@ -189,8 +198,8 @@ impl<'a> PacketPart<'a> for SVCB<'a> {
         2 + self.target.len()
             + self
                 .params
-                .iter()
-                .map(|param| param.value.len() + 4)
+                .values()
+                .map(|value| value.len() + 4)
                 .sum::<usize>()
     }
 }
@@ -210,27 +219,29 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(sample_rdata.priority, 1);
-        assert_eq!(sample_rdata.target, Name::new_unchecked(""));
+        let mut expected_rdata = SVCB::new(1, Name::new_unchecked(""));
+        expected_rdata.set_alpn(["http/1.1".try_into()?, "h2".try_into()?])?;
+        expected_rdata.set_ipv4hint([0xa2_9f_89_55, 0xa2_9f_8a_55])?;
+        expected_rdata.set_param(
+            SVCB::ECH,
+            &b"\x00\x45\
+                \xfe\x0d\x00\x41\x44\x00\x20\x00\x20\x1a\xd1\x4d\x5c\xa9\x52\xda\
+                \x88\x18\xae\xaf\xd7\xc6\xc8\x7d\x47\xb4\xb3\x45\x7f\x8e\x58\xbc\
+                \x87\xb8\x95\xfc\xb3\xde\x1b\x34\x33\x00\x04\x00\x01\x00\x01\x00\
+                \x12cloudflare-ech.com\x00\x00"[..],
+        )?;
+        expected_rdata.set_ipv6hint([
+            0x2606_4700_0007_0000_0000_0000_a29f_8955,
+            0x2606_4700_0007_0000_0000_0000_a29f_8a55,
+        ])?;
+
+        assert_eq!(*sample_rdata, expected_rdata);
+
         assert_eq!(
-            sample_rdata.params,
-            vec![
-                SvcParam::alpn(["http/1.1".try_into()?, "h2".try_into()?])?,
-                SvcParam::ipv4hint([0xa2_9f_89_55, 0xa2_9f_8a_55])?,
-                SvcParam::new(
-                    SvcParam::ECH,
-                    b"\x00\x45\
-                        \xfe\x0d\x00\x41\x44\x00\x20\x00\x20\x1a\xd1\x4d\x5c\xa9\x52\xda\
-                        \x88\x18\xae\xaf\xd7\xc6\xc8\x7d\x47\xb4\xb3\x45\x7f\x8e\x58\xbc\
-                        \x87\xb8\x95\xfc\xb3\xde\x1b\x34\x33\x00\x04\x00\x01\x00\x01\x00\
-                        \x12cloudflare-ech.com\x00\x00"
-                )?,
-                SvcParam::ipv6hint([
-                    0x2606_4700_0007_0000_0000_0000_a29f_8955,
-                    0x2606_4700_0007_0000_0000_0000_a29f_8a55
-                ])?,
-            ]
+            sample_rdata.get_param(SVCB::ALPN),
+            Some(&b"\x08http/1.1\x02h2"[..])
         );
+        assert_eq!(sample_rdata.get_param(SVCB::PORT), None);
 
         Ok(())
     }
@@ -243,57 +254,43 @@ mod tests {
             (
                 "D.1. AliasMode",
                 b"\x00\x00\x03foo\x07example\x03com\x00",
-                SVCB {
-                    priority: 0,
-                    target: Name::new_unchecked("foo.example.com"),
-                    params: vec![],
-                },
+                SVCB::new(0, Name::new_unchecked("foo.example.com")),
             ),
             (
                 "D.2.3. TargetName Is '.'",
                 b"\x00\x01\x00",
-                SVCB {
-                    priority: 1,
-                    target: Name::new_unchecked(""),
-                    params: vec![],
-                },
+                SVCB::new(1, Name::new_unchecked("")),
             ),
             (
                 "D.2.4. Specified a Port",
                 b"\x00\x10\x03foo\x07example\x03com\x00\x00\x03\x00\x02\x00\x35",
-                SVCB {
-                    priority: 16,
-                    target: Name::new_unchecked("foo.example.com"),
-                    params: vec![
-                        SvcParam::port(53),
-                    ],
-                },
+                {
+                    let mut svcb = SVCB::new(16, Name::new_unchecked("foo.example.com"));
+                    svcb.set_port(53);
+                    svcb
+                }
             ),
             (
                 "D.2.6. A Generic Key and Quoted Value with a Decimal Escape",
                 b"\x00\x01\x03foo\x07example\x03com\x00\x02\x9b\x00\x09hello\xd2qoo",
-                SVCB {
-                    priority: 1,
-                    target: Name::new_unchecked("foo.example.com"),
-                    params: vec![
-                        SvcParam::new(667, b"hello\xd2qoo").unwrap(),
-                    ],
-                },
+                {
+                    let mut svcb = SVCB::new(1, Name::new_unchecked("foo.example.com"));
+                    svcb.set_param(667, &b"hello\xd2qoo"[..]).unwrap();
+                    svcb
+                }
             ),
             (
                 "D.2.7. Two Quoted IPv6 Hints",
                 b"\x00\x01\x03foo\x07example\x03com\x00\x00\x06\x00\x20\
                     \x20\x01\x0d\xb8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01\
                     \x20\x01\x0d\xb8\x00\x00\x00\x00\x00\x00\x00\x00\x00\x53\x00\x01",
-                SVCB {
-                    priority: 1,
-                    target: Name::new_unchecked("foo.example.com"),
-                    params: vec![
-                        SvcParam::ipv6hint([
-                            0x2001_0db8_0000_0000_0000_0000_0000_0001,
-                            0x2001_0db8_0000_0000_0000_0000_0053_0001,
-                        ]).unwrap(),
-                    ],
+                {
+                    let mut svcb = SVCB::new(1, Name::new_unchecked("foo.example.com"));
+                    svcb.set_ipv6hint([
+                        0x2001_0db8_0000_0000_0000_0000_0000_0001,
+                        0x2001_0db8_0000_0000_0000_0000_0053_0001,
+                    ]).unwrap();
+                    svcb
                 },
             ),
             (
@@ -302,14 +299,12 @@ mod tests {
                     \x00\x00\x00\x04\x00\x01\x00\x04\
                     \x00\x01\x00\x09\x02h2\x05h3-19\
                     \x00\x04\x00\x04\xc0\x00\x02\x01",
-                SVCB {
-                    priority: 16,
-                    target: Name::new_unchecked("foo.example.org"),
-                    params: vec![
-                        SvcParam::mandatory([SvcParam::ALPN, SvcParam::IPV4HINT]).unwrap(),
-                        SvcParam::alpn(["h2".try_into().unwrap(), "h3-19".try_into().unwrap()]).unwrap(),
-                        SvcParam::ipv4hint([0xc0_00_02_01]).unwrap(),
-                    ],
+                {
+                    let mut svcb = SVCB::new(16, Name::new_unchecked("foo.example.org"));
+                    svcb.set_alpn(["h2".try_into().unwrap(), "h3-19".try_into().unwrap()]).unwrap();
+                    svcb.set_mandatory([SVCB::ALPN, SVCB::IPV4HINT]).unwrap();
+                    svcb.set_ipv4hint([0xc0_00_02_01]).unwrap();
+                    svcb
                 },
             ),
         ];
