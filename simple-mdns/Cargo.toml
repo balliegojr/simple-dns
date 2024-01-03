@@ -18,10 +18,9 @@ sync = []
 async-tokio = ["dep:tokio"]
 
 [dependencies]
-simple-dns = { path = "../simple-dns", version = "0.5" }
+simple-dns = { path = "../simple-dns", version = "0.6" }
 socket2 = { version = "0.5", features = ["all"] }
 log = "^0.4"
-lazy_static = "^1.4.0"
 radix_trie = "^0.2.1"
 tokio = { version = "1.32", features = [
     "net",

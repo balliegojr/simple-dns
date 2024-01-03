@@ -1,6 +1,4 @@
 #![doc = include_str!("../README.md")]
-#![warn(missing_docs)]
-extern crate lazy_static;
 
 use std::collections::HashSet;
 
