@@ -75,7 +75,7 @@ impl<'a> SVCB<'a> {
     ///
     /// The `keys` MUST not be empty and already in strictly increasing order.
     pub fn set_mandatory<I: IntoIterator<Item = u16>>(&mut self, keys: I) -> crate::Result<()> {
-        let value = keys.into_iter().map(u16::to_be_bytes).flatten().collect();
+        let value = keys.into_iter().flat_map(u16::to_be_bytes).collect();
         self.set_param(Self::MANDATORY, Cow::Owned(value))
     }
 
@@ -108,7 +108,7 @@ impl<'a> SVCB<'a> {
     ///
     /// The `ips` MUST not be empty.
     pub fn set_ipv4hint<I: IntoIterator<Item = u32>>(&mut self, ips: I) -> crate::Result<()> {
-        let value = ips.into_iter().map(u32::to_be_bytes).flatten().collect();
+        let value = ips.into_iter().flat_map(u32::to_be_bytes).collect();
         self.set_param(Self::IPV4HINT, Cow::Owned(value))
     }
 
@@ -116,7 +116,7 @@ impl<'a> SVCB<'a> {
     ///
     /// The `ips` MUST not be empty.
     pub fn set_ipv6hint<I: IntoIterator<Item = u128>>(&mut self, ips: I) -> crate::Result<()> {
-        let value = ips.into_iter().map(u128::to_be_bytes).flatten().collect();
+        let value = ips.into_iter().flat_map(u128::to_be_bytes).collect();
         self.set_param(Self::IPV6HINT, Cow::Owned(value))
     }
 
@@ -186,7 +186,7 @@ impl<'a> PacketPart<'a> for SVCB<'a> {
             out.write_all(&key.to_be_bytes())?;
             let value_length = value.len() as u16;
             out.write_all(&value_length.to_be_bytes())?;
-            out.write_all(&value)?;
+            out.write_all(value)?;
         }
         Ok(())
     }
