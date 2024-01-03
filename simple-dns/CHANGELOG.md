@@ -1,3 +1,9 @@
+# 0.6.0 (2024-01-03)
+
+### Added (Breaking)
+- Anotate TYPE with non_exhaustive
+- Add SVBC record type parsing (RFC 9460)
+
 # 0.5.7 (2023-10-17)
 
 ### Fix
