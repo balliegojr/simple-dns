@@ -176,6 +176,7 @@ macro_rules! rdata_enum {
         /// Each value is described according to its own RFC
         #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
         #[allow(missing_docs)]
+        #[non_exhaustive]
         pub enum TYPE {
             $( $i,)+
 
