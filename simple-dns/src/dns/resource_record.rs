@@ -56,7 +56,6 @@ impl<'a> ResourceRecord<'a> {
     }
 
     /// Return true if current resource match given query type
-    /// The types `A` and `AAAA` will match each other
     pub fn match_qtype(&self, qtype: QTYPE) -> bool {
         let type_code = self.rdata.type_code();
         match qtype {
@@ -65,10 +64,7 @@ impl<'a> ResourceRecord<'a> {
             QTYPE::AXFR => true, // TODO: figure out what to do here
             QTYPE::MAILB => type_code == TYPE::MR || type_code == TYPE::MB || type_code == TYPE::MG,
             QTYPE::MAILA => type_code == TYPE::MX,
-            QTYPE::TYPE(ty) => match ty {
-                TYPE::A | TYPE::AAAA => type_code == TYPE::A || type_code == TYPE::AAAA,
-                _ => ty == type_code,
-            },
+            QTYPE::TYPE(ty) => ty == type_code,
         }
     }
 
@@ -285,25 +281,6 @@ mod tests {
         assert!(rr.match_qtype(QTYPE::ANY));
         assert!(rr.match_qtype(TYPE::A.into()));
         assert!(!rr.match_qtype(TYPE::WKS.into()));
-    }
-
-    #[test]
-    fn test_match_qtype_for_aaaa() {
-        let mut rr = ResourceRecord {
-            class: CLASS::IN,
-            name: "_srv._udp.local".try_into().unwrap(),
-            ttl: 10,
-            rdata: RData::A(crate::rdata::A { address: 0 }),
-            cache_flush: false,
-        };
-
-        assert!(rr.match_qtype(TYPE::A.into()));
-        assert!(rr.match_qtype(TYPE::AAAA.into()));
-
-        rr.rdata = RData::AAAA(crate::rdata::AAAA { address: 0 });
-
-        assert!(rr.match_qtype(TYPE::A.into()));
-        assert!(rr.match_qtype(TYPE::AAAA.into()));
     }
 
     #[test]

@@ -1,7 +1,10 @@
 # 0.6.0 (2024-01-03)
 
-### Added (Breaking)
+### Changed (Breaking)
 - Anotate TYPE with non_exhaustive
+- QCLASS::match_qtype no longer matcher A and AAAA together
+
+### Added (Breaking)
 - Add SVBC record type parsing (RFC 9460)
 
 # 0.5.7 (2023-10-17)
