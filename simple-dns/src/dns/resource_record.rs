@@ -94,8 +94,7 @@ impl<'a> ResourceRecord<'a> {
             out.write_all(&class)?;
         }
 
-        out.write_all(&self.ttl.to_be_bytes())?;
-        out.write_all(&(self.rdata.len() as u16).to_be_bytes())
+        out.write_all(&self.ttl.to_be_bytes())
             .map_err(crate::SimpleDnsError::from)
     }
 }
@@ -145,6 +144,7 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         self.name.write_to(out)?;
         self.write_common(out)?;
+        out.write_all(&(self.rdata.len() as u16).to_be_bytes())?;
         self.rdata.write_to(out)
     }
 
@@ -155,7 +155,17 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
     ) -> crate::Result<()> {
         self.name.write_compressed_to(out, name_refs)?;
         self.write_common(out)?;
-        self.rdata.write_compressed_to(out, name_refs)
+
+        let len_position = out.stream_position()?;
+        out.write_all(&[0, 0])?;
+
+        self.rdata.write_compressed_to(out, name_refs)?;
+        let end = out.stream_position()?;
+
+        out.seek(std::io::SeekFrom::Start(len_position))?;
+        out.write_all(&((end - len_position - 2) as u16).to_be_bytes())?;
+        out.seek(std::io::SeekFrom::End(0))?;
+        Ok(())
     }
 }
 

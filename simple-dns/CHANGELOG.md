@@ -1,5 +1,8 @@
 # 0.6.0 (2024-01-03)
 
+### Fix
+- Fixes invalid rdata length when generating compressed packets.
+
 ### Changed (Breaking)
 - Anotate TYPE with non_exhaustive
 - QCLASS::match_qtype no longer matcher A and AAAA together
