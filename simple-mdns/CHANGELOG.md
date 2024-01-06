@@ -1,3 +1,9 @@
+
+# 0.6.1 (2024-01-06)
+
+### Fixed
+- Implement Clone for `InstanceInformation`
+
 # 0.6.0 (2024-01-06)
 
 ### Breaking Changes

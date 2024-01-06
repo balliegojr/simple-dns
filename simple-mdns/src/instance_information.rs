@@ -8,7 +8,7 @@ use simple_dns::{Name, ResourceRecord};
 
 /// Represents a single instance of the service.
 /// Notice that it is not possible to associate a port to a single ip address, due to limitations of the DNS protocol
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct InstanceInformation {
     instance_name: String,
     /// Ips for this instance
