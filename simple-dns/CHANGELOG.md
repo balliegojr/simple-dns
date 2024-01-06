@@ -1,4 +1,4 @@
-# 0.6.0 (2024-01-03)
+# 0.6.0 (2024-01-06)
 
 ### Fix
 - Fixes invalid rdata length when generating compressed packets.
