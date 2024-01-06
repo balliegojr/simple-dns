@@ -27,10 +27,10 @@ It is necessary to provide instance and service name
         "_mysrv._tcp.local", 
         60
     ).expect("Failed to start service discovery");
-    # }
 
     // Removing service from discovery
     discovery.remove_service_from_discovery();
+    # }
 ```
 
 
