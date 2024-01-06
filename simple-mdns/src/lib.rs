@@ -1,7 +1,8 @@
+#![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
-
 use std::collections::HashSet;
 
+use resource_record_manager::DomainResourceFilter;
 use simple_dns::{rdata::RData, Packet, TYPE};
 
 pub mod conversion_utils;
@@ -36,14 +37,17 @@ pub(crate) fn build_reply<'b>(
     let mut unicast_response = false;
     let mut additional_records = HashSet::new();
 
-    // TODO: fill the questions for the response
-    // TODO: filter out questions with known answers
+    // TODO: add dns-sd metaquery (https://datatracker.ietf.org/doc/html/rfc6763#autoid-25)
+
     for question in packet.questions.iter() {
         if question.unicast_response {
             unicast_response = question.unicast_response
         }
 
-        for d_resources in resources.get_domain_resources(&question.qname, true, true) {
+        // FIXME: send negative response for IPv4 or IPv6 if necessary
+        for d_resources in resources
+            .get_domain_resources(&question.qname, DomainResourceFilter::authoritative(true))
+        {
             for answer in d_resources
                 .filter(|r| r.match_qclass(question.qclass) && r.match_qtype(question.qtype))
             {
@@ -51,10 +55,14 @@ pub(crate) fn build_reply<'b>(
 
                 if let RData::SRV(srv) = &answer.rdata {
                     let target = resources
-                        .get_domain_resources(&srv.target, false, true)
+                        .get_domain_resources(
+                            &srv.target,
+                            DomainResourceFilter::authoritative(false),
+                        )
                         .flatten()
                         .filter(|r| {
-                            r.match_qtype(TYPE::A.into()) && r.match_qclass(question.qclass)
+                            (r.match_qtype(TYPE::A.into()) || r.match_qtype(TYPE::AAAA.into()))
+                                && r.match_qclass(question.qclass)
                         })
                         .cloned();
 
@@ -95,28 +103,28 @@ mod tests {
 
     fn get_resources() -> ResourceRecordManager<'static> {
         let mut resources = ResourceRecordManager::new();
-        resources.add_owned_resource(port_to_srv_record(
+        resources.add_authoritative_resource(port_to_srv_record(
             &Name::new_unchecked("_res1._tcp.com"),
             8080,
             0,
         ));
-        resources.add_owned_resource(ip_addr_to_resource_record(
+        resources.add_authoritative_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
             Ipv4Addr::LOCALHOST.into(),
             0,
         ));
-        resources.add_owned_resource(ip_addr_to_resource_record(
+        resources.add_authoritative_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res1._tcp.com"),
             Ipv6Addr::LOCALHOST.into(),
             0,
         ));
 
-        resources.add_owned_resource(port_to_srv_record(
+        resources.add_authoritative_resource(port_to_srv_record(
             &Name::new_unchecked("_res2._tcp.com"),
             8080,
             0,
         ));
-        resources.add_owned_resource(ip_addr_to_resource_record(
+        resources.add_authoritative_resource(ip_addr_to_resource_record(
             &Name::new_unchecked("_res2._tcp.com"),
             Ipv4Addr::LOCALHOST.into(),
             0,
@@ -129,7 +137,7 @@ mod tests {
         let resources = get_resources();
 
         let packet = Packet::new_query(1);
-        assert!(build_reply(packet, &resources,).is_none());
+        assert!(build_reply(packet, &resources).is_none());
     }
 
     #[test]
@@ -144,7 +152,7 @@ mod tests {
             false,
         ));
 
-        assert!(build_reply(packet, &resources,).is_none());
+        assert!(build_reply(packet, &resources).is_none());
     }
 
     #[test]
@@ -162,7 +170,7 @@ mod tests {
         let (reply, unicast_response) = build_reply(packet, &resources).unwrap();
 
         assert!(unicast_response);
-        assert_eq!(2, reply.answers.len());
+        assert_eq!(1, reply.answers.len());
         assert_eq!(0, reply.additional_records.len());
     }
 

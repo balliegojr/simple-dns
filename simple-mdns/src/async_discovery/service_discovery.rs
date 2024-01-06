@@ -9,15 +9,11 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 
-use std::{
-    collections::{HashMap, HashSet},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashSet, net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
-    resource_record_manager::ResourceRecordManager, socket_helper::nonblocking,
+    resource_record_manager::{DomainResourceFilter, ResourceRecordManager},
+    socket_helper::nonblocking,
     InstanceInformation, NetworkScope, SimpleMdnsError,
 };
 
@@ -30,36 +26,34 @@ use crate::{
 /// ## Example
 /// ```no_run
 /// use simple_mdns::async_discovery::ServiceDiscovery;
-/// use std::net::SocketAddr;
+/// use simple_mdns::InstanceInformation;
 /// use std::str::FromStr;
 ///
-/// let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
-/// discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
+/// let mut discovery = ServiceDiscovery::new(
+///     InstanceInformation::new("a".into()).with_socket_address("192.168.1.22:8090".parse().expect("Invalid Socket Address")),
+///     "_mysrv._tcp.local",
+///     60
+/// ).expect("Failed to create service discovery");
 ///
 /// ```
 pub struct ServiceDiscovery {
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
-    full_name: Name<'static>,
     service_name: Name<'static>,
-    resource_ttl: u32,
 
     advertise_tx: Sender<bool>,
 }
 impl ServiceDiscovery {
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
+    /// Creates a new ServiceDiscovery by providing `instance_information`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
     ///
-    /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
-    ///
-    /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     pub fn new(
-        instance_name: &str,
+        instance_information: InstanceInformation,
         service_name: &str,
         resource_ttl: u32,
     ) -> Result<Self, SimpleMdnsError> {
         Self::new_with_scope(
-            instance_name,
+            instance_information,
             service_name,
             resource_ttl,
             None,
@@ -67,37 +61,42 @@ impl ServiceDiscovery {
         )
     }
 
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
-    /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
+    /// Creates a new ServiceDiscovery by providing `instance_information`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
     ///
-    /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// `on_discovery` channel, if provided, will receive every instance information when
     /// discovered
     /// `network_scope` to be used
     pub fn new_with_scope(
-        instance_name: &str,
+        instance_information: InstanceInformation,
         service_name: &str,
         resource_ttl: u32,
-        on_discovery: Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
+        on_discovery: Option<tokio::sync::mpsc::Sender<InstanceInformation>>,
         network_scope: NetworkScope,
     ) -> Result<Self, SimpleMdnsError> {
-        let full_name = format!("{}.{}", instance_name, service_name);
-        let full_name = Name::new(&full_name)?.into_owned();
+        let instance_full_name = format!(
+            "{}.{service_name}",
+            instance_information.escaped_instance_name()
+        );
+        let instance_full_name = Name::new(&instance_full_name)?.into_owned();
         let service_name = Name::new(service_name)?.into_owned();
 
         let mut resource_manager = ResourceRecordManager::new();
-        resource_manager.add_owned_resource(ResourceRecord::new(
+        resource_manager.add_authoritative_resource(ResourceRecord::new(
             service_name.clone(),
             simple_dns::CLASS::IN,
-            0,
-            RData::PTR(service_name.clone().into()),
+            resource_ttl,
+            RData::PTR(instance_full_name.clone().into()),
         ));
+
+        for resource in instance_information.into_records(&instance_full_name, resource_ttl)? {
+            resource_manager.add_authoritative_resource(resource);
+        }
 
         let resource_manager = Arc::new(RwLock::new(resource_manager));
         let service_discovery = ServiceDiscoveryExecutor {
-            full_name: full_name.clone(),
+            instance_name: instance_full_name,
             service_name: service_name.clone(),
             resource_manager: resource_manager.clone(),
             sender_socket: crate::socket_helper::sender_socket(network_scope.is_v4())
@@ -115,92 +114,57 @@ impl ServiceDiscovery {
             }
         });
 
+        let announce = advertise_tx.clone();
+        spawn(async move {
+            let _ = announce.send(false).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            let _ = announce.send(false).await;
+        });
+
         Ok(Self {
             resource_manager,
-            full_name,
             service_name,
-            resource_ttl,
             advertise_tx,
         })
     }
 
-    /// Add the  service info to discovery and immediately advertise the service
-    pub async fn add_service_info(
-        &mut self,
-        service_info: InstanceInformation,
-    ) -> Result<(), SimpleMdnsError> {
-        {
-            let mut resource_manager = self.resource_manager.write().await;
-            for resource in service_info.into_records(&self.full_name.clone(), self.resource_ttl)? {
-                resource_manager.add_owned_resource(resource);
-            }
-        }
-
-        self.advertise_service(false).await
-    }
-
-    /// Remove all addresses from service discovery
+    /// Remove service from discovery by announcing with a cache flush and
+    /// removing all the internal resource records
     pub async fn remove_service_from_discovery(&mut self) {
-        if (self.advertise_service(true).await).is_err() {
+        if (self.announce(true).await).is_err() {
             log::error!("Failed to advertise cache flush");
         };
         self.resource_manager.write().await.clear();
     }
 
-    async fn advertise_service(&mut self, cache_flush: bool) -> Result<(), SimpleMdnsError> {
+    /// Announce the service by sending a packet with all the resource records in the answers
+    /// section. It is not necessary to call this method manually, it will be called automatically
+    /// when the instance is added to the discovery.
+    ///
+    /// if `cache_flush` is true, then the resources will have the cache flush flag set, this will
+    /// cause them to be removed from any cache that receives the packet.
+    pub async fn announce(&mut self, cache_flush: bool) -> Result<(), SimpleMdnsError> {
         self.advertise_tx
             .send(cache_flush)
             .await
             .map_err(|_| SimpleMdnsError::ServiceDiscoveryStopped)
     }
 
-    /// Return the addresses of all known services
-    pub async fn get_known_services(&self) -> HashMap<String, InstanceInformation> {
+    /// Return the [`InstanceInformation`] of all known services
+    pub async fn get_known_services(&self) -> HashSet<InstanceInformation> {
         self.resource_manager
             .read()
             .await
-            .get_domain_resources(&self.service_name, true, false)
-            .map(|domain_resources| {
-                let mut ip_addresses: Vec<IpAddr> = Vec::new();
-                let mut ports = Vec::new();
-                let mut attributes = HashMap::new();
-                let mut instance_name: Option<String> = Default::default();
-
-                for resource in domain_resources {
-                    if instance_name.is_none() {
-                        instance_name = resource
-                            .name
-                            .without(&self.service_name)
-                            .map(|sub_domain| sub_domain.to_string());
-                    }
-                    match &resource.rdata {
-                        simple_dns::rdata::RData::A(a) => {
-                            ip_addresses.push(Ipv4Addr::from(a.address).into())
-                        }
-                        simple_dns::rdata::RData::AAAA(aaaa) => {
-                            ip_addresses.push(Ipv6Addr::from(aaaa.address).into())
-                        }
-                        simple_dns::rdata::RData::TXT(txt) => attributes.extend(txt.attributes()),
-                        simple_dns::rdata::RData::SRV(srv) => ports.push(srv.port),
-                        _ => {}
-                    }
-                }
-
-                (
-                    instance_name.unwrap_or_default(),
-                    InstanceInformation {
-                        ip_addresses,
-                        ports,
-                        attributes,
-                    },
-                )
+            .get_domain_resources(&self.service_name, DomainResourceFilter::cached())
+            .filter_map(|domain_resources| {
+                InstanceInformation::from_records(&self.service_name, domain_resources)
             })
             .collect()
     }
 }
 
 struct ServiceDiscoveryExecutor {
-    full_name: Name<'static>,
+    instance_name: Name<'static>,
     service_name: Name<'static>,
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     sender_socket: UdpSocket,
@@ -211,7 +175,7 @@ impl ServiceDiscoveryExecutor {
     async fn execution_loop(
         self,
         mut advertise: Receiver<bool>,
-        mut on_discovery: Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
+        mut on_discovery: Option<tokio::sync::mpsc::Sender<InstanceInformation>>,
     ) -> Result<(), SimpleMdnsError> {
         let recv_socket =
             crate::socket_helper::join_multicast(self.network_scope).and_then(nonblocking)?;
@@ -278,14 +242,14 @@ impl ServiceDiscoveryExecutor {
         &self,
         buf: &[u8],
         origin_addr: SocketAddr,
-        on_discovery: &mut Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
+        on_discovery: &mut Option<tokio::sync::mpsc::Sender<InstanceInformation>>,
     ) -> Result<(), SimpleMdnsError> {
         let packet = Packet::parse(buf)?;
         if packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
             add_response_to_resources(
                 packet,
                 &self.service_name,
-                &self.full_name,
+                &self.instance_name,
                 &mut *self.resource_manager.write().await,
                 on_discovery,
             )
@@ -318,36 +282,35 @@ impl ServiceDiscoveryExecutor {
         let resource_manager = self.resource_manager.read().await;
         let mut additional_records = HashSet::new();
 
-        for d_resources in
-            resource_manager.get_domain_resources(&self.full_name.clone(), true, true)
-        {
+        // FIXME: include only the resources with appropriate network scope
+        for d_resources in resource_manager.get_domain_resources(
+            &self.service_name,
+            DomainResourceFilter::authoritative(true),
+        ) {
             if cache_flush {
                 d_resources
                     .filter(|r| r.match_qclass(CLASS::IN.into()))
                     .for_each(|r| packet.answers.push(r.to_cache_flush_record()));
             } else {
-                d_resources
-                    .filter(|r| {
-                        r.match_qclass(CLASS::IN.into())
-                            && (r.match_qtype(TYPE::SRV.into()) || r.match_qtype(TYPE::TXT.into()))
-                    })
-                    .cloned()
-                    .for_each(|resource| {
-                        if let RData::SRV(srv) = &resource.rdata {
-                            let target = resource_manager
-                                .get_domain_resources(&srv.target, false, true)
-                                .flatten()
-                                .filter(|r| {
-                                    r.match_qtype(TYPE::A.into())
-                                        && r.match_qclass(CLASS::IN.into())
-                                })
-                                .cloned();
+                d_resources.cloned().for_each(|resource| {
+                    if let RData::SRV(srv) = &resource.rdata {
+                        let target = resource_manager
+                            .get_domain_resources(
+                                &srv.target,
+                                DomainResourceFilter::authoritative(false),
+                            )
+                            .flatten()
+                            .filter(|r| {
+                                (r.match_qtype(TYPE::A.into()) || r.match_qtype(TYPE::AAAA.into()))
+                                    && r.match_qclass(CLASS::IN.into())
+                            })
+                            .cloned();
 
-                            additional_records.extend(target);
-                        }
+                        additional_records.extend(target);
+                    }
 
-                        packet.answers.push(resource);
-                    });
+                    packet.answers.push(resource);
+                });
             };
         }
 
@@ -400,20 +363,13 @@ async fn add_response_to_resources(
     service_name: &Name<'_>,
     full_name: &Name<'_>,
     owned_resources: &mut ResourceRecordManager<'static>,
-    on_discovery: &mut Option<tokio::sync::mpsc::Sender<(String, InstanceInformation)>>,
+    on_discovery: &mut Option<tokio::sync::mpsc::Sender<InstanceInformation>>,
 ) {
     let resources = packet
         .answers
         .into_iter()
         .chain(packet.additional_records)
-        .filter(|aw| {
-            aw.name.ne(full_name)
-                && aw.name.is_subdomain_of(service_name)
-                && (aw.match_qtype(TYPE::SRV.into())
-                    || aw.match_qtype(TYPE::TXT.into())
-                    || aw.match_qtype(TYPE::A.into())
-                    || aw.match_qtype(TYPE::PTR.into()))
-        })
+        .filter(|aw| aw.name.ne(full_name) && aw.name.is_subdomain_of(service_name))
         .map(|r| r.into_owned());
 
     if let Some(channel) = on_discovery {
@@ -423,30 +379,30 @@ async fn add_response_to_resources(
         }
 
         let mut instance_name: Option<String> = Default::default();
-        let instance_information =
-            InstanceInformation::from_records(resources.iter().inspect(|record| {
+        let instance_information = InstanceInformation::from_records(
+            service_name,
+            resources.iter().inspect(|record| {
                 if instance_name.is_none() {
                     instance_name = record
                         .name
                         .without(service_name)
                         .map(|sub_domain| sub_domain.to_string());
                 }
-            }));
+            }),
+        );
 
-        if channel
-            .send((instance_name.unwrap_or_default(), instance_information))
-            .await
-            .is_err()
-        {
-            *on_discovery = None
+        if let Some(instance_information) = instance_information {
+            if channel.send(instance_information).await.is_err() {
+                *on_discovery = None
+            }
         }
 
         for resource in resources {
-            owned_resources.add_expirable_resource(resource);
+            owned_resources.add_cached_resource(resource);
         }
     } else {
         for resource in resources {
-            owned_resources.add_expirable_resource(resource);
+            owned_resources.add_cached_resource(resource);
         }
     }
 }

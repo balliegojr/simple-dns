@@ -1,7 +1,7 @@
 use simple_dns::{rdata::RData, Name, Packet, Question, ResourceRecord, CLASS, TYPE};
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     error::Error,
     net::{SocketAddr, UdpSocket},
     sync::{Arc, RwLock},
@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    resource_record_manager::ResourceRecordManager, InstanceInformation, NetworkScope,
-    SimpleMdnsError,
+    resource_record_manager::{DomainResourceFilter, ResourceRecordManager},
+    InstanceInformation, NetworkScope, SimpleMdnsError,
 };
 
 /// Service Discovery implementation using DNS-SD.
@@ -22,37 +22,36 @@ use crate::{
 /// ## Example
 /// ```
 /// use simple_mdns::sync_discovery::ServiceDiscovery;
-/// use std::net::SocketAddr;
+/// use simple_mdns::InstanceInformation;
 /// use std::str::FromStr;
 ///
-/// let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
-/// discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
+/// let mut discovery = ServiceDiscovery::new(
+///     InstanceInformation::new("a".into()).with_socket_address("192.168.1.22:8090".parse().expect("Invalid Socket Address")),
+///     "_mysrv._tcp.local",
+///     60
+/// ).expect("Failed to create service discovery");
 ///
 /// ```
 pub struct ServiceDiscovery {
-    full_name: Name<'static>,
+    instance_name: Name<'static>,
     service_name: Name<'static>,
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
-    resource_ttl: u32,
     sender_socket: UdpSocket,
     network_scope: NetworkScope,
 }
 
 impl ServiceDiscovery {
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
+    /// Creates a new ServiceDiscovery by providing `instance_information`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
     ///
-    /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
-    ///
-    /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     pub fn new(
-        instance_name: &str,
+        instance_information: InstanceInformation,
         service_name: &str,
         resource_ttl: u32,
     ) -> Result<Self, SimpleMdnsError> {
         Self::new_with_scope(
-            instance_name,
+            instance_information,
             service_name,
             resource_ttl,
             None,
@@ -60,45 +59,50 @@ impl ServiceDiscovery {
         )
     }
 
-    /// Creates a new ServiceDiscovery by providing `instance`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
-    /// `instance_name` and `service_name` will be composed together in order to advertise this instance, like `instance_name`.`service_name`
+    /// Creates a new ServiceDiscovery by providing `instance_information`, `service_name`, `resource ttl`, `on_disovery` and `network_scope`
     ///
-    /// `instance_name` must be in the standard specified by the mdns RFC and short, example: **_my_inst**
     /// `service_name` must be in the standard specified by the mdns RFC, example: **_my_service._tcp.local**
     /// `resource_ttl` refers to the amount of time in seconds your service will be cached in the dns responder.
     /// `on_discovery` channel, if provided, will receive every instance information when
     /// discovered
     /// `network_scope` to be used
     pub fn new_with_scope(
-        instance_name: &str,
+        instance_information: InstanceInformation,
         service_name: &str,
         resource_ttl: u32,
-        on_discovery: Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
+        on_discovery: Option<std::sync::mpsc::Sender<InstanceInformation>>,
         network_scope: NetworkScope,
     ) -> Result<Self, SimpleMdnsError> {
-        let full_name = format!("{}.{}", instance_name, service_name);
-        let full_name = Name::new(&full_name)?.into_owned();
+        let instance_full_name = format!(
+            "{}.{service_name}",
+            instance_information.escaped_instance_name()
+        );
+        let instance_full_name = Name::new(&instance_full_name)?.into_owned();
         let service_name = Name::new(service_name)?.into_owned();
 
         let mut resource_manager = ResourceRecordManager::new();
-        resource_manager.add_owned_resource(ResourceRecord::new(
+        resource_manager.add_authoritative_resource(ResourceRecord::new(
             service_name.clone(),
             simple_dns::CLASS::IN,
-            0,
-            RData::PTR(service_name.clone().into()),
+            resource_ttl,
+            RData::PTR(instance_full_name.clone().into()),
         ));
 
+        for resource in instance_information.into_records(&instance_full_name, resource_ttl)? {
+            resource_manager.add_authoritative_resource(resource);
+        }
+
         let service_discovery = Self {
-            full_name,
+            instance_name: instance_full_name,
             service_name,
             resource_manager: Arc::new(RwLock::new(resource_manager)),
-            resource_ttl,
             sender_socket: crate::socket_helper::sender_socket(network_scope.is_v4())?,
             network_scope,
         };
 
         service_discovery.receive_packets_loop(on_discovery)?;
         service_discovery.refresh_known_instances()?;
+        service_discovery.announce(false);
 
         if let Err(err) = query_service_instances(
             service_discovery.service_name.clone(),
@@ -111,48 +115,21 @@ impl ServiceDiscovery {
         Ok(service_discovery)
     }
 
-    /// Add the  service info to discovery and immediately advertise the service
-    pub fn add_service_info(
-        &mut self,
-        service_info: InstanceInformation,
-    ) -> Result<(), Box<dyn Error>> {
-        {
-            let mut resource_manager = self.resource_manager.write().unwrap();
-            for resource in service_info.into_records(&self.full_name.clone(), self.resource_ttl)? {
-                resource_manager.add_owned_resource(resource);
-            }
-        }
-
-        self.advertise_service(false);
-        Ok(())
-    }
-
-    /// Remove all addresses from service discovery
+    /// Remove service from discovery by announcing with a cache flush and
+    /// removing all the internal resource records
     pub fn remove_service_from_discovery(&mut self) {
-        self.advertise_service(true);
+        self.announce(true);
         self.resource_manager.write().unwrap().clear();
     }
 
-    /// Return the addresses of all known services
-    pub fn get_known_services(&self) -> HashMap<String, InstanceInformation> {
+    /// Return the [`InstanceInformation`] of all known services
+    pub fn get_known_services(&self) -> HashSet<InstanceInformation> {
         self.resource_manager
             .read()
             .unwrap()
-            .get_domain_resources(&self.service_name, true, false)
-            .map(|domain_resources| {
-                let mut instance_name: Option<String> = Default::default();
-
-                let instance_information =
-                    InstanceInformation::from_records(domain_resources.inspect(|record| {
-                        if instance_name.is_none() {
-                            instance_name = record
-                                .name
-                                .without(&self.service_name)
-                                .map(|sub_domain| sub_domain.to_string());
-                        }
-                    }));
-
-                (instance_name.unwrap_or_default(), instance_information)
+            .get_domain_resources(&self.service_name, DomainResourceFilter::cached())
+            .filter_map(|domain_resources| {
+                InstanceInformation::from_records(&self.service_name, domain_resources)
             })
             .collect()
     }
@@ -192,42 +169,45 @@ impl ServiceDiscovery {
         Ok(())
     }
 
-    fn advertise_service(&self, cache_flush: bool) {
-        log::info!("Advertising service");
+    /// Announce the service by sending a packet with all the resource records in the answers
+    /// section. It is not necessary to call this method manually, it will be called automatically
+    /// when the instance is added to the discovery.
+    ///
+    /// if `cache_flush` is true, then the resources will have the cache flush flag set, this will
+    /// cause them to be removed from any cache that receives the packet.
+    pub fn announce(&self, cache_flush: bool) {
         let mut packet = Packet::new_reply(1);
         let resource_manager = self.resource_manager.read().unwrap();
         let mut additional_records = HashSet::new();
 
-        for d_resources in
-            resource_manager.get_domain_resources(&self.full_name.clone(), true, true)
-        {
+        for d_resources in resource_manager.get_domain_resources(
+            &self.instance_name.clone(),
+            DomainResourceFilter::authoritative(true),
+        ) {
             if cache_flush {
                 d_resources
                     .filter(|r| r.match_qclass(CLASS::IN.into()))
                     .for_each(|r| packet.answers.push(r.to_cache_flush_record()));
             } else {
-                d_resources
-                    .filter(|r| {
-                        r.match_qclass(CLASS::IN.into())
-                            && (r.match_qtype(TYPE::SRV.into()) || r.match_qtype(TYPE::TXT.into()))
-                    })
-                    .cloned()
-                    .for_each(|resource| {
-                        if let RData::SRV(srv) = &resource.rdata {
-                            let target = resource_manager
-                                .get_domain_resources(&srv.target, false, true)
-                                .flatten()
-                                .filter(|r| {
-                                    r.match_qtype(TYPE::A.into())
-                                        && r.match_qclass(CLASS::IN.into())
-                                })
-                                .cloned();
+                d_resources.cloned().for_each(|resource| {
+                    if let RData::SRV(srv) = &resource.rdata {
+                        let target = resource_manager
+                            .get_domain_resources(
+                                &srv.target,
+                                DomainResourceFilter::authoritative(false),
+                            )
+                            .flatten()
+                            .filter(|r| {
+                                (r.match_qtype(TYPE::A.into()) || r.match_qtype(TYPE::AAAA.into()))
+                                    && r.match_qclass(CLASS::IN.into())
+                            })
+                            .cloned();
 
-                            additional_records.extend(target);
-                        }
+                        additional_records.extend(target);
+                    }
 
-                        packet.answers.push(resource);
-                    });
+                    packet.answers.push(resource);
+                });
             };
         }
 
@@ -253,10 +233,10 @@ impl ServiceDiscovery {
 
     fn receive_packets_loop(
         &self,
-        mut on_discovery: Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
+        mut on_discovery: Option<std::sync::mpsc::Sender<InstanceInformation>>,
     ) -> Result<(), SimpleMdnsError> {
         let service_name = self.service_name.clone();
-        let full_name = self.full_name.clone();
+        let full_name = self.instance_name.clone();
         let resources = self.resource_manager.clone();
         let multicast_address = self.network_scope.socket_address();
 
@@ -356,20 +336,13 @@ fn add_response_to_resources(
     service_name: &Name<'_>,
     full_name: &Name<'_>,
     owned_resources: &mut ResourceRecordManager,
-    on_discovery: &mut Option<std::sync::mpsc::Sender<(String, InstanceInformation)>>,
+    on_discovery: &mut Option<std::sync::mpsc::Sender<InstanceInformation>>,
 ) {
     let resources = packet
         .answers
         .into_iter()
         .chain(packet.additional_records)
-        .filter(|aw| {
-            aw.name.ne(full_name)
-                && aw.name.is_subdomain_of(service_name)
-                && (aw.match_qtype(TYPE::SRV.into())
-                    || aw.match_qtype(TYPE::TXT.into())
-                    || aw.match_qtype(TYPE::A.into())
-                    || aw.match_qtype(TYPE::PTR.into()))
-        })
+        .filter(|aw| aw.name.ne(full_name) && aw.name.is_subdomain_of(service_name))
         .map(|r| r.into_owned());
 
     if let Some(channel) = on_discovery {
@@ -378,30 +351,20 @@ fn add_response_to_resources(
             return;
         }
 
-        let mut instance_name: Option<String> = Default::default();
-        let instance_information =
-            InstanceInformation::from_records(resources.iter().inspect(|record| {
-                if instance_name.is_none() {
-                    instance_name = record
-                        .name
-                        .without(service_name)
-                        .map(|sub_domain| sub_domain.to_string());
-                }
-            }));
-
-        if channel
-            .send((instance_name.unwrap_or_default(), instance_information))
-            .is_err()
+        if let Some(instance_information) =
+            InstanceInformation::from_records(service_name, resources.iter())
         {
-            *on_discovery = None
+            if channel.send(instance_information).is_err() {
+                *on_discovery = None
+            }
         }
 
         for resource in resources {
-            owned_resources.add_expirable_resource(resource);
+            owned_resources.add_cached_resource(resource);
         }
     } else {
         for resource in resources {
-            owned_resources.add_expirable_resource(resource);
+            owned_resources.add_cached_resource(resource);
         }
     }
 }

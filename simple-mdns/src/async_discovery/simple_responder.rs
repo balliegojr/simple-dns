@@ -77,7 +77,7 @@ impl SimpleMdnsResponder {
     /// Register a Resource Record
     pub async fn add_resource(&mut self, resource: ResourceRecord<'static>) {
         let mut resources = self.resources.write().await;
-        resources.add_owned_resource(resource);
+        resources.add_authoritative_resource(resource);
     }
 
     /// Remove a resource record
@@ -130,7 +130,6 @@ impl SimpleMdnsResponder {
                             sender_socket.send_to(&reply, reply_addr).await?;
                         }
                         None => {
-                            log::trace!("No reply for query");
                             continue;
                         }
                     };

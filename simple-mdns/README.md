@@ -19,12 +19,18 @@ It is necessary to provide instance and service name
 ```rust  
     # #[cfg(feature = "sync")] {
     use simple_mdns::sync_discovery::ServiceDiscovery;
-    use std::net::SocketAddr;
+    use simple_mdns::InstanceInformation;
     use std::str::FromStr;
 
-    let mut discovery = ServiceDiscovery::new("a", "_mysrv._tcp.local", 60).expect("Invalid Service Name");
-    discovery.add_service_info(SocketAddr::from_str("192.168.1.22:8090").unwrap().into());
+    let mut discovery = ServiceDiscovery::new(
+        InstanceInformation::new("a".into()).with_socket_address("192.168.1.22:8090".parse().expect("Invalid socket address")),
+        "_mysrv._tcp.local", 
+        60
+    ).expect("Failed to start service discovery");
     # }
+
+    // Removing service from discovery
+    discovery.remove_service_from_discovery();
 ```
 
 
@@ -99,11 +105,16 @@ IPV6 is now supported by using the `NetworkScope` enum.
 ```rust  
     # #[cfg(feature = "sync")] {
     use simple_mdns::sync_discovery::ServiceDiscovery;
-    use simple_mdns::NetworkScope;
-    use std::net::SocketAddr;
+    use simple_mdns::{NetworkScope, InstanceInformation};
     use std::str::FromStr;
 
-    let mut discovery = ServiceDiscovery::new_with_scope("a", "_mysrv._tcp.local", 60, None, NetworkScope::V4).expect("Invalid Service Name");
+    let mut discovery = ServiceDiscovery::new_with_scope(
+        InstanceInformation::new("a".into()), 
+        "_mysrv._tcp.local", 
+        60, 
+        None, 
+        NetworkScope::V6
+    ).expect(" Service Name");
     # }
 ```
 

@@ -28,7 +28,8 @@ impl NetworkScope {
         matches!(&self, Self::V4 | Self::V4WithInterface(..))
     }
 
-    pub(crate) fn socket_address(&self) -> SocketAddr {
+    /// Gets de socket address for the network scope.
+    pub fn socket_address(&self) -> SocketAddr {
         if self.is_v4() {
             SocketAddr::new(IpAddr::V4(MULTICAST_ADDR_IPV4), MULTICAST_PORT)
         } else {

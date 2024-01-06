@@ -1,3 +1,12 @@
+# 0.6.0 (2024-01-06)
+
+### Breaking Changes
+- `InstanceInformation` now has the instance name.
+- `ServiceDiscovery::new` receives an `InstanceInformation` instead of a instance name.
+- `ServiceDiscovery` notification channel no longer sends a tuple of `instance name` nad `InstanceInformation`. Only `InstanceInformation` is sent now.
+- Removed the function `add_service_info` from both sync and async `ServiceDiscovery`
+- No longer send cached resources when replying or announcing service. 
+
 # 0.5.0 (2023-10-17)
 
 ### Breaking changes
