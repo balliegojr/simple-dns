@@ -102,7 +102,8 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
 
 IPV6 is now supported by using the `NetworkScope` enum.  
 
-```rust  
+```rust, no_run  
+    # // This is test is marked as no_run because IPV6 is not available in github actions.
     # #[cfg(feature = "sync")] {
     use simple_mdns::sync_discovery::ServiceDiscovery;
     use simple_mdns::{NetworkScope, InstanceInformation};
@@ -113,7 +114,7 @@ IPV6 is now supported by using the `NetworkScope` enum.
         "_mysrv._tcp.local", 
         60, 
         None, 
-        NetworkScope::V6
+        NetworkScope::V6,
     ).expect(" Service Name");
     # }
 ```
