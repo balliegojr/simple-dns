@@ -54,19 +54,20 @@ impl<'a> SOA<'a> {
 }
 
 impl<'a> PacketPart<'a> for SOA<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let mname = Name::parse(data, position)?;
-        let rname = Name::parse(data, position + mname.len())?;
-        let offset = position + mname.len() + rname.len();
+        let rname = Name::parse(data, position)?;
 
-        let serial = u32::from_be_bytes(data[offset..offset + 4].try_into()?);
-        let refresh = i32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
-        let retry = i32::from_be_bytes(data[offset + 8..offset + 12].try_into()?);
-        let expire = i32::from_be_bytes(data[offset + 12..offset + 16].try_into()?);
-        let minimum = u32::from_be_bytes(data[offset + 16..offset + 20].try_into()?);
+        let serial = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
+        let refresh = i32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
+        let retry = i32::from_be_bytes(data[*position + 8..*position + 12].try_into()?);
+        let expire = i32::from_be_bytes(data[*position + 12..*position + 16].try_into()?);
+        let minimum = u32::from_be_bytes(data[*position + 16..*position + 20].try_into()?);
+
+        *position += 20;
 
         Ok(Self {
             mname,
@@ -120,7 +121,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(soa.write_to(&mut data).is_ok());
 
-        let soa = SOA::parse(&data, 0);
+        let soa = SOA::parse(&data, &mut 0);
         assert!(soa.is_ok());
         let soa = soa.unwrap();
 
@@ -131,7 +132,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/SOA.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::SOA(rdata) => rdata,
             _ => unreachable!(),
         };

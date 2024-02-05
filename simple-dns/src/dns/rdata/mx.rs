@@ -30,12 +30,13 @@ impl<'a> MX<'a> {
 }
 
 impl<'a> PacketPart<'a> for MX<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let preference = u16::from_be_bytes(data[position..position + 2].try_into()?);
-        let exchange = Name::parse(data, position + 2)?;
+        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        *position += 2;
+        let exchange = Name::parse(data, position)?;
 
         Ok(Self {
             preference,
@@ -78,7 +79,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(mx.write_to(&mut data).is_ok());
 
-        let mx = MX::parse(&data, 0);
+        let mx = MX::parse(&data, &mut 0);
         assert!(mx.is_ok());
         let mx = mx.unwrap();
 
@@ -91,7 +92,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/MX.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::MX(rdata) => rdata,
             _ => unreachable!(),
         };

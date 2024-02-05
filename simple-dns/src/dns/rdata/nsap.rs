@@ -38,15 +38,16 @@ impl NSAP {
 }
 
 impl<'a> PacketPart<'a> for NSAP {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if data.len() < position + 20 {
+        if data.len() < *position + 20 {
             return Err(SimpleDnsError::InsufficientData);
         }
 
-        let data = &data[position..position + 20];
+        let data = &data[*position..*position + 20];
+        *position += 20;
 
         let afi = u8::from_be(data[0]);
         let idi = u16::from_be_bytes([data[1], data[2]]);
@@ -116,7 +117,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(nsap.write_to(&mut data).is_ok());
 
-        let nsap = NSAP::parse(&data, 0);
+        let nsap = NSAP::parse(&data, &mut 0);
         assert!(nsap.is_ok());
         let nsap = nsap.unwrap();
 
@@ -136,7 +137,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/NSAP.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::NSAP(rdata) => rdata,
             _ => unreachable!(),
         };

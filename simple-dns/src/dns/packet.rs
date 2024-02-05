@@ -143,9 +143,7 @@ impl<'a> Packet<'a> {
         let mut section_items = Vec::with_capacity(items_count as usize);
 
         for _ in 0..items_count {
-            let item = T::parse(data, *offset)?;
-            *offset += item.len();
-            section_items.push(item);
+            section_items.push(T::parse(data, offset)?);
         }
 
         Ok(section_items)

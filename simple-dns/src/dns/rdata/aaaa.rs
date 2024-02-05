@@ -15,11 +15,12 @@ impl RR for AAAA {
 }
 
 impl<'a> PacketPart<'a> for AAAA {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = u128::from_be_bytes(data[position..position + 16].try_into()?);
+        let address = u128::from_be_bytes(data[*position..*position + 16].try_into()?);
+        *position += 16;
         Ok(Self { address })
     }
 
@@ -64,7 +65,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(aaaa.write_to(&mut bytes).is_ok());
 
-        let aaaa = AAAA::parse(&bytes, 0);
+        let aaaa = AAAA::parse(&bytes, &mut 0);
         assert!(aaaa.is_ok());
         let aaaa = aaaa.unwrap();
 
@@ -77,7 +78,7 @@ mod tests {
         let sample_file = std::fs::read("samples/zonefile/AAAA.sample")?;
         let sample_ip: u128 = "fd92:7065:b8e:ffff::5".parse::<Ipv6Addr>()?.into();
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::AAAA(rdata) => rdata,
             _ => unreachable!(),
         };

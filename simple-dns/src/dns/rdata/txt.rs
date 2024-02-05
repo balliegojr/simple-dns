@@ -175,22 +175,21 @@ impl<'a> TryFrom<TXT<'a>> for String {
 }
 
 impl<'a> PacketPart<'a> for TXT<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let mut strings = Vec::new();
-        let mut curr_position = position;
+        let initial_position = *position;
 
-        while curr_position < data.len() {
-            let char_str = CharacterString::parse(&data[curr_position..], 0)?;
-            curr_position += char_str.len();
+        while *position < data.len() {
+            let char_str = CharacterString::parse(data, position)?;
             strings.push(char_str);
         }
 
         Ok(Self {
             strings,
-            size: data.len() - position,
+            size: *position - initial_position,
         })
     }
 
@@ -231,7 +230,7 @@ mod tests {
         txt.write_to(&mut out)?;
         assert_eq!(out.len(), txt.len());
 
-        let txt2 = TXT::parse(&out, 0)?;
+        let txt2 = TXT::parse(&out, &mut 0)?;
         assert_eq!(2, txt2.strings.len());
         assert_eq!(txt.strings[0], txt2.strings[0]);
         assert_eq!(txt.strings[1], txt2.strings[1]);
@@ -262,7 +261,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/TXT.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::TXT(rdata) => rdata,
             _ => unreachable!(),
         };
@@ -281,7 +280,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(txt.write_to(&mut bytes).is_ok());
 
-        let parsed_txt = TXT::parse(&bytes, 0)?;
+        let parsed_txt = TXT::parse(&bytes, &mut 0)?;
         let parsed_string: String = parsed_txt.try_into()?;
 
         assert_eq!(parsed_string, string);

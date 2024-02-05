@@ -48,19 +48,21 @@ impl<'a> TryFrom<CharacterString<'a>> for String {
 }
 
 impl<'a> PacketPart<'a> for CharacterString<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let length = data[position] as usize;
-
-        if length < MAX_CHARACTER_STRING_LENGTH && length + position < data.len() {
-            Ok(Self {
-                data: Cow::Borrowed(&data[position + 1..position + 1 + length]),
-            })
-        } else {
-            Err(SimpleDnsError::InvalidCharacterString)
+        let length = data[*position] as usize;
+        if length > MAX_CHARACTER_STRING_LENGTH || length + *position > data.len() {
+            return Err(SimpleDnsError::InvalidCharacterString);
         }
+
+        let data = &data[*position + 1..*position + 1 + length];
+        *position += length + 1;
+
+        Ok(Self {
+            data: Cow::Borrowed(data),
+        })
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
@@ -127,7 +129,7 @@ mod tests {
 
     #[test]
     fn parse() {
-        let c_string = CharacterString::parse(b"\x0esome_long_text", 0);
+        let c_string = CharacterString::parse(b"\x0esome_long_text", &mut 0);
         assert!(c_string.is_ok());
         let c_string = c_string.unwrap();
         assert_eq!(15, c_string.len());

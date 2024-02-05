@@ -28,12 +28,12 @@ impl<'a> ISDN<'a> {
 }
 
 impl<'a> PacketPart<'a> for ISDN<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let address = CharacterString::parse(data, position)?;
-        let sa = CharacterString::parse(data, position + address.len())?;
+        let sa = CharacterString::parse(data, position)?;
 
         Ok(Self { address, sa })
     }
@@ -73,7 +73,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(isdn.write_to(&mut data).is_ok());
 
-        let isdn = ISDN::parse(&data, 0);
+        let isdn = ISDN::parse(&data, &mut 0);
         assert!(isdn.is_ok());
         let isdn = isdn.unwrap();
 
@@ -86,7 +86,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/ISDN.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::ISDN(rdata) => rdata,
             _ => unreachable!(),
         };

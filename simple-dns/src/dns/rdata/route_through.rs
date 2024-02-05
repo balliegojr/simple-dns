@@ -30,12 +30,13 @@ impl<'a> RouteThrough<'a> {
 }
 
 impl<'a> PacketPart<'a> for RouteThrough<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let preference = u16::from_be_bytes(data[position..position + 2].try_into()?);
-        let intermediate_host = Name::parse(data, position + 2)?;
+        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        *position += 2;
+        let intermediate_host = Name::parse(data, position)?;
 
         Ok(Self {
             preference,
@@ -78,7 +79,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(rt.write_to(&mut data).is_ok());
 
-        let rt = RouteThrough::parse(&data, 0);
+        let rt = RouteThrough::parse(&data, &mut 0);
         assert!(rt.is_ok());
         let rt = rt.unwrap();
 
@@ -91,7 +92,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/RT.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::RouteThrough(rdata) => rdata,
             _ => unreachable!(),
         };

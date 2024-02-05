@@ -148,19 +148,20 @@ impl<'a> SVCB<'a> {
 }
 
 impl<'a> PacketPart<'a> for SVCB<'a> {
-    fn parse(data: &'a [u8], mut position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let priority = u16::from_be_bytes(data[position..position + 2].try_into()?);
-        let target = Name::parse(data, position + 2)?;
-        position += 2 + target.len();
+        let priority = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        *position += 2;
+
+        let target = Name::parse(data, position)?;
         let mut params = BTreeMap::new();
         let mut previous_key = -1;
-        while position < data.len() {
-            let key = u16::from_be_bytes(data[position..position + 2].try_into()?);
+        while *position < data.len() {
+            let key = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
             let value_length = usize::from(u16::from_be_bytes(
-                data[position + 2..position + 4].try_into()?,
+                data[*position + 2..*position + 4].try_into()?,
             ));
             if i32::from(key) <= previous_key {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
@@ -168,9 +169,9 @@ impl<'a> PacketPart<'a> for SVCB<'a> {
             previous_key = i32::from(key);
             params.insert(
                 key,
-                Cow::Borrowed(&data[position + 4..position + 4 + value_length]),
+                Cow::Borrowed(&data[*position + 4..*position + 4 + value_length]),
             );
-            position += 4 + value_length;
+            *position += 4 + value_length;
         }
         Ok(Self {
             priority,
@@ -214,7 +215,7 @@ mod tests {
         // Copy of the answer from `dig crypto.cloudflare.com -t HTTPS`.
         let sample_file = std::fs::read("samples/zonefile/HTTPS.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::HTTPS(rdata) => rdata,
             _ => unreachable!(),
         };
@@ -314,7 +315,7 @@ mod tests {
             svcb.write_to(&mut data).unwrap();
             assert_eq!(expected_bytes, &data, "Test {name}");
 
-            let svcb2 = SVCB::parse(&data, 0).unwrap();
+            let svcb2 = SVCB::parse(&data, &mut 0).unwrap();
             assert_eq!(svcb, &svcb2, "Test {name}");
         }
     }

@@ -100,19 +100,18 @@ impl<'a> ResourceRecord<'a> {
 }
 
 impl<'a> PacketPart<'a> for ResourceRecord<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let name = Name::parse(data, position)?;
-        let offset = position + name.len();
-
-        if offset + 8 > data.len() {
+        if *position + 8 > data.len() {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
-        let ttl = u32::from_be_bytes(data[offset + 4..offset + 8].try_into()?);
-        let rdata = RData::parse(data, offset)?;
+        let class_value = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
+        let ttl = u32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
+        let rdata = RData::parse(data, position)?;
         if rdata.type_code() == TYPE::OPT {
             Ok(Self {
                 name,
@@ -122,8 +121,6 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
                 cache_flush: false,
             })
         } else {
-            let class_value = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
-
             let cache_flush = class_value & flag::CACHE_FLUSH == flag::CACHE_FLUSH;
             let class = (class_value & !flag::CACHE_FLUSH).try_into()?;
 
@@ -198,7 +195,7 @@ mod tests {
     #[test]
     fn test_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
-        let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
+        let rr = ResourceRecord::parse(&bytes[..], &mut 0).unwrap();
 
         assert_eq!("_srv._udp.local", rr.name.to_string());
         assert_eq!(CLASS::IN, rr.class);
@@ -215,7 +212,7 @@ mod tests {
     #[test]
     fn test_cache_flush_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
-        let rr = ResourceRecord::parse(&bytes[..], 0).unwrap();
+        let rr = ResourceRecord::parse(&bytes[..], &mut 0).unwrap();
 
         assert_eq!(CLASS::IN, rr.class);
         assert!(rr.cache_flush);
@@ -345,8 +342,7 @@ mod tests {
             let data = std::fs::read(&file_path?.path())?;
             let mut pos = 0;
             while pos < data.len() {
-                let res = crate::ResourceRecord::parse(&data, pos)?;
-                pos += res.len();
+                crate::ResourceRecord::parse(&data, &mut pos)?;
             }
         }
 

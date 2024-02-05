@@ -39,14 +39,15 @@ impl<'a> SRV<'a> {
 }
 
 impl<'a> PacketPart<'a> for SRV<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let priority = u16::from_be_bytes(data[position..position + 2].try_into()?);
-        let weight = u16::from_be_bytes(data[position + 2..position + 4].try_into()?);
-        let port = u16::from_be_bytes(data[position + 4..position + 6].try_into()?);
-        let target = Name::parse(data, position + 6)?;
+        let priority = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        let weight = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
+        let port = u16::from_be_bytes(data[*position + 4..*position + 6].try_into()?);
+        *position += 6;
+        let target = Name::parse(data, position)?;
 
         Ok(Self {
             priority,
@@ -89,7 +90,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(srv.write_to(&mut bytes).is_ok());
 
-        let srv = SRV::parse(&bytes, 0);
+        let srv = SRV::parse(&bytes, &mut 0);
         assert!(srv.is_ok());
         let srv = srv.unwrap();
 
@@ -122,7 +123,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/SRV.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::SRV(rdata) => rdata,
             _ => unreachable!(),
         };

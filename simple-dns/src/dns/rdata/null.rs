@@ -43,11 +43,13 @@ impl<'a> NULL<'a> {
 }
 
 impl<'a> PacketPart<'a> for NULL<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        Self::new(&data[position..])
+        let data = &data[*position..];
+        *position += data.len();
+        Self::new(data)
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
