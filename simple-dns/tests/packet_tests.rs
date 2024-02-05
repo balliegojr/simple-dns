@@ -142,3 +142,40 @@ fn compressed_rdata_has_correct_length() {
 
     assert!(Packet::parse(&bytes[..]).is_ok());
 }
+
+#[test]
+fn build_bytes_vec_after_parsing_compressed_have_correct_length() {
+    let name = "foobar";
+
+    let mut original = Packet::new_reply(0);
+    original.answers.push(simple_dns::ResourceRecord::new(
+        simple_dns::Name::new("@").unwrap(),
+        simple_dns::CLASS::IN,
+        30,
+        simple_dns::rdata::RData::CNAME(simple_dns::Name::new(name).unwrap().into()),
+    ));
+    original.answers.push(simple_dns::ResourceRecord::new(
+        simple_dns::Name::new("@").unwrap(),
+        simple_dns::CLASS::IN,
+        30,
+        simple_dns::rdata::RData::CNAME(simple_dns::Name::new(name).unwrap().into()),
+    ));
+
+    let compressed = original.build_bytes_vec_compressed().unwrap();
+    let decompressed = Packet::parse(&compressed).unwrap();
+
+    let encoded = decompressed.build_bytes_vec().unwrap();
+
+    assert_eq!(encoded, original.build_bytes_vec().unwrap());
+    // Error:    mistakenly set the first 2 bits as if it is a pointer ------+
+    //                                                                       |
+    // encoded:  [ ...header, ...1st answer, 2nd: qname, type, class, ttl, __2__, 6, "foobar", 0]
+    // expected: [ ...header, ...1st answer, 2nd: qname, type, class, ttl, __8__, 6, "foobar", 0]
+
+    let parsed = Packet::parse(&encoded).unwrap(); // Err InsufficientData
+
+    assert_eq!(
+        parsed.build_bytes_vec().unwrap(),
+        original.build_bytes_vec().unwrap()
+    );
+}

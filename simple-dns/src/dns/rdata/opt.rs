@@ -33,41 +33,41 @@ impl<'a> RR for OPT<'a> {
 }
 
 impl<'a> PacketPart<'a> for OPT<'a> {
-    fn parse(data: &'a [u8], mut position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if position < 8 {
+        if *position < 8 {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         // udp packet size comes from CLASS
-        let udp_packet_size = u16::from_be_bytes(data[position - 8..position - 6].try_into()?);
+        let udp_packet_size = u16::from_be_bytes(data[*position - 8..*position - 6].try_into()?);
         // version comes from ttl
-        let ttl = u32::from_be_bytes(data[position - 6..position - 2].try_into()?);
+        let ttl = u32::from_be_bytes(data[*position - 6..*position - 2].try_into()?);
         let version = ((ttl & masks::VERSION_MASK) >> masks::VERSION_MASK.trailing_zeros()) as u8;
 
         let mut opt_codes = Vec::new();
-        while position < data.len() {
-            if position + 4 > data.len() {
+        while *position < data.len() {
+            if *position + 4 > data.len() {
                 return Err(crate::SimpleDnsError::InsufficientData);
             }
 
-            let code = u16::from_be_bytes(data[position..position + 2].try_into()?);
-            let length = u16::from_be_bytes(data[position + 2..position + 4].try_into()?) as usize;
+            let code = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+            let length =
+                u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?) as usize;
 
-            if position + 4 + length > data.len() {
+            if *position + 4 + length > data.len() {
                 return Err(crate::SimpleDnsError::InsufficientData);
             }
 
-            let inner_data = Cow::Borrowed(&data[position + 4..position + 4 + length]);
-
+            let inner_data = Cow::Borrowed(&data[*position + 4..*position + 4 + length]);
             opt_codes.push(OPTCode {
                 code,
                 data: inner_data,
             });
 
-            position += 4 + length;
+            *position += 4 + length;
         }
 
         Ok(Self {
@@ -161,7 +161,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(opt_rr.write_to(&mut data).is_ok());
 
-        let opt = match ResourceRecord::parse(&data, 0)
+        let opt = match ResourceRecord::parse(&data, &mut 0)
             .expect("failed to parse")
             .rdata
         {
@@ -205,7 +205,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(opt_rr.write_to(&mut data).is_ok());
 
-        let mut opt = match ResourceRecord::parse(&data, 0)
+        let mut opt = match ResourceRecord::parse(&data, &mut 0)
             .expect("failed to parse")
             .rdata
         {

@@ -53,19 +53,20 @@ impl<'a> Question<'a> {
 }
 
 impl<'a> PacketPart<'a> for Question<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self> {
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
-        let offset = position + qname.len();
-
-        if offset + 4 > data.len() {
+        if *position + 4 > data.len() {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
-        let qclass = u16::from_be_bytes(data[offset + 2..offset + 4].try_into()?);
+        let qtype = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        let qclass = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
+
+        *position += 4;
 
         Ok(Self {
             qname,
-            qtype: QTYPE::try_from(u16::from_be_bytes(data[offset..offset + 2].try_into()?))?,
+            qtype: QTYPE::try_from(qtype)?,
             qclass: QCLASS::try_from(qclass & 0x7FFF)?,
             unicast_response: qclass & 0x8000 == 0x8000,
         })
@@ -100,7 +101,7 @@ mod tests {
     #[test]
     fn parse_question() {
         let bytes = b"\x00\x00\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01";
-        let question = Question::parse(bytes, 2);
+        let question = Question::parse(bytes, &mut 2);
 
         assert!(question.is_ok());
         let question = question.unwrap();
@@ -136,7 +137,7 @@ mod tests {
         )
         .write_to(&mut bytes)
         .unwrap();
-        let parsed = Question::parse(&bytes, 0).unwrap();
+        let parsed = Question::parse(&bytes, &mut 0).unwrap();
 
         assert!(parsed.unicast_response);
     }

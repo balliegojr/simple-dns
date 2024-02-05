@@ -31,13 +31,14 @@ impl<'a> CAA<'a> {
 }
 
 impl<'a> PacketPart<'a> for CAA<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let flag = u8::from_be_bytes(data[position..position + 1].try_into()?);
-        let tag = CharacterString::parse(data, position + 1)?;
-        let value = CharacterString::parse(data, position + 1 + tag.len())?;
+        let flag = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
+        *position += 1;
+        let tag = CharacterString::parse(data, position)?;
+        let value = CharacterString::parse(data, position)?;
 
         Ok(Self { flag, tag, value })
     }
@@ -68,7 +69,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(caa.write_to(&mut data).is_ok());
 
-        let caa = CAA::parse(&data, 0);
+        let caa = CAA::parse(&data, &mut 0);
         assert!(caa.is_ok());
         let caa = caa.unwrap();
 

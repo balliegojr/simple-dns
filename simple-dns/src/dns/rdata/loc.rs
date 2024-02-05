@@ -33,15 +33,16 @@ impl LOC {
 }
 
 impl<'a> PacketPart<'a> for LOC {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if data.len() < position + 16 {
+        if data.len() < *position + 16 {
             return Err(SimpleDnsError::InsufficientData);
         }
 
-        let data = &data[position..position + 16];
+        let data = &data[*position..*position + 16];
+        *position += 16;
 
         let version = u8::from_be(data[0]);
         if version != 0 {
@@ -110,7 +111,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(loc.write_to(&mut data).is_ok());
 
-        let loc = LOC::parse(&data, 0);
+        let loc = LOC::parse(&data, &mut 0);
         assert!(loc.is_ok());
         let loc = loc.unwrap();
 
@@ -128,7 +129,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/LOC.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::LOC(rdata) => rdata,
             _ => unreachable!(),
         };

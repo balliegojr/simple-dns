@@ -7,9 +7,10 @@ use super::name::Label;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub(crate) trait PacketPart<'a> {
-    /// Parse the contents of the data buffer begining in the given position
+    /// Parse the contents of the data buffer starting at the given `position`
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    /// The implementor must `position` to ensure that is at the end of the data just parsed
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized;
 

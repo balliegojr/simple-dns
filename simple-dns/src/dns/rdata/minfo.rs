@@ -29,12 +29,12 @@ impl<'a> MINFO<'a> {
 }
 
 impl<'a> PacketPart<'a> for MINFO<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let rmailbox = Name::parse(data, position)?;
-        let emailbox = Name::parse(data, position + rmailbox.len())?;
+        let emailbox = Name::parse(data, position)?;
 
         Ok(Self { rmailbox, emailbox })
     }
@@ -72,7 +72,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(minfo.write_to(&mut data).is_ok());
 
-        let minfo = MINFO::parse(&data, 0);
+        let minfo = MINFO::parse(&data, &mut 0);
         assert!(minfo.is_ok());
         let minfo = minfo.unwrap();
 

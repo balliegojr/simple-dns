@@ -30,12 +30,12 @@ impl<'a> HINFO<'a> {
 }
 
 impl<'a> PacketPart<'a> for HINFO<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let cpu = CharacterString::parse(data, position)?;
-        let os = CharacterString::parse(data, position + cpu.len())?;
+        let os = CharacterString::parse(data, position)?;
 
         Ok(Self { cpu, os })
     }
@@ -75,7 +75,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(hinfo.write_to(&mut data).is_ok());
 
-        let hinfo = HINFO::parse(&data, 0);
+        let hinfo = HINFO::parse(&data, &mut 0);
         assert!(hinfo.is_ok());
         let hinfo = hinfo.unwrap();
 
@@ -88,7 +88,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/HINFO.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::HINFO(rdata) => rdata,
             _ => unreachable!(),
         };

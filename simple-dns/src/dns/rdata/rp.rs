@@ -28,12 +28,12 @@ impl<'a> RP<'a> {
 }
 
 impl<'a> PacketPart<'a> for RP<'a> {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let mbox = Name::parse(data, position)?;
-        let txt = Name::parse(data, position + mbox.len())?;
+        let txt = Name::parse(data, position)?;
         Ok(RP { mbox, txt })
     }
 
@@ -72,7 +72,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(rp.write_to(&mut data).is_ok());
 
-        let rp = RP::parse(&data, 0);
+        let rp = RP::parse(&data, &mut 0);
         assert!(rp.is_ok());
         let rp = rp.unwrap();
 
@@ -85,7 +85,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/RP.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
             RData::RP(rdata) => rdata,
             _ => unreachable!(),
         };

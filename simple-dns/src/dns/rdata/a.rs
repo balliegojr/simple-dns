@@ -15,11 +15,12 @@ impl RR for A {
 }
 
 impl<'a> PacketPart<'a> for A {
-    fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = u32::from_be_bytes(data[position..position + 4].try_into()?);
+        let address = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
+        *position += 4;
         Ok(Self { address })
     }
 
@@ -63,7 +64,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(a.write_to(&mut bytes).is_ok());
 
-        let a = A::parse(&bytes, 0);
+        let a = A::parse(&bytes, &mut 0);
         assert!(a.is_ok());
         let a = a.unwrap();
 
@@ -76,7 +77,7 @@ mod tests {
         let sample_a = std::fs::read("samples/zonefile/A.sample.A")?;
         let sample_ip: u32 = "26.3.0.103".parse::<Ipv4Addr>()?.into();
 
-        let sample_a_rdata = match ResourceRecord::parse(&sample_a, 0)?.rdata {
+        let sample_a_rdata = match ResourceRecord::parse(&sample_a, &mut 0)?.rdata {
             RData::A(a) => a,
             _ => unreachable!(),
         };

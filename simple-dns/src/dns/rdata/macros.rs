@@ -22,7 +22,7 @@ macro_rules! rr_wrapper {
         }
 
         impl<'a> PacketPart<'a> for $t<'a> {
-            fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+            fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,
             {
@@ -76,22 +76,23 @@ macro_rules! rdata_enum {
         }
 
         impl<'a> PacketPart<'a> for RData<'a> {
-            fn parse(data: &'a [u8], position: usize) -> crate::Result<Self>
+            fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,
             {
-                if position + 10 > data.len() {
+                if *position + 10 > data.len() {
                     return Err(crate::SimpleDnsError::InsufficientData);
                 }
 
-                let rdatatype = u16::from_be_bytes(data[position..position + 2].try_into()?).into();
-                let rdatalen = u16::from_be_bytes(data[position + 8..position + 10].try_into()?) as usize;
+                let rdatatype = u16::from_be_bytes(data[*position..*position + 2].try_into()?).into();
+                let rdatalen = u16::from_be_bytes(data[*position + 8..*position + 10].try_into()?) as usize;
+                *position += 10;
 
-                if position + 10 + rdatalen > data.len() {
+                if *position + rdatalen > data.len() {
                     return Err(crate::SimpleDnsError::InsufficientData);
                 }
 
-                parse_rdata(&data[..position + 10 + rdatalen], position + 10, rdatatype)
+                parse_rdata(&data[..*position + rdatalen], position, rdatatype)
             }
 
             fn write_to<T: std::io::Write>(
@@ -158,7 +159,7 @@ macro_rules! rdata_enum {
             }
         }
 
-        fn parse_rdata(data: &[u8], position: usize, rdatatype: TYPE) -> crate::Result<RData> {
+        fn parse_rdata<'a>(data: &'a [u8], position: &mut usize, rdatatype: TYPE) -> crate::Result<RData<'a>> {
             let rdata = match rdatatype {
                 $(
                     TYPE::$i => RData::$i($i::parse(data, position)?),
