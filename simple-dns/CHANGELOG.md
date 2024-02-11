@@ -1,3 +1,8 @@
+# 0.6.1 (2024-02-11)
+
+### Fix
+- Fixes invalid name lengths when generating uncompressed bytes from a packet that was parsed from compressed data.
+
 # 0.6.0 (2024-01-06)
 
 ### Fix
