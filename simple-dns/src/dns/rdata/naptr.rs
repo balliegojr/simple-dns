@@ -1,4 +1,4 @@
-use crate::dns::{CharacterString, PacketPart};
+use crate::dns::{CharacterString, Name, PacketPart};
 
 use super::RR;
 
@@ -47,9 +47,9 @@ impl<'a> PacketPart<'a> for NAPTR<'a> {
     where
         Self: Sized,
     {
-        let order = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
+        let order = u16::from_be_bytes(data[*position..*position + 1].try_into()?);
         *position += 1;
-        let preference = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
+        let preference = u16::from_be_bytes(data[*position..*position + 1].try_into()?);
         *position += 1;
         let flags = CharacterString::parse(data, position)?;
         let services = CharacterString::parse(data, position)?;
