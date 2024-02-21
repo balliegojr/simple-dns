@@ -36,6 +36,9 @@ pub use minfo::MINFO;
 mod mx;
 pub use mx::MX;
 
+mod naptr;
+pub use naptr::NAPTR;
+
 mod nsap;
 pub use nsap::NSAP;
 
@@ -148,6 +151,7 @@ macros::rdata_enum! {
     AFSDB<'a>,
     ISDN<'a>,
     RouteThrough<'a>,
+    NAPTR<'a>,
     NSAP,
     NSAP_PTR<'a>,
     LOC,
