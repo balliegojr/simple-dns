@@ -64,7 +64,7 @@ impl<'a> PacketPart<'a> for NAPTR<'a> {
         out.write_all(&self.preference.to_be_bytes())?;
         self.flags.write_to(out)?;
         self.services.write_to(out)?;
-        self.regexp.write_to(regexp)?;
+        self.regexp.write_to(out)?;
         self.replacement.write_to(out)
     }
 
