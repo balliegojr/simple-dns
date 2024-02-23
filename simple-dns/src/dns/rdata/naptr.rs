@@ -101,6 +101,6 @@ mod tests {
         assert_eq!("123abc", naptr.flags.to_string());
         assert_eq!("test", naptr.services.to_string());
         assert_eq!("@\\w+\\.\\w{2,3}(\\.\\w{2,3})?", naptr.regexp.to_string());
-        assert_eq!("e.exchange.com", naptr.value.to_string());
+        assert_eq!("e.exchange.com", naptr.replacement.to_string());
     }
 }
