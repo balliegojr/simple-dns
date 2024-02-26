@@ -47,10 +47,10 @@ impl<'a> PacketPart<'a> for NAPTR<'a> {
     where
         Self: Sized,
     {
-        let order = u16::from_be_bytes(data[*position..*position + 1].try_into()?);
-        *position += 1;
-        let preference = u16::from_be_bytes(data[*position..*position + 1].try_into()?);
-        *position += 1;
+        let order = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        *position += 2;
+        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
+        *position += 2;
         let flags = CharacterString::parse(data, position)?;
         let services = CharacterString::parse(data, position)?;
         let regexp = CharacterString::parse(data, position)?;
