@@ -679,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "simple-dns"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "bitflags 2.4.2",
  "criterion",

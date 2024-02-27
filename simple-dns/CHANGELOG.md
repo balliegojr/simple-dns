@@ -1,3 +1,8 @@
+# 0.6.2 (2024-02-27)
+
+### Added 
+-  Add NAPTR record type parsing (RFC 3403)
+
 # 0.6.1 (2024-02-11)
 
 ### Fix
