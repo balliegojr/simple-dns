@@ -19,6 +19,10 @@ impl<'a> PacketPart<'a> for A {
     where
         Self: Sized,
     {
+        if data.len() < *position + 4 {
+            return Err(crate::SimpleDnsError::InsufficientData);
+        }
+
         let address = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
         *position += 4;
         Ok(Self { address })
