@@ -73,6 +73,7 @@ macro_rules! rdata_enum {
             )+
 
             NULL(u16, NULL<'a>),
+            Empty(TYPE)
         }
 
         impl<'a> WireFormat<'a> for RData<'a> {
@@ -86,7 +87,17 @@ macro_rules! rdata_enum {
 
                 let rdatatype = u16::from_be_bytes(data[*position..*position + 2].try_into()?).into();
                 let rdatalen = u16::from_be_bytes(data[*position + 8..*position + 10].try_into()?) as usize;
+
+                // OPT needs to look the ttl and class values, hence position will be advanced by OPT
+                // parsing code
+                if rdatatype == TYPE::OPT {
+                    return Ok(RData::OPT(OPT::parse(&data[..*position + rdatalen + 10], position)?))
+                }
                 *position += 10;
+
+                if rdatalen == 0 {
+                    return Ok(RData::Empty(rdatatype));
+                }
 
                 if *position + rdatalen > data.len() {
                     return Err(crate::SimpleDnsError::InsufficientData);
@@ -105,6 +116,7 @@ macro_rules! rdata_enum {
                     )+
 
                     RData::NULL(_, data) => data.write_to(out),
+                    RData::Empty(_) => { Ok(()) },
                 }
             }
 
@@ -119,6 +131,7 @@ macro_rules! rdata_enum {
                     )+
 
                     RData::NULL(_, data) => data.write_compressed_to(out, name_refs),
+                    RData::Empty(_) => { Ok(()) },
                 }
             }
 
@@ -129,6 +142,7 @@ macro_rules! rdata_enum {
                     )+
 
                     RData::NULL(_, data) => data.len(),
+                    RData::Empty(_) => 0,
                 }
             }
         }
@@ -144,6 +158,7 @@ macro_rules! rdata_enum {
                     )+
 
                     RData::NULL(type_code, _) => TYPE::Unknown(*type_code),
+                    RData::Empty(ty) => *ty
                 }
             }
 
@@ -155,6 +170,7 @@ macro_rules! rdata_enum {
                     )+
 
                     RData::NULL(rdatatype, data) => RData::NULL(rdatatype, data.into_owned()),
+                    RData::Empty(ty) => RData::Empty(ty)
                 }
             }
         }

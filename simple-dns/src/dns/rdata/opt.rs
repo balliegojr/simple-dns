@@ -37,15 +37,17 @@ impl<'a> WireFormat<'a> for OPT<'a> {
     where
         Self: Sized,
     {
-        if *position < 8 {
+        if *position + 10 > data.len() {
             return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         // udp packet size comes from CLASS
-        let udp_packet_size = u16::from_be_bytes(data[*position - 8..*position - 6].try_into()?);
+        let udp_packet_size = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
         // version comes from ttl
-        let ttl = u32::from_be_bytes(data[*position - 6..*position - 2].try_into()?);
+        let ttl = u32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
         let version = ((ttl & masks::VERSION_MASK) >> masks::VERSION_MASK.trailing_zeros()) as u8;
+
+        *position += 10;
 
         let mut opt_codes = Vec::new();
         while *position < data.len() {

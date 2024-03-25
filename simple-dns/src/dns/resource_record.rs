@@ -211,6 +211,28 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_rdata() {
+        let rr = ResourceRecord {
+            class: CLASS::NONE,
+            name: "_srv._udp.local".try_into().unwrap(),
+            ttl: 0,
+            rdata: RData::Empty(TYPE::A),
+            cache_flush: false,
+        };
+
+        assert_eq!(rr.rdata.type_code(), TYPE::A);
+        assert_eq!(rr.rdata.len(), 0);
+
+        let mut data = Vec::new();
+        rr.write_to(&mut data).expect("failed to write");
+
+        let parsed_rr = ResourceRecord::parse(&data, &mut 0).expect("failed to parse");
+        assert_eq!(parsed_rr.rdata.type_code(), TYPE::A);
+        assert_eq!(parsed_rr.rdata.len(), 0);
+        assert!(matches!(parsed_rr.rdata, RData::Empty(TYPE::A)));
+    }
+
+    #[test]
     fn test_cache_flush_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
         let rr = ResourceRecord::parse(&bytes[..], &mut 0).unwrap();
