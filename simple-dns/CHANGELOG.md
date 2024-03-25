@@ -1,3 +1,8 @@
+# 0.7.0 (2024-03-25)
+
+### Fix (Breaking)
+- Handle empty rdata parsing (when the lenght is 0)
+
 # 0.6.2 (2024-02-27)
 
 ### Added 
