@@ -1,6 +1,6 @@
 use crate::{QCLASS, QTYPE};
 
-use super::{name::Label, rdata::RData, Name, PacketPart, CLASS, TYPE};
+use super::{name::Label, rdata::RData, Name, WireFormat, CLASS, TYPE};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
@@ -99,7 +99,7 @@ impl<'a> ResourceRecord<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for ResourceRecord<'a> {
+impl<'a> WireFormat<'a> for ResourceRecord<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -112,6 +112,7 @@ impl<'a> PacketPart<'a> for ResourceRecord<'a> {
         let class_value = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
         let ttl = u32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
         let rdata = RData::parse(data, position)?;
+
         if rdata.type_code() == TYPE::OPT {
             Ok(Self {
                 name,

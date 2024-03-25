@@ -1,12 +1,10 @@
-use crate::dns::{CharacterString, Name, PacketPart};
+use crate::dns::{CharacterString, Name, WireFormat};
 
 use super::RR;
 
-/// RFC 3403: Used to map a domain name to a set of services. The fields determine 
+/// RFC 3403: Used to map a domain name to a set of services. The fields determine
 ///           the order of processing, specify the protocol and service to be used,
 ///           and transform the original domain name into a new domain name or URI.
-
-
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct NAPTR<'a> {
@@ -42,7 +40,7 @@ impl<'a> NAPTR<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for NAPTR<'a> {
+impl<'a> WireFormat<'a> for NAPTR<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -56,7 +54,14 @@ impl<'a> PacketPart<'a> for NAPTR<'a> {
         let regexp = CharacterString::parse(data, position)?;
         let replacement = Name::parse(data, position)?;
 
-        Ok(Self { order, preference, flags, services, regexp, replacement})
+        Ok(Self {
+            order,
+            preference,
+            flags,
+            services,
+            regexp,
+            replacement,
+        })
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

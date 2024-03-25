@@ -14,8 +14,8 @@ use header::Header;
 
 pub mod header_buffer;
 
-mod packet_part;
-use packet_part::PacketPart;
+mod wire_format;
+use wire_format::WireFormat;
 
 mod question;
 pub use question::Question;

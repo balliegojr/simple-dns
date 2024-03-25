@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, CharacterString, PacketPart};
+use crate::dns::{name::Label, CharacterString, WireFormat};
 
 use super::RR;
 
@@ -29,7 +29,7 @@ impl<'a> HINFO<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for HINFO<'a> {
+impl<'a> WireFormat<'a> for HINFO<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

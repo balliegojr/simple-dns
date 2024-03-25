@@ -6,7 +6,7 @@ use std::{
 
 use crate::{header_buffer, rdata::OPT, RCODE};
 
-use super::{Header, PacketFlag, PacketPart, Question, ResourceRecord, OPCODE};
+use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
 
 /// Represents a DNS message packet
 ///
@@ -135,7 +135,7 @@ impl<'a> Packet<'a> {
         })
     }
 
-    fn parse_section<T: PacketPart<'a>>(
+    fn parse_section<T: WireFormat<'a>>(
         data: &'a [u8],
         offset: &mut usize,
         items_count: u16,

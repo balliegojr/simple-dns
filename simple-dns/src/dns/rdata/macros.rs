@@ -21,7 +21,7 @@ macro_rules! rr_wrapper {
             }
         }
 
-        impl<'a> PacketPart<'a> for $t<'a> {
+        impl<'a> WireFormat<'a> for $t<'a> {
             fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,
@@ -75,7 +75,7 @@ macro_rules! rdata_enum {
             NULL(u16, NULL<'a>),
         }
 
-        impl<'a> PacketPart<'a> for RData<'a> {
+        impl<'a> WireFormat<'a> for RData<'a> {
             fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,

@@ -1,5 +1,5 @@
 use crate::{
-    dns::{header::Header, PacketPart},
+    dns::{header::Header, WireFormat},
     RCODE,
 };
 use std::borrow::Cow;
@@ -32,7 +32,7 @@ impl<'a> RR for OPT<'a> {
     const TYPE_CODE: u16 = 41;
 }
 
-impl<'a> PacketPart<'a> for OPT<'a> {
+impl<'a> WireFormat<'a> for OPT<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

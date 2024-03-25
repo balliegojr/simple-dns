@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::dns::PacketPart;
+use crate::dns::WireFormat;
 use crate::Name;
 
 use super::RR;
@@ -38,7 +38,7 @@ impl<'a> SRV<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for SRV<'a> {
+impl<'a> WireFormat<'a> for SRV<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

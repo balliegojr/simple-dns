@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::dns::{PacketPart, MAX_NULL_LENGTH};
+use crate::dns::{WireFormat, MAX_NULL_LENGTH};
 
 use super::RR;
 
@@ -42,7 +42,7 @@ impl<'a> NULL<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for NULL<'a> {
+impl<'a> WireFormat<'a> for NULL<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

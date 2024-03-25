@@ -1,4 +1,4 @@
-use crate::{dns::packet_part::PacketPart, SimpleDnsError};
+use crate::{dns::WireFormat, SimpleDnsError};
 
 use super::RR;
 
@@ -37,7 +37,7 @@ impl NSAP {
     }
 }
 
-impl<'a> PacketPart<'a> for NSAP {
+impl<'a> WireFormat<'a> for NSAP {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

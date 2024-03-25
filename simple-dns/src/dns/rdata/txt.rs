@@ -3,7 +3,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use crate::dns::{PacketPart, MAX_CHARACTER_STRING_LENGTH};
+use crate::dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH};
 use crate::CharacterString;
 
 use super::RR;
@@ -174,7 +174,7 @@ impl<'a> TryFrom<TXT<'a>> for String {
     }
 }
 
-impl<'a> PacketPart<'a> for TXT<'a> {
+impl<'a> WireFormat<'a> for TXT<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

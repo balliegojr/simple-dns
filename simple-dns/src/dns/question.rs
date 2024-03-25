@@ -3,7 +3,7 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use super::{name::Label, Name, PacketPart, QCLASS, QTYPE};
+use super::{name::Label, Name, WireFormat, QCLASS, QTYPE};
 
 /// Question represents a query in the DNS Packet
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ impl<'a> Question<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for Question<'a> {
+impl<'a> WireFormat<'a> for Question<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
         if *position + 4 > data.len() {

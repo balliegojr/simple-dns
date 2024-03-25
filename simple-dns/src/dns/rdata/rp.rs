@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, PacketPart};
+use crate::dns::{name::Label, Name, WireFormat};
 
 use super::RR;
 
@@ -27,7 +27,7 @@ impl<'a> RP<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for RP<'a> {
+impl<'a> WireFormat<'a> for RP<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

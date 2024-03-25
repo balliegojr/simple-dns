@@ -1,6 +1,6 @@
 use std::{borrow::Cow, convert::TryInto};
 
-use crate::dns::PacketPart;
+use crate::dns::WireFormat;
 
 use super::RR;
 
@@ -30,7 +30,7 @@ impl<'a> WKS<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for WKS<'a> {
+impl<'a> WireFormat<'a> for WKS<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
@@ -65,9 +65,8 @@ impl<'a> PacketPart<'a> for WKS<'a> {
 mod tests {
     use std::net::Ipv4Addr;
 
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{dns::WireFormat, rdata::RData, ResourceRecord};
 
-    use super::*;
     #[test]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/WKS.sample")?;

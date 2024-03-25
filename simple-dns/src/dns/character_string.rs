@@ -2,7 +2,7 @@ use std::{borrow::Cow, convert::TryFrom, fmt::Display};
 
 use crate::SimpleDnsError;
 
-use super::{PacketPart, MAX_CHARACTER_STRING_LENGTH};
+use super::{WireFormat, MAX_CHARACTER_STRING_LENGTH};
 
 /// CharacterString is expressed in one or two ways:
 /// - as a contiguous set of characters without interior spaces,
@@ -47,7 +47,7 @@ impl<'a> TryFrom<CharacterString<'a>> for String {
     }
 }
 
-impl<'a> PacketPart<'a> for CharacterString<'a> {
+impl<'a> WireFormat<'a> for CharacterString<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

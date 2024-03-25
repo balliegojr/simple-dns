@@ -6,7 +6,7 @@ use std::{
 use super::name::Label;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
-pub(crate) trait PacketPart<'a> {
+pub(crate) trait WireFormat<'a> {
     /// Parse the contents of the data buffer starting at the given `position`
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
     /// The implementor must `position` to ensure that is at the end of the data just parsed

@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
 
-use crate::dns::{PacketPart, MAX_SVC_PARAM_VALUE_LENGTH};
+use crate::dns::{WireFormat, MAX_SVC_PARAM_VALUE_LENGTH};
 use crate::{CharacterString, Name};
 
 use super::RR;
@@ -147,7 +147,7 @@ impl<'a> SVCB<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for SVCB<'a> {
+impl<'a> WireFormat<'a> for SVCB<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

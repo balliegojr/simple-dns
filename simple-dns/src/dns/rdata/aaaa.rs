@@ -1,4 +1,4 @@
-use crate::dns::PacketPart;
+use crate::dns::WireFormat;
 use std::{convert::TryInto, net::Ipv6Addr};
 
 use super::RR;
@@ -14,7 +14,7 @@ impl RR for AAAA {
     const TYPE_CODE: u16 = 28;
 }
 
-impl<'a> PacketPart<'a> for AAAA {
+impl<'a> WireFormat<'a> for AAAA {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

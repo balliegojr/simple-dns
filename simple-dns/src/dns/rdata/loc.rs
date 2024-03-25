@@ -1,4 +1,4 @@
-use crate::{dns::packet_part::PacketPart, SimpleDnsError};
+use crate::{dns::WireFormat, SimpleDnsError};
 
 use super::RR;
 
@@ -32,7 +32,7 @@ impl LOC {
     }
 }
 
-impl<'a> PacketPart<'a> for LOC {
+impl<'a> WireFormat<'a> for LOC {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

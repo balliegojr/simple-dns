@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, PacketPart};
+use crate::dns::{name::Label, Name, WireFormat};
 
 use super::RR;
 
@@ -27,7 +27,7 @@ impl<'a> AFSDB<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for AFSDB<'a> {
+impl<'a> WireFormat<'a> for AFSDB<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

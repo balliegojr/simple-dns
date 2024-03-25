@@ -3,7 +3,7 @@
 
 use crate::CharacterString;
 
-use super::{Name, PacketPart};
+use super::{Name, WireFormat};
 use core::fmt::Debug;
 use std::{collections::HashMap, convert::TryInto};
 

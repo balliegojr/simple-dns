@@ -6,7 +6,7 @@ use std::{
     hash::Hash,
 };
 
-use super::{PacketPart, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
+use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
@@ -143,7 +143,7 @@ impl<'a> Name<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for Name<'a> {
+impl<'a> WireFormat<'a> for Name<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

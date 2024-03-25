@@ -1,4 +1,4 @@
-use crate::dns::{CharacterString, PacketPart};
+use crate::dns::{CharacterString, WireFormat};
 
 use super::RR;
 
@@ -30,7 +30,7 @@ impl<'a> CAA<'a> {
     }
 }
 
-impl<'a> PacketPart<'a> for CAA<'a> {
+impl<'a> WireFormat<'a> for CAA<'a> {
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
