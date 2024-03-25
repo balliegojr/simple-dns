@@ -9,7 +9,7 @@ use super::RR;
 pub struct AFSDB<'a> {
     /// An integer that represents the subtype
     pub subtype: u16,
-    /// The <hostname> field is a [name](`Name`) name of a host that has a server for the cell named by the owner name of the RR
+    /// A [name](`Name`) of a host that has a server for the cell named by the owner name of the RR
     pub hostname: Name<'a>,
 }
 

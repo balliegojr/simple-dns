@@ -22,7 +22,7 @@ pub struct Packet<'a> {
     /// Name servers section
     pub name_servers: Vec<ResourceRecord<'a>>,
     /// Aditional records section.  
-    /// DO NOT use this field to add OPT record, use [`opt_mut`] instead
+    /// DO NOT use this field to add OPT record, use [`Packet::opt_mut`] instead
     pub additional_records: Vec<ResourceRecord<'a>>,
 }
 
@@ -76,7 +76,7 @@ impl<'a> Packet<'a> {
 
     /// Get a mutable reference for  this packet [RCODE] information
     /// Warning, if the [RCODE] value is greater than 15 (4 bits), you MUST provide an [OPT]
-    /// resource record through the [opt_mut] function
+    /// resource record through the [Packet::opt_mut] function
     pub fn rcode_mut(&mut self) -> &mut RCODE {
         &mut self.header.response_code
     }

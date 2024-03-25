@@ -11,7 +11,7 @@ pub struct RouteThrough<'a> {
     /// Lower values are preferred.
     pub preference: u16,
 
-    /// A [Name](`Name`) which specifies a host which will serve as an intermediate in reaching the host specified by <owner>.
+    /// A [Name](`Name`) which specifies a host which will serve as an intermediate in reaching the host specified by **owner**.
     pub intermediate_host: Name<'a>,
 }
 
