@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn parse_sample_files() -> Result<(), Box<dyn std::error::Error>> {
         for file_path in std::fs::read_dir("samples/zonefile")? {
-            let data = std::fs::read(&file_path?.path())?;
+            let data = std::fs::read(file_path?.path())?;
             let mut pos = 0;
             while pos < data.len() {
                 crate::ResourceRecord::parse(&data, &mut pos)?;

@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io::{Cursor, Seek, Write},
-    usize,
 };
 
 use crate::{header_buffer, rdata::OPT, RCODE};

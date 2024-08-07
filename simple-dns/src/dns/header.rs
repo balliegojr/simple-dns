@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn write_example_query() {
-        let mut header = Header::new_query(core::u16::MAX);
+        let mut header = Header::new_query(u16::MAX);
 
         header.set_flags(PacketFlag::TRUNCATION | PacketFlag::RECURSION_DESIRED);
 
@@ -156,7 +156,7 @@ mod tests {
         let buffer = b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02";
         let header = Header::parse(&buffer[..]).unwrap();
 
-        assert_eq!(core::u16::MAX, header.id);
+        assert_eq!(u16::MAX, header.id);
         assert_eq!(OPCODE::StandardQuery, header.opcode);
         assert!(!header.has_flags(
             PacketFlag::AUTHORITATIVE_ANSWER
