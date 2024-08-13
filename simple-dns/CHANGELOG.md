@@ -1,3 +1,8 @@
+# 0.7.1 (2024-08-13)
+
+### Added
+- Add `set_id` function to packet
+
 # 0.7.0 (2024-03-25)
 
 ### Fix (Breaking)
