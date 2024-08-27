@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::dns::{CharacterString, WireFormat};
 
 use super::RR;
@@ -12,7 +14,7 @@ pub struct CAA<'a> {
     /// Property described in the VALUE field. One of `issue`, `issuewild`, or `iodef`
     pub tag: CharacterString<'a>,
     /// Value associated with property tag
-    pub value: CharacterString<'a>,
+    pub value: Cow<'a, [u8]>,
 }
 
 impl<'a> RR for CAA<'a> {
@@ -25,7 +27,7 @@ impl<'a> CAA<'a> {
         CAA {
             flag: self.flag,
             tag: self.tag.into_owned(),
-            value: self.value.into_owned(),
+            value: self.value.into_owned().into(),
         }
     }
 }
@@ -38,7 +40,8 @@ impl<'a> WireFormat<'a> for CAA<'a> {
         let flag = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
         *position += 1;
         let tag = CharacterString::parse(data, position)?;
-        let value = CharacterString::parse(data, position)?;
+        let value = Cow::Borrowed(&data[*position..]);
+        *position += value.len();
 
         Ok(Self { flag, tag, value })
     }
@@ -46,7 +49,8 @@ impl<'a> WireFormat<'a> for CAA<'a> {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.flag.to_be_bytes())?;
         self.tag.write_to(out)?;
-        self.value.write_to(out)
+        out.write_all(&self.value)?;
+        Ok(())
     }
 
     fn len(&self) -> usize {
@@ -56,6 +60,8 @@ impl<'a> WireFormat<'a> for CAA<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::{rdata::RData, Packet, ResourceRecord, CLASS};
+
     use super::*;
 
     #[test]
@@ -63,7 +69,7 @@ mod tests {
         let caa = CAA {
             flag: 0,
             tag: CharacterString::new(b"issue").unwrap(),
-            value: CharacterString::new(b"\"example.org").unwrap(),
+            value: b"\"example.org".into(),
         };
 
         let mut data = Vec::new();
@@ -76,6 +82,48 @@ mod tests {
         assert_eq!(data.len(), caa.len());
         assert_eq!(0, caa.flag);
         assert_eq!("issue", caa.tag.to_string());
-        assert_eq!("\"example.org", caa.value.to_string());
+        assert_eq!(b"\"example.org", &caa.value[..]);
+    }
+
+    #[test]
+    fn parse_rdata_with_multiple_caa_records() {
+        let mut packet = Packet::new_query(0);
+        packet.answers.push(ResourceRecord::new(
+            "caa.xxx.com".try_into().unwrap(),
+            CLASS::IN,
+            11111,
+            crate::rdata::RData::CAA(CAA {
+                flag: 128,
+                tag: CharacterString::new(b"issuewild").unwrap(),
+                value: b"\"example.org".into(),
+            }),
+        ));
+
+        packet.answers.push(ResourceRecord::new(
+            "caa.yyy.com".try_into().unwrap(),
+            CLASS::IN,
+            11111,
+            crate::rdata::RData::CAA(CAA {
+                flag: 128,
+                tag: CharacterString::new(b"issuewild").unwrap(),
+                value: b"\"example_two.org".into(),
+            }),
+        ));
+
+        let data = packet
+            .build_bytes_vec_compressed()
+            .expect("Failed to generate packet");
+
+        let mut packet = Packet::parse(&data[..]).expect("Failed to parse packet");
+        let RData::CAA(cca_two) = packet.answers.pop().unwrap().rdata else {
+            panic!("failed to parse CAA record)")
+        };
+
+        let RData::CAA(cca_one) = packet.answers.pop().unwrap().rdata else {
+            panic!("failed to parse CAA record")
+        };
+
+        assert_eq!(b"\"example.org", &cca_one.value[..]);
+        assert_eq!(b"\"example_two.org", &cca_two.value[..]);
     }
 }
