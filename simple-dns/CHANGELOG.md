@@ -1,3 +1,8 @@
+# 0.8.0 (2024-08-27)
+
+### Fix (Breaking)
+- Remove the length octet from CAA value serialization
+
 # 0.7.1 (2024-08-13)
 
 ### Added
