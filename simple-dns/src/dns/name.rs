@@ -402,7 +402,7 @@ impl<'a> Label<'a> {
         if !data
             .iter()
             .skip(1)
-            .all(|c| c.is_ascii_alphanumeric() || *c == b'-')
+            .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_')
         {
             return false;
         }
@@ -448,6 +448,7 @@ mod tests {
         assert!(Name::new("some.local").is_ok());
         assert!(Name::new("some.local.").is_ok());
         assert!(Name::new("some-dash.local.").is_ok());
+        assert!(Name::new("_sync_miss._tcp.local").is_ok());
 
         assert_eq!(Name::new_unchecked("\u{1F600}.local.").labels.len(), 2);
     }
