@@ -149,13 +149,13 @@ fn build_bytes_vec_after_parsing_compressed_have_correct_length() {
 
     let mut original = Packet::new_reply(0);
     original.answers.push(simple_dns::ResourceRecord::new(
-        simple_dns::Name::new("@").unwrap(),
+        simple_dns::Name::new("a").unwrap(),
         simple_dns::CLASS::IN,
         30,
         simple_dns::rdata::RData::CNAME(simple_dns::Name::new(name).unwrap().into()),
     ));
     original.answers.push(simple_dns::ResourceRecord::new(
-        simple_dns::Name::new("@").unwrap(),
+        simple_dns::Name::new("a").unwrap(),
         simple_dns::CLASS::IN,
         30,
         simple_dns::rdata::RData::CNAME(simple_dns::Name::new(name).unwrap().into()),

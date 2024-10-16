@@ -18,15 +18,22 @@ const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
 /// A Name represents a domain-name, which consists of character strings separated by dots.  
 /// Each section of a name is called label  
 /// ex: `google.com` consists of two labels `google` and `com`
+///
+/// A valid name contains only alphanumeric characters, hyphen (-), underscore (_) or dots (.) and must not exceed 255 characters.
+/// Each label must not exceed 63 characters.
+///
+/// Microsoft implementation allows unicode characters in the name content.
+/// To create a name with unicode characters, use [`Name::new_unchecked`] or
+/// [`Name::new_with_labels`]
 #[derive(Eq, Clone)]
 pub struct Name<'a> {
     labels: Vec<Label<'a>>,
 }
 
 impl<'a> Name<'a> {
-    /// Creates a new validated Name
+    /// Creates a new Name. Returns [`Result::<Name>::Ok`] if given `name` contents are valid.
     pub fn new(name: &'a str) -> crate::Result<Self> {
-        let labels = NameSpliter::new(name.as_bytes())
+        let labels = LabelsIter::new(name.as_bytes())
             .map(Label::new)
             .collect::<Result<Vec<Label>, _>>()?;
 
@@ -39,13 +46,22 @@ impl<'a> Name<'a> {
         }
     }
 
-    /// Create a new Name without checking for size limits
+    /// Create a new Name without checking for size limits or contents
     pub fn new_unchecked(name: &'a str) -> Self {
-        let labels = NameSpliter::new(name.as_bytes())
+        let labels = LabelsIter::new(name.as_bytes())
             .map(Label::new_unchecked)
             .collect();
 
         Self { labels }
+    }
+
+    /// Creates a new Name with given labels
+    ///
+    /// Allows construction of labels with `.` in them.
+    pub fn new_with_labels(labels: &[Label<'a>]) -> Self {
+        Self {
+            labels: labels.to_vec(),
+        }
     }
 
     /// Verify if name ends with .local.
@@ -196,9 +212,15 @@ impl<'a> WireFormat<'a> for Name<'a> {
                         return Err(crate::SimpleDnsError::InsufficientData);
                     }
 
-                    labels.push(Label::new(
+                    if len as usize > MAX_LABEL_LENGTH {
+                        return Err(crate::SimpleDnsError::InvalidServiceLabel);
+                    }
+
+                    // Parsing allow invalid characters in the label.
+                    // However, the length of the label must be validated (above)
+                    labels.push(Label::new_unchecked(
                         &data[pointer_position + 1..pointer_position + 1 + len as usize],
-                    )?);
+                    ));
 
                     if !following_compression_pointer {
                         *position += len as usize + 1;
@@ -229,7 +251,6 @@ impl<'a> WireFormat<'a> for Name<'a> {
             .map(|label| label.len() + 1)
             .sum::<usize>()
             + 1
-        // self.total_size
     }
 }
 
@@ -238,6 +259,18 @@ impl<'a> TryFrom<&'a str> for Name<'a> {
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
         Name::new(value)
+    }
+}
+
+impl<'a> From<&'a [Label<'a>]> for Name<'a> {
+    fn from(labels: &'a [Label<'a>]) -> Self {
+        Name::new_with_labels(labels)
+    }
+}
+
+impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
+    fn from(labels: [Label<'a>; N]) -> Self {
+        Name::new_with_labels(&labels)
     }
 }
 
@@ -276,91 +309,106 @@ impl<'a> Hash for Name<'a> {
     }
 }
 
-struct NameSpliter<'a> {
+/// An iterator over the labels in a domain name
+struct LabelsIter<'a> {
     bytes: &'a [u8],
     current: usize,
 }
 
-impl<'a> NameSpliter<'a> {
+impl<'a> LabelsIter<'a> {
     fn new(bytes: &'a [u8]) -> Self {
         Self { bytes, current: 0 }
     }
 }
 
-impl<'a> Iterator for NameSpliter<'a> {
+impl<'a> Iterator for LabelsIter<'a> {
     type Item = Cow<'a, [u8]>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut slices: Vec<&[u8]> = Vec::new();
-
         for i in self.current..self.bytes.len() {
-            if self.bytes[i] == b'.' && i - self.current > 0 {
+            if self.bytes[i] == b'.' {
                 let current = std::mem::replace(&mut self.current, i + 1);
-                if self.bytes[i - 1] == b'\\' {
-                    slices.push(&self.bytes[current..i - 1]);
+                if i - current == 0 {
                     continue;
                 }
-
-                return Some(join_slices(slices, &self.bytes[current..i]));
+                return Some(self.bytes[current..i].into());
             }
         }
 
         if self.current < self.bytes.len() {
             let current = std::mem::replace(&mut self.current, self.bytes.len());
-            Some(join_slices(slices, &self.bytes[current..]))
+            Some(self.bytes[current..].into())
         } else {
             None
         }
     }
 }
 
-fn join_slices<'a>(mut slices: Vec<&'a [u8]>, slice: &'a [u8]) -> Cow<'a, [u8]> {
-    if slices.is_empty() {
-        slice.into()
-    } else {
-        slices.push(slice);
-
-        slices
-            .iter_mut()
-            .fold(Vec::new(), |mut c, v| {
-                if !c.is_empty() {
-                    c.push(b'.');
-                }
-
-                c.extend(&v[..]);
-                c
-            })
-            .into()
-    }
-}
-
+/// Represents a label in a domain name
+///
+/// A valid label is consists of A-Z, a-z, 0-9, and hyphen (-), and must be at most 63 characters
+/// in length.
+/// This library also considers valid any label starting with underscore (_), to be able to parse mDNS domain names.
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Label<'a> {
     data: Cow<'a, [u8]>,
 }
 
 impl<'a> Label<'a> {
+    /// Create a new [`Label`] if given data is valid and within the limits
     pub fn new<T: Into<Cow<'a, [u8]>>>(data: T) -> crate::Result<Self> {
         let label = Self::new_unchecked(data);
-        if label.len() > MAX_LABEL_LENGTH {
-            Err(crate::SimpleDnsError::InvalidServiceLabel)
-        } else {
-            Ok(label)
+        if !Self::is_valid_label(&label.data) {
+            return Err(crate::SimpleDnsError::InvalidServiceLabel);
         }
+
+        Ok(label)
     }
 
+    /// Create a new Label without checking for size limits or valid content.
+    /// This function can be used to create labels with unicode characters
     pub fn new_unchecked<T: Into<Cow<'a, [u8]>>>(data: T) -> Self {
         Self { data: data.into() }
     }
 
+    /// Returns the length of the label
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
+    /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> Label<'b> {
         Label {
             data: self.data.into_owned().into(),
         }
+    }
+
+    fn is_valid_label(data: &[u8]) -> bool {
+        if data.is_empty() || data.len() > MAX_LABEL_LENGTH {
+            return false;
+        }
+
+        if let Some(first) = data.first() {
+            if !first.is_ascii_alphabetic() && *first != b'_' {
+                return false;
+            }
+        }
+
+        if !data
+            .iter()
+            .skip(1)
+            .all(|c| c.is_ascii_alphanumeric() || *c == b'-')
+        {
+            return false;
+        }
+
+        if let Some(last) = data.last() {
+            if !last.is_ascii_alphanumeric() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -390,16 +438,20 @@ mod tests {
     use crate::SimpleDnsError;
 
     #[test]
-    fn construct_valid_names() -> Result<(), SimpleDnsError> {
+    fn construct_valid_names() {
         assert!(Name::new("some").is_ok());
         assert!(Name::new("some.local").is_ok());
         assert!(Name::new("some.local.").is_ok());
-        assert!(Name::new("\u{1F600}.local.").is_ok());
+        assert!(Name::new("some-dash.local.").is_ok());
 
-        let scaped = Name::new("some\\.local")?;
-        assert_eq!(scaped.labels.len(), 1);
+        assert_eq!(Name::new_unchecked("\u{1F600}.local.").labels.len(), 2);
+    }
 
-        Ok(())
+    #[test]
+    fn label_validate() {
+        assert!(Name::new("\u{1F600}.local.").is_err());
+        assert!(Name::new("@.local.").is_err());
+        assert!(Name::new("\\.local.").is_err());
     }
 
     #[test]
@@ -441,7 +493,6 @@ mod tests {
     #[test]
     fn test_write() {
         let mut bytes = Cursor::new(Vec::with_capacity(30));
-
         Name::new_unchecked("_srv._udp.local")
             .write_to(&mut bytes)
             .unwrap();
@@ -454,6 +505,26 @@ mod tests {
             .unwrap();
 
         assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes.get_ref()[..]);
+    }
+
+    #[test]
+    fn root_name_should_generate_no_labels() {
+        assert_eq!(Name::new_unchecked("").labels.len(), 0);
+        assert_eq!(Name::new_unchecked(".").labels.len(), 0);
+    }
+
+    #[test]
+    fn dot_sequence_should_generate_no_labels() {
+        assert_eq!(Name::new_unchecked(".....").labels.len(), 0);
+        assert_eq!(Name::new_unchecked("example.....com").labels.len(), 2);
+    }
+
+    #[test]
+    fn root_name_should_write_zero() {
+        let mut bytes = Cursor::new(Vec::with_capacity(30));
+        Name::new_unchecked(".").write_to(&mut bytes).unwrap();
+
+        assert_eq!(b"\x00", &bytes.get_ref()[..]);
     }
 
     #[test]

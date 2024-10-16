@@ -111,7 +111,7 @@ impl<'a> Header<'a> {
     pub(crate) fn opt_rr(&self) -> Option<ResourceRecord> {
         self.opt.as_ref().map(|opt| {
             ResourceRecord::new(
-                crate::Name::new_unchecked("."),
+                [].into(),
                 crate::CLASS::IN,
                 opt.encode_ttl(self),
                 crate::rdata::RData::OPT(opt.clone()),

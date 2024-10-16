@@ -4,7 +4,7 @@ mod character_string;
 pub use character_string::CharacterString;
 
 mod name;
-pub use name::Name;
+pub use name::{Label, Name};
 
 mod packet;
 pub use packet::Packet;

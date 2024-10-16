@@ -129,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+    fn parse_soa_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/SOA.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
@@ -138,7 +138,14 @@ mod tests {
         };
 
         assert_eq!(sample_rdata.mname, "VENERA.sample".try_into()?);
-        assert_eq!(sample_rdata.rname, "Action\\.domains.sample".try_into()?);
+        assert_eq!(
+            sample_rdata.rname,
+            [
+                Label::new_unchecked(b"Action.domains"),
+                Label::new_unchecked(b"sample")
+            ]
+            .into()
+        );
         assert_eq!(sample_rdata.serial, 20);
         assert_eq!(sample_rdata.refresh, 7200);
         assert_eq!(sample_rdata.retry, 600);
