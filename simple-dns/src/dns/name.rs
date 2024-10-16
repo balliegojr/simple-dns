@@ -376,6 +376,11 @@ impl<'a> Label<'a> {
         self.data.len()
     }
 
+    /// Returns true if the label is empty
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> Label<'b> {
         Label {
