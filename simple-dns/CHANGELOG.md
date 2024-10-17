@@ -1,3 +1,15 @@
+# 0.9.0 (2024-10-17)
+
+### Fix
+- Correct serialization of OPT resource record for eDNS packets
+
+### Added
+- Add `new_with_labels` to `Name` implementation
+- Exposes `Label` type
+
+### Breaking Changes
+- Add data validation to `Name::new`.
+
 # 0.8.0 (2024-08-27)
 
 ### Fix (Breaking)
