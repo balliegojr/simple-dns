@@ -238,8 +238,6 @@ SMIMEA     - RFC 8162
 
 HIP        - RFC 8005
 
-# I'm not implementing
-
-TSIG
+TSIG       - RFC 8945
 
 */
