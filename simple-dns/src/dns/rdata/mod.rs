@@ -97,6 +97,9 @@ pub use ds::DS;
 mod nsec;
 pub use nsec::NSEC;
 
+mod dhcid;
+pub use dhcid::DHCID;
+
 pub(crate) trait RR {
     const TYPE_CODE: u16;
 }
@@ -198,6 +201,7 @@ macros::rdata_enum! {
     RRSIG<'a>,
     DS<'a>,
     NSEC<'a>,
+    DHCID<'a>,
 }
 
 /*
@@ -210,12 +214,9 @@ TKEY       - RFC 2930
 
 APL        - RFC 3123
 
-
 SSHFP      - RFC 4255
 
 DLV        - RFC 4431
-
-DHCID      - RFC 4701
 
 NSEC3PARAM - RFC 5155
 NSEC3      - RFC 5155
