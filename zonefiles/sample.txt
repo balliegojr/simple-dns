@@ -72,3 +72,5 @@ VAXA    A       10.2.0.27
                                                 98631FAD1A292118 )
 
         CERT    PGP 0 0 AAAAAAA=
+
+        NSEC    host.example.com. (A MX NSEC)

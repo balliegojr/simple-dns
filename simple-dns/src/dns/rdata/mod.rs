@@ -93,6 +93,10 @@ pub use rrsig::RRSIG;
 
 mod ds;
 pub use ds::DS;
+
+mod nsec;
+pub use nsec::NSEC;
+
 pub(crate) trait RR {
     const TYPE_CODE: u16;
 }
@@ -193,6 +197,7 @@ macros::rdata_enum! {
     DNSKEY<'a>,
     RRSIG<'a>,
     DS<'a>,
+    NSEC<'a>,
 }
 
 /*
@@ -205,7 +210,6 @@ TKEY       - RFC 2930
 
 APL        - RFC 3123
 
-NSEC       - RFC 4034
 
 SSHFP      - RFC 4255
 
