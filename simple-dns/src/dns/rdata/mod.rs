@@ -69,6 +69,30 @@ pub use wks::WKS;
 mod svcb;
 pub use svcb::SVCB;
 
+mod eui;
+pub use eui::EUI48;
+pub use eui::EUI64;
+
+mod cert;
+pub use cert::CERT;
+
+mod zonemd;
+pub use zonemd::ZONEMD;
+
+mod kx;
+pub use kx::KX;
+
+mod ipseckey;
+pub use ipseckey::IPSECKEY;
+
+mod dnskey;
+pub use dnskey::DNSKEY;
+
+mod rrsig;
+pub use rrsig::RRSIG;
+
+mod ds;
+pub use ds::DS;
 pub(crate) trait RR {
     const TYPE_CODE: u16;
 }
@@ -129,6 +153,7 @@ macros::rr_wrapper! {
     HTTPS: SVCB = 65
 }
 
+
 macros::rdata_enum! {
     A,
     AAAA,
@@ -159,4 +184,57 @@ macros::rdata_enum! {
     CAA<'a>,
     SVCB<'a>,
     HTTPS<'a>,
+    EUI48,
+    EUI64,
+    CERT<'a>,
+    ZONEMD<'a>,
+    KX<'a>,
+    IPSECKEY<'a>,
+    DNSKEY<'a>,
+    RRSIG<'a>,
+    DS<'a>,
 }
+
+/*
+Not implemented
+
+SIG        - RFC 2535
+KEY        - RFC 2535 & RFC 2930
+
+TKEY       - RFC 2930
+
+APL        - RFC 3123
+
+NSEC       - RFC 4034
+
+SSHFP      - RFC 4255
+
+DLV        - RFC 4431
+
+DHCID      - RFC 4701
+
+NSEC3PARAM - RFC 5155
+NSEC3      - RFC 5155
+
+TLSA       - RFC 6698
+
+DNAME      - RFC 6672
+
+OPENPGPKEY - RFC 7929
+
+URI        - RFC 7553
+
+CSYNC      - RFC 7477
+
+CDS        - RFC 7344
+CDNSKEY    - RFC 7344
+
+SMIMEA     - RFC 8162
+
+HIP        - RFC 8005
+
+# I'm not implementing
+
+TSIG
+
+*/
