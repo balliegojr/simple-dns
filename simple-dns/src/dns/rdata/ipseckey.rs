@@ -8,8 +8,6 @@ use super::RR;
 pub struct IPSECKEY<'a> {
     /// Precedence for this record, lower values are preferred
     pub precedence: u8,
-    /// Type of gateway (0=none, 1=IPv4, 2=IPv6, 3=domain name)
-    gateway_type: u8,
     /// Public key algorithm (1=DSA, 2=RSA)
     pub algorithm: u8,
     /// Domain name of the gateway
@@ -92,7 +90,6 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
         *position += public_key.len();
         Ok(Self {
             precedence,
-            gateway_type,
             algorithm,
             gateway,
             public_key: Cow::Borrowed(public_key),
@@ -100,21 +97,23 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
-        if self.gateway_type != match &self.gateway {
-            Gateway::None => 0,
-            Gateway::IPv4(_) => 1,
-            Gateway::IPv6(_) => 2,
-            Gateway::Domain(_) => 3,
-        } {
-            return Err(crate::SimpleDnsError::AttemptedInvalidOperation);
-        }
-        out.write_all(&[self.precedence, self.gateway_type, self.algorithm])?;
         match &self.gateway {
-            Gateway::None => (),
-            Gateway::IPv4(ipv4_addr) => out.write_all(&ipv4_addr.octets())?,
-            Gateway::IPv6(ipv6_addr) => out.write_all(&ipv6_addr.octets())?,
-            Gateway::Domain(name) => name.write_to(out)?,
-        }
+            Gateway::None => {
+                out.write_all(&[self.precedence, 0, self.algorithm])?;
+            },
+            Gateway::IPv4(ipv4_addr) => {
+                out.write_all(&[self.precedence, 1, self.algorithm])?;
+                out.write_all(&ipv4_addr.octets())?
+            },
+            Gateway::IPv6(ipv6_addr) => {
+                out.write_all(&[self.precedence, 2, self.algorithm])?;
+                out.write_all(&ipv6_addr.octets())?
+            },
+            Gateway::Domain(name) => {
+                out.write_all(&[self.precedence, 3, self.algorithm])?;
+                name.write_to(out)?
+            },
+        };
         out.write_all(&self.public_key)?;
         Ok(())
     }
@@ -134,7 +133,6 @@ impl<'a> IPSECKEY<'a> {
     pub fn into_owned<'b>(self) -> IPSECKEY<'b> {
         IPSECKEY {
             precedence: self.precedence,
-            gateway_type: self.gateway_type,
             algorithm: self.algorithm,
             gateway: self.gateway.into_owned(),
             public_key: self.public_key.into_owned().into(),
@@ -152,7 +150,6 @@ mod tests {
     fn parse_and_write_ipseckey() {
         let ipseckey = IPSECKEY {
             precedence: 10,
-            gateway_type: 1,
             algorithm: 2,
             gateway: Gateway::IPv4(Ipv4Addr::new(192,0,2,38)),
             public_key: Cow::Borrowed(b"\x01\x03\x51\x53\x79\x86\xed\x35\x53\x3b\x60\x64\x47\x8e\xee\xb2\x7b\x5b\xd7\x4d\xae\x14\x9b\x6e\x81\xba\x3a\x05\x21\xaf\x82\xab\x78\x01"),
@@ -163,7 +160,6 @@ mod tests {
 
         let ipseckey = IPSECKEY::parse(&data, &mut 0).unwrap();
         assert_eq!(ipseckey.precedence, 10);
-        assert_eq!(ipseckey.gateway_type, 1);
         assert_eq!(ipseckey.algorithm, 2);
         assert_eq!(ipseckey.gateway, Gateway::IPv4(Ipv4Addr::new(192,0,2,38)));
         assert_eq!(*ipseckey.public_key, *b"\x01\x03\x51\x53\x79\x86\xed\x35\x53\x3b\x60\x64\x47\x8e\xee\xb2\x7b\x5b\xd7\x4d\xae\x14\x9b\x6e\x81\xba\x3a\x05\x21\xaf\x82\xab\x78\x01");
@@ -179,7 +175,6 @@ mod tests {
         };
 
         assert_eq!(sample_rdata.precedence, 10);
-        assert_eq!(sample_rdata.gateway_type, 1);
         assert_eq!(sample_rdata.algorithm, 2);
         assert_eq!(sample_rdata.gateway, Gateway::IPv4(Ipv4Addr::new(192,0,2,38)));
         assert_eq!(*sample_rdata.public_key, *b"\x01\x03\x51\x53\x79\x86\xed\x35\x53\x3b\x60\x64\x47\x8e\xee\xb2\x7b\x5b\xd7\x4d\xae\x14\x9b\x6e\x81\xba\x3a\x05\x21\xaf\x82\xab\x78\x01");

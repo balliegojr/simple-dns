@@ -6,8 +6,11 @@ use super::RR;
 /// A DHCID record see [rfc4701](https://datatracker.ietf.org/doc/html/rfc4701)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DHCID<'a> {
+    /// Identifier type code
     pub identifier: u16,
+    /// Digest type code
     pub digest_type: u8,
+    /// Digest (length depends on digest type)
     pub digest: Cow<'a, [u8]>
 }
 
