@@ -3,17 +3,17 @@ use std::{borrow::Cow, convert::TryInto};
 
 use super::RR;
 
-/// A DS record see [rfc4034](https://www.rfc-editor.org/rfc/rfc4034#section-4)
+/// A DS record see [rfc4034](https://www.rfc-editor.org/rfc/rfc4034#section-5)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DS<'a> {
     /// The key tag is a 16-bit value used to identify the DNSKEY record referenced by this DS record
-    key_tag: u16,
+    pub key_tag: u16,
     /// The algorithm number identifying the cryptographic algorithm used to create the signature
-    algorithm: u8,
+    pub algorithm: u8,
     /// The digest type number identifying the cryptographic hash algorithm used to create the digest
-    digest_type: u8,
+    pub digest_type: u8,
     /// The digest value calculated over the referenced DNSKEY record
-    digest: Cow<'a, [u8]>
+    pub digest: Cow<'a, [u8]>
 }
 
 
