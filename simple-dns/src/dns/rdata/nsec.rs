@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashSet};
+use std::borrow::Cow;
 
 use crate::{dns::WireFormat, Name};
 
@@ -34,15 +34,13 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     {
         let next_name = Name::parse(data, position)?;
         let mut type_bit_maps = Vec::new();
-        let mut records: HashSet<u8> = HashSet::new();
 
         while data.len() > *position {
             let window_block = data[*position];
             *position += 1;
-            if records.contains(&window_block) {
+            if type_bit_maps.last().is_some_and(|f: &TypeBitMap<'_>| f.window_block - 1 != window_block) {
                 return Err(crate::SimpleDnsError::AttemptedInvalidOperation);
             }
-            records.insert(window_block);
 
             let bitmap_length = data[*position];
             *position += 1;
@@ -64,8 +62,11 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         self.next_name.write_to(out)?;
+
+        let mut sorted = self.type_bit_maps.clone();
+        sorted.sort_by(|a, b| a.window_block.cmp(&b.window_block));
         
-        for record in self.type_bit_maps.iter() {
+        for record in sorted.iter() {
             out.write_all(&[record.window_block])?;
             out.write_all(&[record.bitmap.len() as u8])?;
             out.write_all(&record.bitmap)?;
