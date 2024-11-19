@@ -49,7 +49,7 @@ impl From<Ipv6Addr> for AAAA {
 mod tests {
     use std::{net::Ipv6Addr, str::FromStr};
 
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{rdata::RData, ResourceRecord, CLASS};
 
     use super::*;
 
@@ -83,5 +83,23 @@ mod tests {
 
         assert_eq!(sample_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn aaaa_bind9_compatible() {
+        let sample_ip = "fd92:7065:b8e:ffff::5";
+        let rdata = AAAA {
+            address: sample_ip.parse::<Ipv6Addr>().unwrap().into(),
+        };
+
+        let mut bytes = Vec::new();
+        rdata.write_to(&mut bytes).unwrap();
+
+        let text = bind9_sys::wire_to_text(&bytes, CLASS::IN as u16, AAAA::TYPE_CODE);
+        assert_eq!(sample_ip, text);
+
+        let bytes = bind9_sys::text_to_wire(&text, CLASS::IN as u16, AAAA::TYPE_CODE);
+        let parsed = AAAA::parse(&bytes, &mut 0).expect("Failed to parse");
+        assert_eq!(rdata, parsed);
     }
 }

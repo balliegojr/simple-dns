@@ -49,7 +49,7 @@ impl From<Ipv4Addr> for A {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{rdata::RData, ResourceRecord, CLASS};
 
     use super::*;
 
@@ -82,5 +82,22 @@ mod tests {
 
         assert_eq!(sample_a_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn a_bind9_compatible() {
+        let rdata = A {
+            address: std::net::Ipv4Addr::new(127, 0, 0, 1).into(),
+        };
+
+        let mut bytes = Vec::new();
+        rdata.write_to(&mut bytes).unwrap();
+
+        let text = bind9_sys::wire_to_text(&bytes, CLASS::IN as u16, A::TYPE_CODE);
+        assert_eq!("127.0.0.1", text);
+
+        let bytes = bind9_sys::text_to_wire(&text, CLASS::IN as u16, A::TYPE_CODE);
+        let parsed = A::parse(&bytes, &mut 0).expect("Failed to parse");
+        assert_eq!(rdata, parsed);
     }
 }

@@ -62,7 +62,7 @@ impl<'a> WireFormat<'a> for AFSDB<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::{rdata::RData, ResourceRecord, CLASS};
 
     use super::*;
 
@@ -97,5 +97,23 @@ mod tests {
         assert_eq!(sample_rdata.subtype, 0);
         assert_eq!(sample_rdata.hostname, "hostname.sample".try_into()?);
         Ok(())
+    }
+
+    #[test]
+    fn aaaa_bind9_compatible() {
+        let rdata = AFSDB {
+            subtype: 1,
+            hostname: Name::new("afsdb.hostname.com").unwrap(),
+        };
+
+        let mut bytes = Vec::new();
+        rdata.write_to(&mut bytes).unwrap();
+
+        let text = bind9_sys::wire_to_text(&bytes, CLASS::IN as u16, AFSDB::TYPE_CODE);
+        assert_eq!("1 afsdb.hostname.com.", text);
+
+        let bytes = bind9_sys::text_to_wire(&text, CLASS::IN as u16, AFSDB::TYPE_CODE);
+        let parsed = AFSDB::parse(&bytes, &mut 0).expect("Failed to parse");
+        assert_eq!(rdata, parsed);
     }
 }
