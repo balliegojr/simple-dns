@@ -1,0 +1,13 @@
+#include <dns/callbacks.h>
+#include <dns/compress.h>
+#include <dns/enumclass.h>
+#include <dns/enumtype.h>
+#include <dns/name.h>
+#include <dns/rdata.h>
+#include <dns/rdatastruct.h>
+#include <dns/types.h>
+#include <isc/buffer.h>
+#include <isc/lex.h>
+#include <isc/mem.h>
+#include <isc/result.h>
+#include <isc/types.h>
