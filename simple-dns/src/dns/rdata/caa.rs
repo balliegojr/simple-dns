@@ -42,6 +42,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
         let flag = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
         *position += 1;
         let tag = CharacterString::parse(data, position)?;
+        // FIXME: remove quotes if they are the first and last characters
         let value = Cow::Borrowed(&data[*position..]);
         *position += value.len();
 
@@ -51,6 +52,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.flag.to_be_bytes())?;
         self.tag.write_to(out)?;
+        //FIXME: add quotes if the value is not already quoted
         out.write_all(&self.value)?;
         Ok(())
     }
@@ -127,5 +129,28 @@ mod tests {
 
         assert_eq!(b"\"example.org", &cca_one.value[..]);
         assert_eq!(b"\"example_two.org", &cca_two.value[..]);
+    }
+
+    #[test]
+    fn caa_bind9_compatible() {
+        let text = r#"0 issue "ca1.example.net""#;
+        let bytes = bind9_sys::text_to_wire(text, CLASS::IN as u16, CAA::TYPE_CODE);
+
+        let parsed = CAA::parse(&bytes, &mut 0).expect("Failed to parse");
+        let rdata = CAA {
+            flag: 0,
+            tag: CharacterString::new(b"issue").unwrap(),
+            value: b"ca1.example.net".into(),
+        };
+        assert_eq!(parsed, rdata, "parsed records differ");
+
+        let mut bytes = Vec::new();
+        rdata.write_to(&mut bytes).unwrap();
+
+        assert_eq!(
+            bind9_sys::wire_to_text(&bytes, CLASS::IN as u16, CAA::TYPE_CODE),
+            text,
+            "text representation differs"
+        );
     }
 }
