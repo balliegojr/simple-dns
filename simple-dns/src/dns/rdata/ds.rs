@@ -13,9 +13,8 @@ pub struct DS<'a> {
     /// The digest type number identifying the cryptographic hash algorithm used to create the digest
     pub digest_type: u8,
     /// The digest value calculated over the referenced DNSKEY record
-    pub digest: Cow<'a, [u8]>
+    pub digest: Cow<'a, [u8]>,
 }
-
 
 impl<'a> RR for DS<'a> {
     const TYPE_CODE: u16 = 43;
@@ -66,7 +65,7 @@ impl<'a> DS<'a> {
             key_tag: self.key_tag,
             algorithm: self.algorithm,
             digest_type: self.digest_type,
-            digest: Cow::Owned(self.digest.into_owned())
+            digest: Cow::Owned(self.digest.into_owned()),
         }
     }
 }
@@ -85,7 +84,7 @@ mod tests {
         let digest = vec![1, 2, 3, 4, 5];
         let rdata = DS {
             key_tag,
-            algorithm, 
+            algorithm,
             digest_type,
             digest: Cow::Owned(digest),
         };
@@ -110,9 +109,26 @@ mod tests {
         assert_eq!(sample_rdata.algorithm, 5);
         assert_eq!(sample_rdata.digest_type, 1);
         assert_eq!(sample_rdata.key_tag, 60485);
-        assert_eq!(*sample_rdata.digest, *b"\x2B\xB1\x83\xAF\x5F\x22\x58\x81\x79\xA5\x3B\x0A\x98\x63\x1F\xAD\x1A\x29\x21\x18");
+        assert_eq!(
+            *sample_rdata.digest,
+            *b"\x2B\xB1\x83\xAF\x5F\x22\x58\x81\x79\xA5\x3B\x0A\x98\x63\x1F\xAD\x1A\x29\x21\x18"
+        );
 
         Ok(())
     }
 
+    #[test]
+    fn bind9_compatible() {
+        let text = "12892 5 1 7AA4A3F416C2F2391FB7AB0D434F762CD62D1390";
+        let rdata = DS {
+            key_tag: 12892,
+            algorithm: 5,
+            digest_type: 1,
+            digest: Cow::Borrowed(&[
+                0x7A, 0xA4, 0xA3, 0xF4, 0x16, 0xC2, 0xF2, 0x39, 0x1F, 0xB7, 0xAB, 0x0D, 0x43, 0x4F,
+                0x76, 0x2C, 0xD6, 0x2D, 0x13, 0x90,
+            ]),
+        };
+        super::super::check_bind9!(DS, rdata, &text);
+    }
 }

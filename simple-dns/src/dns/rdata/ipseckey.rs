@@ -1,5 +1,8 @@
 use crate::{dns::WireFormat, Name};
-use std::{borrow::Cow, net::{Ipv4Addr, Ipv6Addr}};
+use std::{
+    borrow::Cow,
+    net::{Ipv4Addr, Ipv6Addr},
+};
 
 use super::RR;
 
@@ -70,7 +73,7 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
                 ));
                 *position += 4;
                 x
-            },
+            }
             2 => {
                 let mut octets = [0u8; 16];
                 if data.len() < *position + 16 {
@@ -100,19 +103,19 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
         match &self.gateway {
             Gateway::None => {
                 out.write_all(&[self.precedence, 0, self.algorithm])?;
-            },
+            }
             Gateway::IPv4(ipv4_addr) => {
                 out.write_all(&[self.precedence, 1, self.algorithm])?;
                 out.write_all(&ipv4_addr.octets())?
-            },
+            }
             Gateway::IPv6(ipv6_addr) => {
                 out.write_all(&[self.precedence, 2, self.algorithm])?;
                 out.write_all(&ipv6_addr.octets())?
-            },
+            }
             Gateway::Domain(name) => {
                 out.write_all(&[self.precedence, 3, self.algorithm])?;
                 name.write_to(out)?
-            },
+            }
         };
         out.write_all(&self.public_key)?;
         Ok(())
@@ -161,7 +164,10 @@ mod tests {
         let ipseckey = IPSECKEY::parse(&data, &mut 0).unwrap();
         assert_eq!(ipseckey.precedence, 10);
         assert_eq!(ipseckey.algorithm, 2);
-        assert_eq!(ipseckey.gateway, Gateway::IPv4(Ipv4Addr::new(192,0,2,38)));
+        assert_eq!(
+            ipseckey.gateway,
+            Gateway::IPv4(Ipv4Addr::new(192, 0, 2, 38))
+        );
         assert_eq!(*ipseckey.public_key, *b"\x01\x03\x51\x53\x79\x86\xed\x35\x53\x3b\x60\x64\x47\x8e\xee\xb2\x7b\x5b\xd7\x4d\xae\x14\x9b\x6e\x81\xba\x3a\x05\x21\xaf\x82\xab\x78\x01");
     }
 
@@ -176,11 +182,30 @@ mod tests {
 
         assert_eq!(sample_rdata.precedence, 10);
         assert_eq!(sample_rdata.algorithm, 2);
-        assert_eq!(sample_rdata.gateway, Gateway::IPv4(Ipv4Addr::new(192,0,2,38)));
+        assert_eq!(
+            sample_rdata.gateway,
+            Gateway::IPv4(Ipv4Addr::new(192, 0, 2, 38))
+        );
         assert_eq!(*sample_rdata.public_key, *b"\x01\x03\x51\x53\x79\x86\xed\x35\x53\x3b\x60\x64\x47\x8e\xee\xb2\x7b\x5b\xd7\x4d\xae\x14\x9b\x6e\x81\xba\x3a\x05\x21\xaf\x82\xab\x78\x01");
-
 
         Ok(())
     }
-}
 
+    #[test]
+    fn bind9_compatible() {
+        use base64::prelude::*;
+
+        let text = "10 3 2 mygateway.example.com. AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==";
+        let rdata = IPSECKEY {
+            precedence: 10,
+            algorithm: 2,
+            gateway: Gateway::Domain(Name::new_unchecked("mygateway.example.com")),
+            public_key: Cow::Owned(
+                BASE64_STANDARD
+                    .decode("AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==")
+                    .unwrap(),
+            ),
+        };
+        super::super::check_bind9!(IPSECKEY, rdata, &text);
+    }
+}

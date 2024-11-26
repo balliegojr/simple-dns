@@ -16,7 +16,6 @@ pub struct DNSKEY<'a> {
     pub public_key: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for DNSKEY<'a> {
     const TYPE_CODE: u16 = 48;
 }
@@ -74,9 +73,10 @@ impl<'a> DNSKEY<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{rdata::RData, ResourceRecord};
 
-    use super::*;
+    use base64::prelude::*;
 
     #[test]
     fn parse_and_write_dnskey() {
@@ -94,7 +94,7 @@ mod tests {
         rdata.write_to(&mut writer).unwrap();
         let rdata = DNSKEY::parse(&writer, &mut 0).unwrap();
         assert_eq!(rdata.flags, flags);
-        assert_eq!(rdata.protocol, protocol); 
+        assert_eq!(rdata.protocol, protocol);
         assert_eq!(rdata.algorithm, algorithm);
         assert_eq!(&*rdata.public_key, &[1, 2, 3, 4, 5]);
     }
@@ -115,9 +115,19 @@ mod tests {
             *sample_rdata.public_key,
             *b"\x01\x03\xd2\x2a\x6c\xa7\x7f\x35\xb8\x93\x20\x6f\xd3\x5e\x4c\x50\x6d\x83\x78\x84\x37\x09\xb9\x7e\x04\x16\x47\xe1\xbf\xf4\x3d\x8d\x64\xc6\x49\xaf\x1e\x37\x19\x73\xc9\xe8\x91\xfc\xe3\xdf\x51\x9a\x8c\x84\x0a\x63\xee\x42\xa6\xd2\xeb\xdd\xbb\x97\x03\x5d\x21\x5a\xa4\xe4\x17\xb1\xfa\x45\xfa\x11\xa9\x74\x1e\xa2\x09\x8c\x1d\xfa\x5f\xb5\xfe\xb3\x32\xfd\x4b\xc8\x15\x20\x89\xae\xf3\x6b\xa6\x44\xcc\xe2\x41\x3b\x3b\x72\xbe\x18\xcb\xef\x8d\xa2\x53\xf4\xe9\x3d\x21\x03\x86\x6d\x92\x34\xa2\xe2\x8d\xf5\x29\xa6\x7d\x54\x68\xdb\xef\xe3"
         );
-        
+
         Ok(())
     }
 
+    #[test]
+    fn bind9_compatible() {
+        let text = "512 255 1 AQMFD5raczCJHViKtLYhWGz8hMY9UGRuniJDBzC7w0aRyzWZriO6i2od GWWQVucZqKVsENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esga60z yGW6LFe9r8n6paHrlG5ojqf0BaqHT+8=";
+        let rdata = DNSKEY {
+            flags: 512,
+            protocol: 255,
+            algorithm: 1,
+            public_key: Cow::Owned(BASE64_STANDARD.decode("AQMFD5raczCJHViKtLYhWGz8hMY9UGRuniJDBzC7w0aRyzWZriO6i2odGWWQVucZqKVsENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esga60zyGW6LFe9r8n6paHrlG5ojqf0BaqHT+8=").unwrap()),
+        };
+        super::super::check_bind9!(DNSKEY, rdata, text);
+    }
 }
-

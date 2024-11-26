@@ -16,7 +16,6 @@ pub struct CERT<'a> {
     pub certificate: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for CERT<'a> {
     const TYPE_CODE: u16 = 37;
 }
@@ -74,6 +73,7 @@ mod tests {
     use crate::{rdata::RData, ResourceRecord};
 
     use super::*;
+    use base64::prelude::*;
 
     #[test]
     fn parse_and_write_cert() {
@@ -108,12 +108,21 @@ mod tests {
         assert_eq!(sample_rdata.type_code, 3);
         assert_eq!(sample_rdata.key_tag, 0);
         assert_eq!(sample_rdata.algorithm, 0);
-        assert_eq!(
-            *sample_rdata.certificate,
-            *b"\x00\x00\x00\x00\x00"
-        );
-        
+        assert_eq!(*sample_rdata.certificate, *b"\x00\x00\x00\x00\x00");
+
         Ok(())
     }
 
+    #[test]
+    fn bind9_compatible() {
+        let text = "65534 65535 PRIVATEOID MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDDq5a0oiMxJ iOdwaSmkU2NPPJXOWPZVWpIGxB0kczGcCS6Xq0VinNqLe5YI9M1YwXeh ZANiAASeQ9fMKeGOSzWhj7ePMA9Ws1t/wGKbIyFwsSvnc/nqOAFmS1JD Mc8QaRW/awjzaQc/mbu4cNA7iSId8iVCWj5VkcP8tL7HLYZRFMSr/nxU NGfHXtuGhMxm61SvnX3czhg=";
+        let rdata = CERT {
+            type_code: 65534,
+            key_tag: 65535,
+            algorithm: 254,
+            certificate: Cow::Owned(BASE64_STANDARD.decode("MIG2AgEAMBAGByqGSM49AgEGBSuBBAAiBIGeMIGbAgEBBDDq5a0oiMxJiOdwaSmkU2NPPJXOWPZVWpIGxB0kczGcCS6Xq0VinNqLe5YI9M1YwXehZANiAASeQ9fMKeGOSzWhj7ePMA9Ws1t/wGKbIyFwsSvnc/nqOAFmS1JDMc8QaRW/awjzaQc/mbu4cNA7iSId8iVCWj5VkcP8tL7HLYZRFMSr/nxUNGfHXtuGhMxm61SvnX3czhg=").unwrap()),
+        };
+
+        super::super::check_bind9!(CERT, rdata, text);
+    }
 }

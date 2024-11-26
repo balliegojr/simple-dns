@@ -1,4 +1,4 @@
-use crate::dns::{WireFormat, Name};
+use crate::dns::{Name, WireFormat};
 use std::{borrow::Cow, convert::TryInto};
 
 use super::RR;
@@ -23,9 +23,8 @@ pub struct RRSIG<'a> {
     /// The domain name of the zone that contains the signed RRset
     pub signer_name: Name<'a>,
     /// The cryptographic signature that covers the RRSIG RDATA
-    pub signature: Cow<'a, [u8]>
+    pub signature: Cow<'a, [u8]>,
 }
-
 
 impl<'a> RR for RRSIG<'a> {
     const TYPE_CODE: u16 = 46;
@@ -110,11 +109,15 @@ impl<'a> RRSIG<'a> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::{RData, A}, ResourceRecord};
     use super::*;
+    use crate::{
+        rdata::{RData, A},
+        ResourceRecord,
+    };
+
+    use base64::prelude::*;
 
     #[test]
     fn parse_and_write_rrsig() {
@@ -154,8 +157,27 @@ mod tests {
         assert_eq!(sample_rdata.key_tag, 2642);
         assert_eq!(sample_rdata.signer_name, Name::new("example.com.")?);
         assert_eq!(*sample_rdata.signature, *b"\xa0\x90\x75\x5b\xa5\x8d\x1a\xff\xa5\x76\xf4\x37\x58\x31\xb4\x31\x09\x20\xe4\x81\x21\x8d\x18\xa9\xf1\x64\xeb\x3d\x81\xaf\xd3\xb8\x75\xd3\xc7\x54\x28\x63\x1e\x0c\xf2\xa2\x8d\x50\x87\x5f\x70\xc3\x29\xd7\xdb\xfa\xfe\xa8\x07\xdc\x1f\xba\x1d\xc3\x4c\x95\xd4\x01\xf2\x3f\x33\x4c\xe6\x3b\xfc\xf3\xf1\xb5\xb4\x47\x39\xe5\xf0\xed\xed\x18\xd6\xb3\x3f\x04\x0a\x91\x13\x76\xd1\x73\xd7\x57\xa9\xf0\xc1\xfa\x17\x98\x94\x1b\xb0\xb3\x6b\x2d\xf9\x06\x27\x90\xfa\x7f\x01\x66\xf2\x73\x7e\xea\x90\x73\x78\x34\x1f\xb1\x2d\xc0\xa7\x7a");
-        
+
         Ok(())
     }
-}
 
+    #[test]
+    fn bind9_compatible() {
+        let text = "NSEC 1 3 3600 20000102030405 19961211100908 2143 foo.nil. MxFcby9k/yvedMfQgKzhH5er0Mu/vILz45IkskceFGgiWCn/GxHhai6V AuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=";
+
+        let rdata = RRSIG {
+            type_covered: crate::rdata::NSEC::TYPE_CODE,
+            algorithm: 1,
+            labels: 3,
+            original_ttl: 3600,
+            signature_expiration: 946782245,
+            signature_inception: 850298948,
+            key_tag: 2143,
+            signer_name: Name::new_unchecked("foo.nil"),
+            signature: BASE64_STANDARD.decode("MxFcby9k/yvedMfQgKzhH5er0Mu/vILz45IkskceFGgiWCn/GxHhai6VAuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=").unwrap().into(),
+                    
+        };
+
+        super::super::check_bind9!(RRSIG, rdata, text);
+    }
+}

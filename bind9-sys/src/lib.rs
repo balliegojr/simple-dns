@@ -42,6 +42,8 @@ pub fn wire_to_text(data: &[u8], class: u16, type_: u16) -> String {
 
 pub fn text_to_wire(data: &str, class: u16, type_: u16) -> Vec<u8> {
     let mut source_bytes = data.as_bytes().to_vec();
+    assert!(source_bytes.len() < 1024);
+
     let mut intermediate_bytes = [0u8; 1024];
     let mut wire_bytes = [0u8; 1024];
 

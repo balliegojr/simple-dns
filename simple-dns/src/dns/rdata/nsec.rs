@@ -22,7 +22,6 @@ pub struct TypeBitMap<'a> {
     pub bitmap: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for NSEC<'a> {
     const TYPE_CODE: u16 = 47;
 }
@@ -34,26 +33,34 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     {
         let next_name = Name::parse(data, position)?;
         let mut type_bit_maps = Vec::new();
+        let mut prev_window_block = None;
 
         while data.len() > *position {
             let window_block = data[*position];
-            *position += 1;
-            if type_bit_maps.last().is_some_and(|f: &TypeBitMap<'_>| f.window_block - 1 != window_block) {
-                return Err(crate::SimpleDnsError::AttemptedInvalidOperation);
+            if let Some(prev_window_block) = prev_window_block {
+                if window_block <= prev_window_block {
+                    return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                }
             }
 
+            prev_window_block = Some(window_block);
+            *position += 1;
+
             let bitmap_length = data[*position];
+            if bitmap_length > 32 {
+                return Err(crate::SimpleDnsError::InvalidDnsPacket);
+            }
             *position += 1;
 
             let bitmap = &data[*position..*position + bitmap_length as usize];
             *position += bitmap_length as usize;
-            
+
             type_bit_maps.push(TypeBitMap {
                 window_block,
                 bitmap: Cow::Borrowed(bitmap),
             });
         }
-        
+
         Ok(Self {
             next_name,
             type_bit_maps,
@@ -65,12 +72,12 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
 
         let mut sorted = self.type_bit_maps.clone();
         sorted.sort_by(|a, b| a.window_block.cmp(&b.window_block));
-        
+
         for record in sorted.iter() {
             out.write_all(&[record.window_block])?;
             out.write_all(&[record.bitmap.len() as u8])?;
             out.write_all(&record.bitmap)?;
-        };
+        }
 
         Ok(())
     }
@@ -83,10 +90,14 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
 impl<'a> NSEC<'a> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> NSEC<'b> {
-        let type_bit_maps = self.type_bit_maps.into_iter().map(|x| TypeBitMap {
-            window_block: x.window_block,
-            bitmap: x.bitmap.into_owned().into(),
-        }).collect();
+        let type_bit_maps = self
+            .type_bit_maps
+            .into_iter()
+            .map(|x| TypeBitMap {
+                window_block: x.window_block,
+                bitmap: x.bitmap.into_owned().into(),
+            })
+            .collect();
         NSEC {
             next_name: self.next_name.into_owned(),
             type_bit_maps,
@@ -128,12 +139,41 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(sample_rdata.next_name, Name::new("host.example.com.").unwrap());
+        assert_eq!(
+            sample_rdata.next_name,
+            Name::new("host.example.com.").unwrap()
+        );
         assert_eq!(sample_rdata.type_bit_maps.len(), 1);
         assert_eq!(sample_rdata.type_bit_maps[0].window_block, 0);
-        assert_eq!(sample_rdata.type_bit_maps[0].bitmap, vec![64, 1, 0, 0, 0, 1]);
+        assert_eq!(
+            sample_rdata.type_bit_maps[0].bitmap,
+            vec![64, 1, 0, 0, 0, 1]
+        );
 
         Ok(())
     }
 
+    #[test]
+    fn bind9_compatible() {
+        let text = "host.example.com. A MX RRSIG NSEC TYPE1234";
+        let rdata = NSEC {
+            next_name: Name::new_unchecked("host.example.com"),
+            type_bit_maps: vec![
+                TypeBitMap {
+                    window_block: 0,
+                    bitmap: (&[0x40, 0x01, 0x00, 0x00, 0x00, 0x03]).into(),
+                },
+                TypeBitMap {
+                    window_block: 4,
+                    bitmap: (&[
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x20,
+                    ])
+                        .into(),
+                },
+            ],
+        };
+        super::super::check_bind9!(NSEC, rdata, &text);
+    }
 }

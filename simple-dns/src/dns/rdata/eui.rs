@@ -30,7 +30,7 @@ impl<'a> WireFormat<'a> for EUI48 {
     where
         Self: Sized,
     {
-        let address =data[*position..*position + 6].try_into()?;
+        let address = data[*position..*position + 6].try_into()?;
         *position += 6;
         Ok(Self { address })
     }
@@ -50,7 +50,7 @@ impl<'a> WireFormat<'a> for EUI64 {
     where
         Self: Sized,
     {
-        let address =data[*position..*position + 8].try_into()?;
+        let address = data[*position..*position + 8].try_into()?;
         *position += 8;
         Ok(Self { address })
     }
@@ -147,5 +147,22 @@ mod tests {
 
         Ok(())
     }
-}
 
+    #[test]
+    fn bind9_compatible_eui48() {
+        let text = "01-23-45-67-89-ab";
+        let rdata = EUI48 {
+            address: [0x01, 0x23, 0x45, 0x67, 0x89, 0xab],
+        };
+        super::super::check_bind9!(EUI48, rdata, &text);
+    }
+
+    #[test]
+    fn bind9_compatible_eui64() {
+        let text = "01-23-45-67-89-ab-cd-ef";
+        let rdata = EUI64 {
+            address: [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef],
+        };
+        super::super::check_bind9!(EUI64, rdata, &text);
+    }
+}
