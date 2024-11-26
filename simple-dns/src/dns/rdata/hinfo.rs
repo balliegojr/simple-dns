@@ -99,4 +99,14 @@ mod tests {
         assert_eq!(sample_rdata.os, "NetBSD-1.4".try_into()?);
         Ok(())
     }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = r#""Generic PC clone" "NetBSD-1.4""#;
+        let rdata = HINFO {
+            cpu: "Generic PC clone".try_into().unwrap(),
+            os: "NetBSD-1.4".try_into().unwrap(),
+        };
+        super::super::check_bind9!(HINFO, rdata, &text);
+    }
 }

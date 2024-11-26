@@ -95,4 +95,15 @@ mod tests {
         assert_eq!(sample_rdata.txt, "txt-dname.sample".try_into()?);
         Ok(())
     }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = "mbox-dname.sample. txt-dname.sample.";
+        let rdata = RP {
+            mbox: "mbox-dname.sample".try_into().unwrap(),
+            txt: "txt-dname.sample".try_into().unwrap(),
+        };
+
+        super::super::check_bind9!(RP, rdata, text);
+    }
 }

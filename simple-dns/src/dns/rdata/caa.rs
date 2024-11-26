@@ -132,25 +132,14 @@ mod tests {
     }
 
     #[test]
-    fn caa_bind9_compatible() {
+    fn bind9_compatible() {
         let text = r#"0 issue "ca1.example.net""#;
-        let bytes = bind9_sys::text_to_wire(text, CLASS::IN as u16, CAA::TYPE_CODE);
-
-        let parsed = CAA::parse(&bytes, &mut 0).expect("Failed to parse");
         let rdata = CAA {
             flag: 0,
             tag: CharacterString::new(b"issue").unwrap(),
             value: b"ca1.example.net".into(),
         };
-        assert_eq!(parsed, rdata, "parsed records differ");
 
-        let mut bytes = Vec::new();
-        rdata.write_to(&mut bytes).unwrap();
-
-        assert_eq!(
-            bind9_sys::wire_to_text(&bytes, CLASS::IN as u16, CAA::TYPE_CODE),
-            text,
-            "text representation differs"
-        );
+        super::super::check_bind9!(CAA, rdata, text);
     }
 }
