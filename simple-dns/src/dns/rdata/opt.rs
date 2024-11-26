@@ -226,16 +226,4 @@ mod tests {
         assert_eq!(1, opt_code.code);
         assert_eq!(vec![255, 255], *opt_code.data);
     }
-
-    // #[test]
-    // fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
-    //     let sample_file = std::fs::read("samples/zonefile/OPT.sample")?;
-    //
-    //     let sample_rdata = match ResourceRecord::parse(&sample_file, 0)?.rdata {
-    //         RData::OPT(rdata) => rdata,
-    //         _ => unreachable!(),
-    //     };
-    //
-    //     Ok(())
-    // }
 }

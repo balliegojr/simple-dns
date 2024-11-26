@@ -239,3 +239,28 @@ HIP        - RFC 8005
 
 TSIG       - RFC 8945
 */
+
+#[cfg(test)]
+macro_rules! check_bind9 {
+    ( $ty:ident, $rdata:expr, $text:expr) => {
+        crate::rdata::check_bind9!($ty, $rdata, $text, $text);
+    };
+
+    ($ty:ident, $rdata:expr, $text:expr, $text_comp:expr) => {
+        let bytes = bind9_sys::text_to_wire($text, crate::CLASS::IN as u16, $ty::TYPE_CODE);
+        let parsed = $ty::parse(&bytes, &mut 0).expect("Failed to parse");
+        assert_eq!($rdata, parsed, "parsed data differ");
+
+        let mut parsed_bytes = Vec::new();
+        parsed
+            .write_to(&mut parsed_bytes)
+            .expect("Failed to write to vec");
+
+        let text_rpr =
+            bind9_sys::wire_to_text(&parsed_bytes, crate::CLASS::IN as u16, $ty::TYPE_CODE);
+        assert_eq!(*$text_comp, text_rpr, "text representation differ");
+    };
+}
+
+#[cfg(test)]
+pub(crate) use check_bind9;

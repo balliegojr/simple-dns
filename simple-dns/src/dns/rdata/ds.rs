@@ -118,4 +118,19 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = "12892 5 1 7AA4A3F416C2F2391FB7AB0D434F762CD62D1390";
+        let rdata = DS {
+            key_tag: 12892,
+            algorithm: 5,
+            digest_type: 1,
+            digest: Cow::Borrowed(&[
+                0x7A, 0xA4, 0xA3, 0xF4, 0x16, 0xC2, 0xF2, 0x39, 0x1F, 0xB7, 0xAB, 0x0D, 0x43, 0x4F,
+                0x76, 0x2C, 0xD6, 0x2D, 0x13, 0x90,
+            ]),
+        };
+        super::super::check_bind9!(DS, rdata, &text);
+    }
 }

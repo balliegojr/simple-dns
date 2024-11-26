@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, usize};
 
 use crate::{dns::WireFormat, Name};
 
@@ -34,32 +34,35 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     {
         let next_name = Name::parse(data, position)?;
         let mut type_bit_maps = Vec::new();
+        let mut prev_window_block = None;
 
         while data.len() > *position {
             let window_block = data[*position];
-            *position += 1;
-
-            if type_bit_maps.last().is_some_and(|f: &TypeBitMap<'_>| {
-                f.window_block > 0 && f.window_block - 1 != window_block
-            }) {
-                return Err(crate::SimpleDnsError::AttemptedInvalidOperation);
+            if let Some(prev_window_block) = prev_window_block {
+                if window_block <= prev_window_block {
+                    return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                }
             }
+
+            prev_window_block = Some(window_block);
+            *position += 1;
 
             if *position >= data.len() {
                 return Err(crate::SimpleDnsError::InsufficientData);
             }
 
-            let bitmap_length = data[*position];
+            let bitmap_length = data[*position] as usize;
+            if bitmap_length > 32 {
+                return Err(crate::SimpleDnsError::InvalidDnsPacket);
+            }
             *position += 1;
 
-            let bitmap_end = *position + bitmap_length as usize;
-
-            if bitmap_end > data.len() {
+            if *position + bitmap_length > data.len() {
                 return Err(crate::SimpleDnsError::InsufficientData);
             }
 
-            let bitmap = &data[*position..bitmap_end];
-            *position = bitmap_end;
+            let bitmap = &data[*position..*position + bitmap_length];
+            *position += bitmap_length;
 
             type_bit_maps.push(TypeBitMap {
                 window_block,
@@ -157,5 +160,29 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = "host.example.com. A MX RRSIG NSEC TYPE1234";
+        let rdata = NSEC {
+            next_name: Name::new_unchecked("host.example.com"),
+            type_bit_maps: vec![
+                TypeBitMap {
+                    window_block: 0,
+                    bitmap: (&[0x40, 0x01, 0x00, 0x00, 0x00, 0x03]).into(),
+                },
+                TypeBitMap {
+                    window_block: 4,
+                    bitmap: (&[
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        0x00, 0x00, 0x20,
+                    ])
+                        .into(),
+                },
+            ],
+        };
+        super::super::check_bind9!(NSEC, rdata, &text);
     }
 }

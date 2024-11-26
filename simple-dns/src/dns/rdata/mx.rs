@@ -103,4 +103,14 @@ mod tests {
         assert_eq!(sample_rdata.exchange, "VENERA.sample".try_into()?);
         Ok(())
     }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = "10 exchange.";
+        let rdata = MX {
+            preference: 10,
+            exchange: Name::new_unchecked("exchange"),
+        };
+        super::super::check_bind9!(MX, rdata, &text);
+    }
 }

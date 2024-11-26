@@ -158,4 +158,20 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn bind9_compatible() {
+        let text = "a.test. hostmaster.null. 1613723740 900 300 604800 900";
+        let rdata = SOA {
+            mname: Name::new_unchecked("a.test"),
+            rname: Name::new_unchecked("hostmaster.null"),
+            serial: 1613723740,
+            refresh: 900,
+            retry: 300,
+            expire: 604800,
+            minimum: 900,
+        };
+
+        super::super::check_bind9!(SOA, rdata, text);
+    }
 }
