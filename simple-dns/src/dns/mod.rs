@@ -33,7 +33,6 @@ const MAX_LABEL_LENGTH: usize = 63;
 const MAX_NAME_LENGTH: usize = 255;
 const MAX_CHARACTER_STRING_LENGTH: usize = 255;
 const MAX_NULL_LENGTH: usize = 65535;
-const MAX_SVC_PARAM_VALUE_LENGTH: usize = 65535;
 
 bitflags! {
     /// Possible Packet Flags

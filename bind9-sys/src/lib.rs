@@ -27,7 +27,8 @@ pub fn wire_to_text(data: &[u8], class: u16, type_: u16) -> String {
                 &mut source_buffer,
                 dns_decompress_DNS_DECOMPRESS_ALWAYS,
                 &mut intermediate_buffer,
-            )
+            ),
+            "bind9 failed to parse wire data"
         );
 
         assert_eq!(
