@@ -394,7 +394,7 @@ impl<'a> Label<'a> {
         }
 
         if let Some(first) = data.first() {
-            if !first.is_ascii_alphabetic() && *first != b'_' {
+            if !first.is_ascii_alphanumeric() && *first != b'_' {
                 return false;
             }
         }
@@ -449,6 +449,7 @@ mod tests {
         assert!(Name::new("some.local.").is_ok());
         assert!(Name::new("some-dash.local.").is_ok());
         assert!(Name::new("_sync_miss._tcp.local").is_ok());
+        assert!(Name::new("1sync_miss._tcp.local").is_ok());
 
         assert_eq!(Name::new_unchecked("\u{1F600}.local.").labels.len(), 2);
     }
@@ -463,7 +464,6 @@ mod tests {
     #[test]
     fn is_link_local() {
         assert!(!Name::new("some.example.com").unwrap().is_link_local());
-        // assert!(!Name::new("some.example.local").unwrap().is_link_local());
         assert!(Name::new("some.example.local.").unwrap().is_link_local());
     }
 
