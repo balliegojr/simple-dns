@@ -151,6 +151,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "0x47.0005.80.005a00.0010.1000.e133.ffffff000164.10";
         let nsap = NSAP {

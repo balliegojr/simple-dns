@@ -498,6 +498,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r#"3 svc4.example.net. alpn="bar" port=8004 key667="hello\210qoo""#;
 

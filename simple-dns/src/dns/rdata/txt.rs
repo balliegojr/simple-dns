@@ -304,6 +304,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r#""\"foo\010bar\"""#;
         let rdata: TXT = "\"foo\nbar\"".try_into().unwrap();

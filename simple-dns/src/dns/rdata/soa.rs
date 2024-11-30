@@ -160,6 +160,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "a.test. hostmaster.null. 1613723740 900 300 604800 900";
         let rdata = SOA {

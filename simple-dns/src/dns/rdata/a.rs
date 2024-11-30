@@ -85,6 +85,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "127.0.0.1";
         let rdata = A {

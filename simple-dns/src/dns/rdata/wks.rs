@@ -65,7 +65,6 @@ impl<'a> WireFormat<'a> for WKS<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::net::Ipv4Addr;
 
     use crate::{dns::WireFormat, rdata::RData, ResourceRecord};
@@ -89,7 +88,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
+        use super::*;
         let text = "10.0.0.1 tcp telnet ftp 0 1 2";
         let rdata = WKS {
             address: Ipv4Addr::new(10, 0, 0, 1).into(),
