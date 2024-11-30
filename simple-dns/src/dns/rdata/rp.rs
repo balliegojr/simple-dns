@@ -97,6 +97,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "mbox-dname.sample. txt-dname.sample.";
         let rdata = RP {

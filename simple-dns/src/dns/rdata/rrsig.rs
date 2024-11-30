@@ -119,7 +119,6 @@ mod tests {
         ResourceRecord,
     };
 
-    use base64::prelude::*;
 
     #[test]
     fn parse_and_write_rrsig() {
@@ -164,7 +163,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
+        use base64::prelude::*;
         let text = "NSEC 1 3 3600 20000102030405 19961211100908 2143 foo.nil. MxFcby9k/yvedMfQgKzhH5er0Mu/vILz45IkskceFGgiWCn/GxHhai6V AuHAoNUz4YoU1tVfSCSqQYn6//11U6Nld80jEeC8aTrO+KKmCaY=";
 
         let rdata = RRSIG {

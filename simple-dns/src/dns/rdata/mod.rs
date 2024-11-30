@@ -241,6 +241,7 @@ TSIG       - RFC 8945
 */
 
 #[cfg(test)]
+#[cfg(feature = "bind9-check")]
 macro_rules! check_bind9 {
     ( $ty:ident, $rdata:expr, $text:expr) => {
         crate::rdata::check_bind9!($ty, $rdata, $text, $text);
@@ -263,4 +264,5 @@ macro_rules! check_bind9 {
 }
 
 #[cfg(test)]
+#[cfg(feature = "bind9-check")]
 pub(crate) use check_bind9;

@@ -120,6 +120,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "12892 5 1 7AA4A3F416C2F2391FB7AB0D434F762CD62D1390";
         let rdata = DS {

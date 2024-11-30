@@ -101,6 +101,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r#""Generic PC clone" "NetBSD-1.4""#;
         let rdata = HINFO {

@@ -132,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r#"0 issue "ca1.example.net""#;
         let rdata = CAA {

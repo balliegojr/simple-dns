@@ -139,6 +139,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "60 9 0.000 N 24 39 0.000 E 10.05m 20m 2000m 20m";
         let rdata = LOC {

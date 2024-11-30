@@ -163,6 +163,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "host.example.com. A MX RRSIG NSEC TYPE1234";
         let rdata = NSEC {

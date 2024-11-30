@@ -116,6 +116,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r#"65535 65535 "blurgh" "blorf" "blllbb" foo."#;
         let rdata = NAPTR {

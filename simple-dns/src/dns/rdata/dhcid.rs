@@ -105,6 +105,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = r"AAABxLmlskllE0MVjd57zHcWmEH3pCQ6VytcKD//7es/deY=";
         let rdata = DHCID {

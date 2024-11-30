@@ -78,8 +78,6 @@ mod tests {
     use super::*;
     use crate::{rdata::RData, ResourceRecord};
 
-    use base64::prelude::*;
-
     #[test]
     fn parse_and_write_dnskey() {
         let flags = 12345u16;
@@ -122,7 +120,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
+        use base64::prelude::*;
+
         let text = "512 255 1 AQMFD5raczCJHViKtLYhWGz8hMY9UGRuniJDBzC7w0aRyzWZriO6i2od GWWQVucZqKVsENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esga60z yGW6LFe9r8n6paHrlG5ojqf0BaqHT+8=";
         let rdata = DNSKEY {
             flags: 512,

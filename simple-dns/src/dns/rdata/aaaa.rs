@@ -86,6 +86,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "fd92:7065:b8e:ffff::5";
         let rdata = AAAA {
