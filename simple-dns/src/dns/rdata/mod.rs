@@ -67,7 +67,7 @@ mod wks;
 pub use wks::WKS;
 
 mod svcb;
-pub use svcb::SVCB;
+pub use svcb::{SVCParam, SVCB};
 
 mod eui;
 pub use eui::EUI48;
