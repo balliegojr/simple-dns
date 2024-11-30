@@ -1,5 +1,4 @@
 name: Rust
-
 on:
   push:
     branches: [ main ]
@@ -10,21 +9,33 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  text-bind-check:
+    name: Test Bind9 check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install bind9
+      run: sudo apt-get install bind9-dev
+    - name: Build
+      run: cargo build --verbose --all-features
+    - name: Run tests
+      run: cargo test --verbose --all-features
+
   test-dev:
     name: Test Dev on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [windows-latest, macOS-latest]
       
     steps:
     - uses: actions/checkout@v2
     - name: Clippy
-      run: cargo clippy --all-features -- -D warnings 
+      run: cargo clippy --features sync --features async-tokio -- -D warnings 
     - name: Build
-      run: cargo build --verbose --all-features
+      run: cargo build --verbose --features sync --features async-tokio
     - name: Run tests
-      run: cargo test --verbose --all-features
+      run: cargo test --verbose --features sync --features async-tokio
 
   test-release:
     name: Test Release on ${{ matrix.os }}
@@ -36,8 +47,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Clippy
-      run: cargo clippy --release --all-features -- -D warnings 
+      run: cargo clippy --release --features sync --features async-tokio -- -D warnings 
     - name: Build
-      run: cargo build --verbose --release --all-features
+      run: cargo build --verbose --release --features sync --features async-tokio
     - name: Run tests
-      run: cargo test --verbose --release --all-features
+      run: cargo test --verbose --release --features sync --features async-tokio

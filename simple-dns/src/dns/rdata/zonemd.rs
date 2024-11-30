@@ -16,7 +16,6 @@ pub struct ZONEMD<'a> {
     pub digest: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for ZONEMD<'a> {
     const TYPE_CODE: u16 = 63;
 }
@@ -71,7 +70,10 @@ impl<'a> ZONEMD<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::{RData, ZONEMD}, ResourceRecord};
+    use crate::{
+        rdata::{RData, ZONEMD},
+        ResourceRecord,
+    };
 
     use super::*;
 
@@ -113,5 +115,18 @@ mod tests {
 
         Ok(())
     }
-}
 
+    #[test]
+    #[cfg(feature = "bind9-check")]
+    fn bind9_compatible() {
+        let text = "2019020700 1 0 C220B8A6ED5728A971902F7E3D4FD93ADEEA88B0453C2E8E8C863D46 5AB06CF34EB95B266398C98B59124FA239CB7EEB";
+        let rdata = ZONEMD {
+            serial: 2019020700,
+            scheme: 1,
+            algorithm: 0,
+            digest: b"\xC2\x20\xB8\xA6\xED\x57\x28\xA9\x71\x90\x2F\x7E\x3D\x4F\xD9\x3A\xDE\xEA\x88\xB0\x45\x3C\x2E\x8E\x8C\x86\x3D\x46\x5A\xB0\x6C\xF3\x4E\xB9\x5B\x26\x63\x98\xC9\x8B\x59\x12\x4F\xA2\x39\xCB\x7E\xEB".into()
+        };
+
+        super::super::check_bind9!(ZONEMD, rdata, text);
+    }
+}

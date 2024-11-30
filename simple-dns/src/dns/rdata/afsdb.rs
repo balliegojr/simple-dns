@@ -98,6 +98,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible() {
         let text = "1 afsdb.hostname.com.";
         let rdata = AFSDB {

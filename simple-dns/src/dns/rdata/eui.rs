@@ -149,6 +149,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible_eui48() {
         let text = "01-23-45-67-89-ab";
         let rdata = EUI48 {
@@ -158,6 +159,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "bind9-check")]
     fn bind9_compatible_eui64() {
         let text = "01-23-45-67-89-ab-cd-ef";
         let rdata = EUI64 {
