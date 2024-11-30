@@ -1,3 +1,6 @@
+#![allow(unused_imports)]
+#![allow(unused)]
+
 use std::{
     io,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
