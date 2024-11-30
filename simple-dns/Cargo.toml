@@ -1,6 +1,6 @@
 [package]
 name = "simple-dns"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2021"
 description = "Rust implementation to parse and write DNS packets"

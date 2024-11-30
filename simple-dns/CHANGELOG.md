@@ -1,3 +1,11 @@
+# 0.9.1 (2024-11-30)
+
+### Fix
+- Allow labels starting with numbers (RFC-1123)
+
+### Added
+- Add CERT, DNSKEY, DS, EUI48, EUI64, IPSECKEY, KX, RRSIG, ZONEMD, NSEC, DHCID support
+
 # 0.9.0 (2024-10-17)
 
 ### Fix
