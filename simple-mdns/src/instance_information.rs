@@ -73,6 +73,7 @@ impl<'a> InstanceInformation {
         unescaped_instance_name(self.instance_name.as_str())
     }
 
+    #[allow(unused)]
     pub(crate) fn from_records<'b>(
         service_name: &Name<'b>,
         records: impl Iterator<Item = &'b ResourceRecord<'b>>,
@@ -113,7 +114,7 @@ impl<'a> InstanceInformation {
         })
     }
 
-    /// Transform into a [Vec<ResourceRecord>](`Vec<ResourceRecord>`)
+    /// Transform into a [`Vec<ResourceRecord>`](`Vec<ResourceRecord>`)
     pub fn into_records(
         self,
         service_name: &Name<'a>,
