@@ -10,11 +10,17 @@ keywords = ["dns", "parser"]
 categories = ["parser-implementations", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+bind9-check = ["bind9-sys/bind9-check"]
+
 [dependencies]
 bitflags = "2.4"
 
 [dev-dependencies]
 criterion = "0.5"
+bind9-sys = { path = "../bind9-sys"  }
+base64 = "0.22.1"
 
 [lib]
 bench = false

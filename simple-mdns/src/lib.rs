@@ -26,8 +26,10 @@ pub mod async_discovery;
 #[cfg(feature = "sync")]
 pub mod sync_discovery;
 
+#[allow(unused)]
 const UNICAST_RESPONSE: bool = cfg!(not(test));
 
+#[allow(unused)]
 pub(crate) fn build_reply<'b>(
     packet: simple_dns::Packet,
     resources: &'b resource_record_manager::ResourceRecordManager<'b>,

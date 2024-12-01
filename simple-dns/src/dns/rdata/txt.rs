@@ -300,4 +300,13 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    #[cfg(feature = "bind9-check")]
+    fn bind9_compatible() {
+        let text = r#""\"foo\010bar\"""#;
+        let rdata: TXT = "\"foo\nbar\"".try_into().unwrap();
+
+        super::super::check_bind9!(TXT, rdata, text);
+    }
 }
