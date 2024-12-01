@@ -7,6 +7,7 @@ fn main() {
     if cfg!(feature = "bind9-check") {
         println!("cargo:rustc-link-lib=dns");
         println!("cargo:rustc-link-lib=isc");
+        println!("cargo:rustc-link-lib=atomic");
 
         generate_bindings(&out_path);
     } else {
