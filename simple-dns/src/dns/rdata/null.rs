@@ -43,7 +43,7 @@ impl<'a> NULL<'a> {
 }
 
 impl<'a> WireFormat<'a> for NULL<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {

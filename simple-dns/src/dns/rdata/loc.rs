@@ -33,14 +33,12 @@ impl LOC {
 }
 
 impl<'a> WireFormat<'a> for LOC {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 16;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if data.len() < *position + 16 {
-            return Err(SimpleDnsError::InsufficientData);
-        }
-
         let data = &data[*position..*position + 16];
         *position += 16;
 
@@ -83,10 +81,6 @@ impl<'a> WireFormat<'a> for LOC {
         out.write_all(&self.altitude.to_be_bytes())?;
 
         Ok(())
-    }
-
-    fn len(&self) -> usize {
-        16
     }
 }
 

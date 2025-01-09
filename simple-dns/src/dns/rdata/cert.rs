@@ -16,13 +16,14 @@ pub struct CERT<'a> {
     pub certificate: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for CERT<'a> {
     const TYPE_CODE: u16 = 37;
 }
 
 impl<'a> WireFormat<'a> for CERT<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 5;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -53,7 +54,7 @@ impl<'a> WireFormat<'a> for CERT<'a> {
     }
 
     fn len(&self) -> usize {
-        5 + self.certificate.len()
+        self.certificate.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -108,12 +109,8 @@ mod tests {
         assert_eq!(sample_rdata.type_code, 3);
         assert_eq!(sample_rdata.key_tag, 0);
         assert_eq!(sample_rdata.algorithm, 0);
-        assert_eq!(
-            *sample_rdata.certificate,
-            *b"\x00\x00\x00\x00\x00"
-        );
-        
+        assert_eq!(*sample_rdata.certificate, *b"\x00\x00\x00\x00\x00");
+
         Ok(())
     }
-
 }

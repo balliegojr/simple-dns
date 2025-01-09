@@ -30,7 +30,8 @@ impl<'a> RouteThrough<'a> {
 }
 
 impl<'a> WireFormat<'a> for RouteThrough<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 2;
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -59,7 +60,7 @@ impl<'a> WireFormat<'a> for RouteThrough<'a> {
     }
 
     fn len(&self) -> usize {
-        self.intermediate_host.len() + 2
+        self.intermediate_host.len() + Self::MINIMUM_LEN
     }
 }
 

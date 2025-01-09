@@ -73,7 +73,7 @@ impl<'a> Name<'a> {
     }
 
     /// Returns an Iter of this Name Labels
-    pub fn iter(&'a self) -> std::slice::Iter<Label<'a>> {
+    pub fn iter(&'a self) -> std::slice::Iter<'a, Label<'a>> {
         self.labels.iter()
     }
 
@@ -160,7 +160,9 @@ impl<'a> Name<'a> {
 }
 
 impl<'a> WireFormat<'a> for Name<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 1;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -173,7 +175,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
         let mut name_size = 0usize;
 
         loop {
-            if *position >= data.len() {
+            if pointer_position >= data.len() {
                 return Err(crate::SimpleDnsError::InsufficientData);
             }
 
@@ -250,7 +252,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
             .iter()
             .map(|label| label.len() + 1)
             .sum::<usize>()
-            + 1
+            + Self::MINIMUM_LEN
     }
 }
 

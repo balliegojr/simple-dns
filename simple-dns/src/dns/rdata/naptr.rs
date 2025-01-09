@@ -41,7 +41,9 @@ impl<'a> NAPTR<'a> {
 }
 
 impl<'a> WireFormat<'a> for NAPTR<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 4;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -74,7 +76,11 @@ impl<'a> WireFormat<'a> for NAPTR<'a> {
     }
 
     fn len(&self) -> usize {
-        self.flags.len() + self.services.len() + self.regexp.len() + self.replacement.len() + 4
+        self.flags.len()
+            + self.services.len()
+            + self.regexp.len()
+            + self.replacement.len()
+            + Self::MINIMUM_LEN
     }
 }
 

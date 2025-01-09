@@ -16,13 +16,14 @@ pub struct ZONEMD<'a> {
     pub digest: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for ZONEMD<'a> {
     const TYPE_CODE: u16 = 63;
 }
 
 impl<'a> WireFormat<'a> for ZONEMD<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 6;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -53,7 +54,7 @@ impl<'a> WireFormat<'a> for ZONEMD<'a> {
     }
 
     fn len(&self) -> usize {
-        4 + 1 + 1 + self.digest.len()
+        self.digest.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -71,7 +72,10 @@ impl<'a> ZONEMD<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::{RData, ZONEMD}, ResourceRecord};
+    use crate::{
+        rdata::{RData, ZONEMD},
+        ResourceRecord,
+    };
 
     use super::*;
 
@@ -114,4 +118,3 @@ mod tests {
         Ok(())
     }
 }
-

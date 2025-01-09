@@ -1,4 +1,4 @@
-use crate::{dns::WireFormat, SimpleDnsError};
+use crate::dns::WireFormat;
 
 use super::RR;
 
@@ -38,14 +38,12 @@ impl NSAP {
 }
 
 impl<'a> WireFormat<'a> for NSAP {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 20;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if data.len() < *position + 20 {
-            return Err(SimpleDnsError::InsufficientData);
-        }
-
         let data = &data[*position..*position + 20];
         *position += 20;
 
@@ -87,10 +85,6 @@ impl<'a> WireFormat<'a> for NSAP {
         out.write_all(&[self.sel.to_be()])?;
 
         Ok(())
-    }
-
-    fn len(&self) -> usize {
-        20
     }
 }
 

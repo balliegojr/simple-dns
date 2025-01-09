@@ -39,7 +39,9 @@ impl<'a> SRV<'a> {
 }
 
 impl<'a> WireFormat<'a> for SRV<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 6;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -66,7 +68,7 @@ impl<'a> WireFormat<'a> for SRV<'a> {
     }
 
     fn len(&self) -> usize {
-        self.target.len() + 6
+        self.target.len() + Self::MINIMUM_LEN
     }
 }
 

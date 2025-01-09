@@ -28,7 +28,7 @@ impl<'a> RP<'a> {
 }
 
 impl<'a> WireFormat<'a> for RP<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {

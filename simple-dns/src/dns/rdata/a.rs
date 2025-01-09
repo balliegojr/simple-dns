@@ -15,7 +15,9 @@ impl RR for A {
 }
 
 impl<'a> WireFormat<'a> for A {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 4;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -27,10 +29,6 @@ impl<'a> WireFormat<'a> for A {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address.to_be_bytes())
             .map_err(crate::SimpleDnsError::from)
-    }
-
-    fn len(&self) -> usize {
-        4
     }
 }
 

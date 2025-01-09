@@ -9,16 +9,17 @@ pub struct KX<'a> {
     /// The preference (or priority) lowest values are prioritized.
     pub preference: u16,
     /// The DNS domain name of the key exchanger. This host must have an associated KEY RR.
-    pub exchanger: Name<'a>
+    pub exchanger: Name<'a>,
 }
-
 
 impl<'a> RR for KX<'a> {
     const TYPE_CODE: u16 = 36;
 }
 
 impl<'a> WireFormat<'a> for KX<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 2;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -27,7 +28,7 @@ impl<'a> WireFormat<'a> for KX<'a> {
         let exchanger = Name::parse(data, position)?;
         Ok(Self {
             preference,
-            exchanger
+            exchanger,
         })
     }
 
@@ -38,7 +39,7 @@ impl<'a> WireFormat<'a> for KX<'a> {
     }
 
     fn len(&self) -> usize {
-        2 + self.exchanger.len()
+        self.exchanger.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -47,7 +48,7 @@ impl<'a> KX<'a> {
     pub fn into_owned<'b>(self) -> KX<'b> {
         KX {
             preference: self.preference,
-            exchanger: self.exchanger.into_owned()
+            exchanger: self.exchanger.into_owned(),
         }
     }
 }
@@ -62,15 +63,15 @@ mod tests {
     fn parse_and_write_kx() {
         let kx = KX {
             preference: 5,
-            exchanger: Name::new("example.com.").unwrap()
+            exchanger: Name::new("example.com.").unwrap(),
         };
-        
+
         let mut data = Vec::new();
         kx.write_to(&mut data).unwrap();
 
         let kx = KX::parse(&data, &mut 0).unwrap();
         assert_eq!(kx.preference, 5);
-        assert_eq!(kx.exchanger,Name::new("example.com.").unwrap());
+        assert_eq!(kx.exchanger, Name::new("example.com.").unwrap());
     }
 
     #[test]
@@ -88,4 +89,3 @@ mod tests {
         Ok(())
     }
 }
-

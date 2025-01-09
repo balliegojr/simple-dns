@@ -100,7 +100,14 @@ impl<'a> ResourceRecord<'a> {
 }
 
 impl<'a> WireFormat<'a> for ResourceRecord<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 10;
+
+    // Disable redundant length check.
+    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
+        Self::parse_after_check(data, position)
+    }
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -136,7 +143,7 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
     }
 
     fn len(&self) -> usize {
-        self.name.len() + self.rdata.len() + 10
+        self.name.len() + self.rdata.len() + Self::MINIMUM_LEN
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

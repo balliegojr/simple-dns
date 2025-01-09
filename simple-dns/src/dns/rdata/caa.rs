@@ -33,7 +33,9 @@ impl<'a> CAA<'a> {
 }
 
 impl<'a> WireFormat<'a> for CAA<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 1;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -54,7 +56,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
     }
 
     fn len(&self) -> usize {
-        self.tag.len() + self.value.len() + 1
+        self.tag.len() + self.value.len() + Self::MINIMUM_LEN
     }
 }
 

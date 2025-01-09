@@ -48,13 +48,19 @@ impl<'a> TryFrom<CharacterString<'a>> for String {
 }
 
 impl<'a> WireFormat<'a> for CharacterString<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 1;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let length = data[*position] as usize;
         if length > MAX_CHARACTER_STRING_LENGTH || length + *position > data.len() {
             return Err(SimpleDnsError::InvalidCharacterString);
+        }
+
+        if *position + 1 + length > data.len() {
+            return Err(crate::SimpleDnsError::InsufficientData);
         }
 
         let data = &data[*position + 1..*position + 1 + length];
@@ -72,7 +78,7 @@ impl<'a> WireFormat<'a> for CharacterString<'a> {
     }
 
     fn len(&self) -> usize {
-        self.data.len() + 1
+        self.data.len() + Self::MINIMUM_LEN
     }
 }
 

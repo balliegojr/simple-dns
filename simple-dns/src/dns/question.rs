@@ -53,11 +53,17 @@ impl<'a> Question<'a> {
 }
 
 impl<'a> WireFormat<'a> for Question<'a> {
+    const MINIMUM_LEN: usize = 4;
+
+    // Disable redundant length check.
     fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
+        Self::parse_after_check(data, position)
+    }
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
         let qname = Name::parse(data, position)?;
-        if *position + 4 > data.len() {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
+
+        Self::check_len(data, position)?;
 
         let qtype = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
         let qclass = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
@@ -73,7 +79,7 @@ impl<'a> WireFormat<'a> for Question<'a> {
     }
 
     fn len(&self) -> usize {
-        self.qname.len() + 4
+        self.qname.len() + Self::MINIMUM_LEN
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

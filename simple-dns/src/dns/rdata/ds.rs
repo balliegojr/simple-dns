@@ -13,16 +13,17 @@ pub struct DS<'a> {
     /// The digest type number identifying the cryptographic hash algorithm used to create the digest
     pub digest_type: u8,
     /// The digest value calculated over the referenced DNSKEY record
-    pub digest: Cow<'a, [u8]>
+    pub digest: Cow<'a, [u8]>,
 }
-
 
 impl<'a> RR for DS<'a> {
     const TYPE_CODE: u16 = 43;
 }
 
 impl<'a> WireFormat<'a> for DS<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 4;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -55,7 +56,7 @@ impl<'a> WireFormat<'a> for DS<'a> {
     }
 
     fn len(&self) -> usize {
-        4 + self.digest.len()
+        self.digest.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -66,7 +67,7 @@ impl<'a> DS<'a> {
             key_tag: self.key_tag,
             algorithm: self.algorithm,
             digest_type: self.digest_type,
-            digest: Cow::Owned(self.digest.into_owned())
+            digest: Cow::Owned(self.digest.into_owned()),
         }
     }
 }
@@ -85,7 +86,7 @@ mod tests {
         let digest = vec![1, 2, 3, 4, 5];
         let rdata = DS {
             key_tag,
-            algorithm, 
+            algorithm,
             digest_type,
             digest: Cow::Owned(digest),
         };
@@ -110,9 +111,11 @@ mod tests {
         assert_eq!(sample_rdata.algorithm, 5);
         assert_eq!(sample_rdata.digest_type, 1);
         assert_eq!(sample_rdata.key_tag, 60485);
-        assert_eq!(*sample_rdata.digest, *b"\x2B\xB1\x83\xAF\x5F\x22\x58\x81\x79\xA5\x3B\x0A\x98\x63\x1F\xAD\x1A\x29\x21\x18");
+        assert_eq!(
+            *sample_rdata.digest,
+            *b"\x2B\xB1\x83\xAF\x5F\x22\x58\x81\x79\xA5\x3B\x0A\x98\x63\x1F\xAD\x1A\x29\x21\x18"
+        );
 
         Ok(())
     }
-
 }

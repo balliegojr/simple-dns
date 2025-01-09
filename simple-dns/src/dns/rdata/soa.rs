@@ -54,12 +54,16 @@ impl<'a> SOA<'a> {
 }
 
 impl<'a> WireFormat<'a> for SOA<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 20;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let mname = Name::parse(data, position)?;
         let rname = Name::parse(data, position)?;
+
+        Self::check_len(data, position)?;
 
         let serial = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
         let refresh = i32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
@@ -97,7 +101,7 @@ impl<'a> WireFormat<'a> for SOA<'a> {
     }
 
     fn len(&self) -> usize {
-        self.mname.len() + self.rname.len() + 20
+        self.mname.len() + self.rname.len() + Self::MINIMUM_LEN
     }
 }
 
