@@ -30,7 +30,9 @@ impl<'a> MX<'a> {
 }
 
 impl<'a> WireFormat<'a> for MX<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 2;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -59,7 +61,7 @@ impl<'a> WireFormat<'a> for MX<'a> {
     }
 
     fn len(&self) -> usize {
-        self.exchange.len() + 2
+        self.exchange.len() + Self::MINIMUM_LEN
     }
 }
 

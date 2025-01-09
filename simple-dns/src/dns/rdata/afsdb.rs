@@ -28,7 +28,9 @@ impl<'a> AFSDB<'a> {
 }
 
 impl<'a> WireFormat<'a> for AFSDB<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 2;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -54,7 +56,7 @@ impl<'a> WireFormat<'a> for AFSDB<'a> {
     }
 
     fn len(&self) -> usize {
-        self.hostname.len() + 2
+        self.hostname.len() + Self::MINIMUM_LEN
     }
 }
 

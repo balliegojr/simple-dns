@@ -160,7 +160,6 @@ macros::rr_wrapper! {
     HTTPS: SVCB = 65
 }
 
-
 macros::rdata_enum! {
     A,
     AAAA,

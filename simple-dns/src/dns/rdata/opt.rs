@@ -33,14 +33,12 @@ impl<'a> RR for OPT<'a> {
 }
 
 impl<'a> WireFormat<'a> for OPT<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 10;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        if *position + 10 > data.len() {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
-
         // udp packet size comes from CLASS
         let udp_packet_size = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
         // version comes from ttl

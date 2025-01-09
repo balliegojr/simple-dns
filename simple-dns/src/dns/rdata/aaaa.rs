@@ -15,17 +15,15 @@ impl RR for AAAA {
 }
 
 impl<'a> WireFormat<'a> for AAAA {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 16;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
         let address = u128::from_be_bytes(data[*position..*position + 16].try_into()?);
         *position += 16;
         Ok(Self { address })
-    }
-
-    fn len(&self) -> usize {
-        16
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

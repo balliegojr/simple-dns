@@ -9,16 +9,10 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(original) = Packet::parse(data) {
         let compressed = original.build_bytes_vec_compressed().unwrap();
 
-        match Packet::parse(&compressed) {
-            Ok(decompressed) => {
-                let encoded = decompressed.build_bytes_vec().unwrap();
+        if let Ok(decompressed) = Packet::parse(&compressed) {
+            let encoded = decompressed.build_bytes_vec().unwrap();
 
-                assert_eq!(encoded, original.build_bytes_vec().unwrap());
-            }
-            Err(e) => {
-                eprintln!("{:?}", original);
-                panic!("Packet failed to parse: {:?}", e);
-            }
+            assert_eq!(encoded, original.build_bytes_vec().unwrap());
         }
     }
 });

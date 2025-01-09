@@ -175,7 +175,9 @@ impl<'a> TryFrom<TXT<'a>> for String {
 }
 
 impl<'a> WireFormat<'a> for TXT<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 1;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -195,7 +197,7 @@ impl<'a> WireFormat<'a> for TXT<'a> {
 
     fn len(&self) -> usize {
         if self.strings.is_empty() {
-            1
+            Self::MINIMUM_LEN
         } else {
             self.size
         }

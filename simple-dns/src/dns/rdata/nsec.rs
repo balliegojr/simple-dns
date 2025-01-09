@@ -22,13 +22,12 @@ pub struct TypeBitMap<'a> {
     pub bitmap: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for NSEC<'a> {
     const TYPE_CODE: u16 = 47;
 }
 
 impl<'a> WireFormat<'a> for NSEC<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -38,22 +37,35 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
         while data.len() > *position {
             let window_block = data[*position];
             *position += 1;
-            if type_bit_maps.last().is_some_and(|f: &TypeBitMap<'_>| f.window_block - 1 != window_block) {
+
+            if type_bit_maps.last().is_some_and(|f: &TypeBitMap<'_>| {
+                f.window_block > 0 && f.window_block - 1 != window_block
+            }) {
                 return Err(crate::SimpleDnsError::AttemptedInvalidOperation);
+            }
+
+            if *position >= data.len() {
+                return Err(crate::SimpleDnsError::InsufficientData);
             }
 
             let bitmap_length = data[*position];
             *position += 1;
 
-            let bitmap = &data[*position..*position + bitmap_length as usize];
-            *position += bitmap_length as usize;
-            
+            let bitmap_end = *position + bitmap_length as usize;
+
+            if bitmap_end > data.len() {
+                return Err(crate::SimpleDnsError::InsufficientData);
+            }
+
+            let bitmap = &data[*position..bitmap_end];
+            *position = bitmap_end;
+
             type_bit_maps.push(TypeBitMap {
                 window_block,
                 bitmap: Cow::Borrowed(bitmap),
             });
         }
-        
+
         Ok(Self {
             next_name,
             type_bit_maps,
@@ -65,12 +77,12 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
 
         let mut sorted = self.type_bit_maps.clone();
         sorted.sort_by(|a, b| a.window_block.cmp(&b.window_block));
-        
+
         for record in sorted.iter() {
             out.write_all(&[record.window_block])?;
             out.write_all(&[record.bitmap.len() as u8])?;
             out.write_all(&record.bitmap)?;
-        };
+        }
 
         Ok(())
     }
@@ -83,10 +95,14 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
 impl<'a> NSEC<'a> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> NSEC<'b> {
-        let type_bit_maps = self.type_bit_maps.into_iter().map(|x| TypeBitMap {
-            window_block: x.window_block,
-            bitmap: x.bitmap.into_owned().into(),
-        }).collect();
+        let type_bit_maps = self
+            .type_bit_maps
+            .into_iter()
+            .map(|x| TypeBitMap {
+                window_block: x.window_block,
+                bitmap: x.bitmap.into_owned().into(),
+            })
+            .collect();
         NSEC {
             next_name: self.next_name.into_owned(),
             type_bit_maps,
@@ -128,12 +144,17 @@ mod tests {
             _ => unreachable!(),
         };
 
-        assert_eq!(sample_rdata.next_name, Name::new("host.example.com.").unwrap());
+        assert_eq!(
+            sample_rdata.next_name,
+            Name::new("host.example.com.").unwrap()
+        );
         assert_eq!(sample_rdata.type_bit_maps.len(), 1);
         assert_eq!(sample_rdata.type_bit_maps[0].window_block, 0);
-        assert_eq!(sample_rdata.type_bit_maps[0].bitmap, vec![64, 1, 0, 0, 0, 1]);
+        assert_eq!(
+            sample_rdata.type_bit_maps[0].bitmap,
+            vec![64, 1, 0, 0, 0, 1]
+        );
 
         Ok(())
     }
-
 }

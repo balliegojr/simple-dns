@@ -148,7 +148,9 @@ impl<'a> SVCB<'a> {
 }
 
 impl<'a> WireFormat<'a> for SVCB<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 2;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -158,7 +160,12 @@ impl<'a> WireFormat<'a> for SVCB<'a> {
         let target = Name::parse(data, position)?;
         let mut params = BTreeMap::new();
         let mut previous_key = -1;
+
         while *position < data.len() {
+            if *position + 4 >= data.len() {
+                return Err(crate::SimpleDnsError::InsufficientData);
+            }
+
             let key = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
             let value_length = usize::from(u16::from_be_bytes(
                 data[*position + 2..*position + 4].try_into()?,
@@ -167,11 +174,15 @@ impl<'a> WireFormat<'a> for SVCB<'a> {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
             previous_key = i32::from(key);
-            params.insert(
-                key,
-                Cow::Borrowed(&data[*position + 4..*position + 4 + value_length]),
-            );
-            *position += 4 + value_length;
+
+            let param_end = *position + 4 + value_length;
+
+            if param_end > data.len() {
+                return Err(crate::SimpleDnsError::InsufficientData);
+            }
+
+            params.insert(key, Cow::Borrowed(&data[*position + 4..param_end]));
+            *position = param_end;
         }
         Ok(Self {
             priority,
@@ -196,12 +207,13 @@ impl<'a> WireFormat<'a> for SVCB<'a> {
     // RFC9460 §2.2 specifically mentioned the TargetName is *uncompressed*.
 
     fn len(&self) -> usize {
-        2 + self.target.len()
+        self.target.len()
             + self
                 .params
                 .values()
                 .map(|value| value.len() + 4)
                 .sum::<usize>()
+            + Self::MINIMUM_LEN
     }
 }
 

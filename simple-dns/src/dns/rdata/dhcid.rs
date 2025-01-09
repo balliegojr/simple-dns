@@ -11,7 +11,7 @@ pub struct DHCID<'a> {
     /// Digest type code
     pub digest_type: u8,
     /// Digest (length depends on digest type)
-    pub digest: Cow<'a, [u8]>
+    pub digest: Cow<'a, [u8]>,
 }
 
 impl<'a> RR for DHCID<'a> {
@@ -19,7 +19,9 @@ impl<'a> RR for DHCID<'a> {
 }
 
 impl<'a> WireFormat<'a> for DHCID<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 3;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -48,7 +50,7 @@ impl<'a> WireFormat<'a> for DHCID<'a> {
     }
 
     fn len(&self) -> usize {
-        2 + 1 + self.digest.len()
+        self.digest.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -101,5 +103,4 @@ mod tests {
 
         Ok(())
     }
-
 }

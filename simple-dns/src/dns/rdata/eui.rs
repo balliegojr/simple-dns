@@ -26,11 +26,13 @@ impl RR for EUI64 {
 }
 
 impl<'a> WireFormat<'a> for EUI48 {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 6;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address =data[*position..*position + 6].try_into()?;
+        let address = data[*position..*position + 6].try_into()?;
         *position += 6;
         Ok(Self { address })
     }
@@ -39,18 +41,16 @@ impl<'a> WireFormat<'a> for EUI48 {
         out.write_all(&self.address)
             .map_err(crate::SimpleDnsError::from)
     }
-
-    fn len(&self) -> usize {
-        6
-    }
 }
 
 impl<'a> WireFormat<'a> for EUI64 {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 8;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address =data[*position..*position + 8].try_into()?;
+        let address = data[*position..*position + 8].try_into()?;
         *position += 8;
         Ok(Self { address })
     }
@@ -58,10 +58,6 @@ impl<'a> WireFormat<'a> for EUI64 {
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address)
             .map_err(crate::SimpleDnsError::from)
-    }
-
-    fn len(&self) -> usize {
-        8
     }
 }
 
@@ -148,4 +144,3 @@ mod tests {
         Ok(())
     }
 }
-

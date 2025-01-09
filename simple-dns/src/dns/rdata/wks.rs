@@ -31,7 +31,9 @@ impl<'a> WKS<'a> {
 }
 
 impl<'a> WireFormat<'a> for WKS<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 5;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -57,7 +59,7 @@ impl<'a> WireFormat<'a> for WKS<'a> {
     }
 
     fn len(&self) -> usize {
-        self.bit_map.len() + 5
+        self.bit_map.len() + Self::MINIMUM_LEN
     }
 }
 

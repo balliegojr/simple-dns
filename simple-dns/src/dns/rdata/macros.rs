@@ -22,7 +22,7 @@ macro_rules! rr_wrapper {
         }
 
         impl<'a> WireFormat<'a> for $t<'a> {
-            fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+            fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,
             {
@@ -77,20 +77,22 @@ macro_rules! rdata_enum {
         }
 
         impl<'a> WireFormat<'a> for RData<'a> {
-            fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+            const MINIMUM_LEN: usize = 10;
+
+            fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,
             {
-                if *position + 10 > data.len() {
-                    return Err(crate::SimpleDnsError::InsufficientData);
-                }
-
                 let rdatatype = u16::from_be_bytes(data[*position..*position + 2].try_into()?).into();
                 let rdatalen = u16::from_be_bytes(data[*position + 8..*position + 10].try_into()?) as usize;
 
                 // OPT needs to look the ttl and class values, hence position will be advanced by OPT
                 // parsing code
                 if rdatatype == TYPE::OPT {
+                    if *position + rdatalen + 10 > data.len() {
+                        return Err(crate::SimpleDnsError::InsufficientData);
+                    }
+
                     return Ok(RData::OPT(OPT::parse(&data[..*position + rdatalen + 10], position)?))
                 }
                 *position += 10;

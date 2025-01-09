@@ -16,13 +16,14 @@ pub struct DNSKEY<'a> {
     pub public_key: Cow<'a, [u8]>,
 }
 
-
 impl<'a> RR for DNSKEY<'a> {
     const TYPE_CODE: u16 = 48;
 }
 
 impl<'a> WireFormat<'a> for DNSKEY<'a> {
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    const MINIMUM_LEN: usize = 4;
+
+    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -56,7 +57,7 @@ impl<'a> WireFormat<'a> for DNSKEY<'a> {
     }
 
     fn len(&self) -> usize {
-        2 + 1 + 1 + self.public_key.len()
+        self.public_key.len() + Self::MINIMUM_LEN
     }
 }
 
@@ -94,7 +95,7 @@ mod tests {
         rdata.write_to(&mut writer).unwrap();
         let rdata = DNSKEY::parse(&writer, &mut 0).unwrap();
         assert_eq!(rdata.flags, flags);
-        assert_eq!(rdata.protocol, protocol); 
+        assert_eq!(rdata.protocol, protocol);
         assert_eq!(rdata.algorithm, algorithm);
         assert_eq!(&*rdata.public_key, &[1, 2, 3, 4, 5]);
     }
@@ -115,9 +116,7 @@ mod tests {
             *sample_rdata.public_key,
             *b"\x01\x03\xd2\x2a\x6c\xa7\x7f\x35\xb8\x93\x20\x6f\xd3\x5e\x4c\x50\x6d\x83\x78\x84\x37\x09\xb9\x7e\x04\x16\x47\xe1\xbf\xf4\x3d\x8d\x64\xc6\x49\xaf\x1e\x37\x19\x73\xc9\xe8\x91\xfc\xe3\xdf\x51\x9a\x8c\x84\x0a\x63\xee\x42\xa6\xd2\xeb\xdd\xbb\x97\x03\x5d\x21\x5a\xa4\xe4\x17\xb1\xfa\x45\xfa\x11\xa9\x74\x1e\xa2\x09\x8c\x1d\xfa\x5f\xb5\xfe\xb3\x32\xfd\x4b\xc8\x15\x20\x89\xae\xf3\x6b\xa6\x44\xcc\xe2\x41\x3b\x3b\x72\xbe\x18\xcb\xef\x8d\xa2\x53\xf4\xe9\x3d\x21\x03\x86\x6d\x92\x34\xa2\xe2\x8d\xf5\x29\xa6\x7d\x54\x68\xdb\xef\xe3"
         );
-        
+
         Ok(())
     }
-
 }
-
