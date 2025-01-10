@@ -22,7 +22,7 @@ pub struct TypeBitMap<'a> {
     pub bitmap: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for NSEC<'a> {
+impl RR for NSEC<'_> {
     const TYPE_CODE: u16 = 47;
 }
 
@@ -93,7 +93,7 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     }
 }
 
-impl<'a> NSEC<'a> {
+impl NSEC<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> NSEC<'b> {
         let type_bit_maps = self

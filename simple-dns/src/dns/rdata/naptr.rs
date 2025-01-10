@@ -22,11 +22,11 @@ pub struct NAPTR<'a> {
     pub replacement: Name<'a>,
 }
 
-impl<'a> RR for NAPTR<'a> {
+impl RR for NAPTR<'_> {
     const TYPE_CODE: u16 = 35;
 }
 
-impl<'a> NAPTR<'a> {
+impl NAPTR<'_> {
     /// Transforms the inner data into it owned type
     pub fn into_owned<'b>(self) -> NAPTR<'b> {
         NAPTR {

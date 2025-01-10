@@ -14,11 +14,11 @@ pub struct MINFO<'a> {
     pub emailbox: Name<'a>,
 }
 
-impl<'a> RR for MINFO<'a> {
+impl RR for MINFO<'_> {
     const TYPE_CODE: u16 = 14;
 }
 
-impl<'a> MINFO<'a> {
+impl MINFO<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> MINFO<'b> {
         MINFO {

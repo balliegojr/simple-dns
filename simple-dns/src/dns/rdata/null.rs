@@ -11,7 +11,7 @@ pub struct NULL<'a> {
     data: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for NULL<'a> {
+impl RR for NULL<'_> {
     const TYPE_CODE: u16 = 10;
 }
 

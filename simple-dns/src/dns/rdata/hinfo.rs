@@ -15,11 +15,11 @@ pub struct HINFO<'a> {
     pub os: CharacterString<'a>,
 }
 
-impl<'a> RR for HINFO<'a> {
+impl RR for HINFO<'_> {
     const TYPE_CODE: u16 = 13;
 }
 
-impl<'a> HINFO<'a> {
+impl HINFO<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> HINFO<'b> {
         HINFO {

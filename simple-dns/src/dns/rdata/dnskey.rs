@@ -16,7 +16,7 @@ pub struct DNSKEY<'a> {
     pub public_key: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for DNSKEY<'a> {
+impl RR for DNSKEY<'_> {
     const TYPE_CODE: u16 = 48;
 }
 
@@ -61,7 +61,7 @@ impl<'a> WireFormat<'a> for DNSKEY<'a> {
     }
 }
 
-impl<'a> DNSKEY<'a> {
+impl DNSKEY<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> DNSKEY<'b> {
         DNSKEY {

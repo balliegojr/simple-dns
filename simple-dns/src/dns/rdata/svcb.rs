@@ -22,7 +22,7 @@ pub struct SVCB<'a> {
     params: BTreeMap<u16, Cow<'a, [u8]>>,
 }
 
-impl<'a> RR for SVCB<'a> {
+impl RR for SVCB<'_> {
     const TYPE_CODE: u16 = 64;
 }
 

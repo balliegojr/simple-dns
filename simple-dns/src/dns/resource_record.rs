@@ -174,7 +174,7 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
     }
 }
 
-impl<'a> Hash for ResourceRecord<'a> {
+impl Hash for ResourceRecord<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.class.hash(state);
@@ -182,7 +182,7 @@ impl<'a> Hash for ResourceRecord<'a> {
     }
 }
 
-impl<'a> PartialEq for ResourceRecord<'a> {
+impl PartialEq for ResourceRecord<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name && self.class == other.class && self.rdata == other.rdata
     }

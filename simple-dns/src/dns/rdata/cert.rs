@@ -16,7 +16,7 @@ pub struct CERT<'a> {
     pub certificate: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for CERT<'a> {
+impl RR for CERT<'_> {
     const TYPE_CODE: u16 = 37;
 }
 
@@ -58,7 +58,7 @@ impl<'a> WireFormat<'a> for CERT<'a> {
     }
 }
 
-impl<'a> CERT<'a> {
+impl CERT<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> CERT<'b> {
         CERT {

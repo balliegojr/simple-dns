@@ -26,7 +26,7 @@ pub struct RRSIG<'a> {
     pub signature: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for RRSIG<'a> {
+impl RR for RRSIG<'_> {
     const TYPE_CODE: u16 = 46;
 }
 
@@ -94,7 +94,7 @@ impl<'a> WireFormat<'a> for RRSIG<'a> {
     }
 }
 
-impl<'a> RRSIG<'a> {
+impl RRSIG<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> RRSIG<'b> {
         RRSIG {

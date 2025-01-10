@@ -15,11 +15,11 @@ pub struct RouteThrough<'a> {
     pub intermediate_host: Name<'a>,
 }
 
-impl<'a> RR for RouteThrough<'a> {
+impl RR for RouteThrough<'_> {
     const TYPE_CODE: u16 = 21;
 }
 
-impl<'a> RouteThrough<'a> {
+impl RouteThrough<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> RouteThrough<'b> {
         RouteThrough {

@@ -12,7 +12,7 @@ pub struct KX<'a> {
     pub exchanger: Name<'a>,
 }
 
-impl<'a> RR for KX<'a> {
+impl RR for KX<'_> {
     const TYPE_CODE: u16 = 36;
 }
 
@@ -43,7 +43,7 @@ impl<'a> WireFormat<'a> for KX<'a> {
     }
 }
 
-impl<'a> KX<'a> {
+impl KX<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> KX<'b> {
         KX {

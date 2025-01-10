@@ -15,11 +15,11 @@ pub struct WKS<'a> {
     pub bit_map: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for WKS<'a> {
+impl RR for WKS<'_> {
     const TYPE_CODE: u16 = 11;
 }
 
-impl<'a> WKS<'a> {
+impl WKS<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> WKS<'b> {
         WKS {

@@ -276,7 +276,7 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
     }
 }
 
-impl<'a> Display for Name<'a> {
+impl Display for Name<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, label) in self.iter().enumerate() {
             if i != 0 {
@@ -290,7 +290,7 @@ impl<'a> Display for Name<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for Name<'a> {
+impl std::fmt::Debug for Name<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Name")
             .field(&format!("{}", self))
@@ -299,13 +299,13 @@ impl<'a> std::fmt::Debug for Name<'a> {
     }
 }
 
-impl<'a> PartialEq for Name<'a> {
+impl PartialEq for Name<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.labels == other.labels
     }
 }
 
-impl<'a> Hash for Name<'a> {
+impl Hash for Name<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.labels.hash(state);
     }
@@ -419,7 +419,7 @@ impl<'a> Label<'a> {
     }
 }
 
-impl<'a> Display for Label<'a> {
+impl Display for Label<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match std::str::from_utf8(&self.data) {
             Ok(s) => f.write_str(s),
@@ -428,7 +428,7 @@ impl<'a> Display for Label<'a> {
     }
 }
 
-impl<'a> std::fmt::Debug for Label<'a> {
+impl std::fmt::Debug for Label<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Label")
             .field("data", &self.to_string())

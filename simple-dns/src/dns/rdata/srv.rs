@@ -22,11 +22,11 @@ pub struct SRV<'a> {
     pub target: Name<'a>,
 }
 
-impl<'a> RR for SRV<'a> {
+impl RR for SRV<'_> {
     const TYPE_CODE: u16 = 33;
 }
 
-impl<'a> SRV<'a> {
+impl SRV<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> SRV<'b> {
         SRV {
