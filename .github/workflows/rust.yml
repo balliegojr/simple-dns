@@ -28,9 +28,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose --all-features
+      run: cargo build --workspace --exclude simple-dns-fuzz --verbose --all-features
     - name: Run tests
-      run: cargo test --verbose --all-features
+      run: cargo test --workspace --exclude simple-dns-fuzz --verbose --all-features
 
   test-release:
     name: Test Release on ${{ matrix.os }}
@@ -42,6 +42,24 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --verbose --release --all-features
+      run: cargo build --workspace --exclude simple-dns-fuzz --verbose --release --all-features
     - name: Run tests
-      run: cargo test --verbose --release --all-features
+      run: cargo test --workspace --exclude simple-dns-fuzz --verbose --release --all-features
+
+  fuzzing:
+    name: Fuzz 
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+    - name: Install cargo-fuzz
+      run: |
+        cargo install cargo-fuzz
+    - name: Run Fuzzing
+      run: |
+        cd simple-dns
+        cargo fuzz run packet_parse -- -max_total_time=180
