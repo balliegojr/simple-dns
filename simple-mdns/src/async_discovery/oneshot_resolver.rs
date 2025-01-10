@@ -35,7 +35,6 @@ use tokio::{
 ///
 ///     # };
 /// ```
-
 pub struct OneShotMdnsResolver {
     query_timeout: Duration,
     unicast_response: bool,
@@ -62,9 +61,9 @@ impl OneShotMdnsResolver {
     }
 
     /// Send a query packet and returns the first response
-    pub async fn query_packet<'a>(
+    pub async fn query_packet(
         &self,
-        packet: Packet<'a>,
+        packet: Packet<'_>,
     ) -> Result<Option<Vec<u8>>, SimpleMdnsError> {
         self.sender_socket
             .send_to(
