@@ -62,4 +62,4 @@ jobs:
     - name: Run Fuzzing
       run: |
         cd simple-dns
-        cargo fuzz run packet_parse -- -max_total_time=180
+        cargo fuzz run packet_parse -- -max_total_time=300
