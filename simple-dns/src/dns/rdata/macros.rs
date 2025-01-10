@@ -22,6 +22,7 @@ macro_rules! rr_wrapper {
         }
 
         impl<'a> WireFormat<'a> for $t<'a> {
+            const MINIMUM_LEN: usize = 0;
             fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
             where
                 Self: Sized,

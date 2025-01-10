@@ -43,6 +43,7 @@ impl<'a> NULL<'a> {
 }
 
 impl<'a> WireFormat<'a> for NULL<'a> {
+    const MINIMUM_LEN: usize = 0;
     fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
     where
         Self: Sized,

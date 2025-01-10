@@ -7,7 +7,7 @@ use super::name::Label;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub(crate) trait WireFormat<'a> {
-    const MINIMUM_LEN: usize = 0;
+    const MINIMUM_LEN: usize;
 
     /// Parse the contents of the data buffer starting at the given `position`
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
