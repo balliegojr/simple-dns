@@ -14,7 +14,7 @@ pub struct DHCID<'a> {
     pub digest: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for DHCID<'a> {
+impl RR for DHCID<'_> {
     const TYPE_CODE: u16 = 49;
 }
 
@@ -54,7 +54,7 @@ impl<'a> WireFormat<'a> for DHCID<'a> {
     }
 }
 
-impl<'a> DHCID<'a> {
+impl DHCID<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> DHCID<'b> {
         DHCID {

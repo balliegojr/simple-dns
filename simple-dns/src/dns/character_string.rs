@@ -90,7 +90,7 @@ impl<'a> TryFrom<&'a str> for CharacterString<'a> {
     }
 }
 
-impl<'a> TryFrom<String> for CharacterString<'a> {
+impl TryFrom<String> for CharacterString<'_> {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
@@ -98,14 +98,14 @@ impl<'a> TryFrom<String> for CharacterString<'a> {
     }
 }
 
-impl<'a> Display for CharacterString<'a> {
+impl Display for CharacterString<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = std::str::from_utf8(&self.data).unwrap();
         f.write_str(s)
     }
 }
 
-impl<'a> std::fmt::Debug for CharacterString<'a> {
+impl std::fmt::Debug for CharacterString<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CharacterString")
             .field("data", &self.to_string())

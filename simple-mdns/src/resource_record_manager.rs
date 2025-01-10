@@ -131,7 +131,7 @@ impl<'a> ResourceRecordManager<'a> {
     }
 }
 
-impl<'a> Default for ResourceRecordManager<'a> {
+impl Default for ResourceRecordManager<'_> {
     fn default() -> Self {
         Self::new()
     }

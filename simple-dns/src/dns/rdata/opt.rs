@@ -28,7 +28,7 @@ pub struct OPT<'a> {
     pub version: u8,
 }
 
-impl<'a> RR for OPT<'a> {
+impl RR for OPT<'_> {
     const TYPE_CODE: u16 = 41;
 }
 
@@ -92,7 +92,7 @@ impl<'a> WireFormat<'a> for OPT<'a> {
     }
 }
 
-impl<'a> OPT<'a> {
+impl OPT<'_> {
     pub(crate) fn extract_rcode_from_ttl(ttl: u32, header: &Header) -> RCODE {
         let mut rcode = (ttl & masks::RCODE_MASK) << 4;
         rcode |= header.response_code as u32;
@@ -125,7 +125,7 @@ pub struct OPTCode<'a> {
     pub data: Cow<'a, [u8]>,
 }
 
-impl<'a> OPTCode<'a> {
+impl OPTCode<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> OPTCode<'b> {
         OPTCode {

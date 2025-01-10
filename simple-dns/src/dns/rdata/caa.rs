@@ -17,11 +17,11 @@ pub struct CAA<'a> {
     pub value: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for CAA<'a> {
+impl RR for CAA<'_> {
     const TYPE_CODE: u16 = 257;
 }
 
-impl<'a> CAA<'a> {
+impl CAA<'_> {
     /// Transforms the inner data into it owned type
     pub fn into_owned<'b>(self) -> CAA<'b> {
         CAA {

@@ -16,7 +16,7 @@ pub struct DS<'a> {
     pub digest: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for DS<'a> {
+impl RR for DS<'_> {
     const TYPE_CODE: u16 = 43;
 }
 
@@ -60,7 +60,7 @@ impl<'a> WireFormat<'a> for DS<'a> {
     }
 }
 
-impl<'a> DS<'a> {
+impl DS<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> DS<'b> {
         DS {

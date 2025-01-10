@@ -13,11 +13,11 @@ pub struct ISDN<'a> {
     pub sa: CharacterString<'a>,
 }
 
-impl<'a> RR for ISDN<'a> {
+impl RR for ISDN<'_> {
     const TYPE_CODE: u16 = 20;
 }
 
-impl<'a> ISDN<'a> {
+impl ISDN<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> ISDN<'b> {
         ISDN {

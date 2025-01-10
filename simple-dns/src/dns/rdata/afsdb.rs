@@ -13,11 +13,11 @@ pub struct AFSDB<'a> {
     pub hostname: Name<'a>,
 }
 
-impl<'a> RR for AFSDB<'a> {
+impl RR for AFSDB<'_> {
     const TYPE_CODE: u16 = 18;
 }
 
-impl<'a> AFSDB<'a> {
+impl AFSDB<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> AFSDB<'b> {
         AFSDB {

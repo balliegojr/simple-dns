@@ -16,7 +16,7 @@ pub struct ZONEMD<'a> {
     pub digest: Cow<'a, [u8]>,
 }
 
-impl<'a> RR for ZONEMD<'a> {
+impl RR for ZONEMD<'_> {
     const TYPE_CODE: u16 = 63;
 }
 
@@ -58,7 +58,7 @@ impl<'a> WireFormat<'a> for ZONEMD<'a> {
     }
 }
 
-impl<'a> ZONEMD<'a> {
+impl ZONEMD<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> ZONEMD<'b> {
         ZONEMD {

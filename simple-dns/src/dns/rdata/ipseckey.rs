@@ -32,7 +32,7 @@ pub enum Gateway<'a> {
     Domain(Name<'a>),
 }
 
-impl<'a> Gateway<'a> {
+impl Gateway<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> Gateway<'b> {
         match self {
@@ -44,7 +44,7 @@ impl<'a> Gateway<'a> {
     }
 }
 
-impl<'a> RR for IPSECKEY<'a> {
+impl RR for IPSECKEY<'_> {
     const TYPE_CODE: u16 = 45;
 }
 
@@ -134,7 +134,7 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
     }
 }
 
-impl<'a> IPSECKEY<'a> {
+impl IPSECKEY<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> IPSECKEY<'b> {
         IPSECKEY {

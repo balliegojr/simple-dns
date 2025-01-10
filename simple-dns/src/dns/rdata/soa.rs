@@ -24,11 +24,11 @@ pub struct SOA<'a> {
     pub minimum: u32,
 }
 
-impl<'a> RR for SOA<'a> {
+impl RR for SOA<'_> {
     const TYPE_CODE: u16 = 6;
 }
 
-impl<'a> SOA<'a> {
+impl SOA<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> SOA<'b> {
         SOA {

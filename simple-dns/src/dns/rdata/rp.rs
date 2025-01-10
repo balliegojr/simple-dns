@@ -13,11 +13,11 @@ pub struct RP<'a> {
     pub txt: Name<'a>,
 }
 
-impl<'a> RR for RP<'a> {
+impl RR for RP<'_> {
     const TYPE_CODE: u16 = 17;
 }
 
-impl<'a> RP<'a> {
+impl RP<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> RP<'b> {
         RP {

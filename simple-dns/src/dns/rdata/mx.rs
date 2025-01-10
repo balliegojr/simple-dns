@@ -15,11 +15,11 @@ pub struct MX<'a> {
     pub exchange: Name<'a>,
 }
 
-impl<'a> RR for MX<'a> {
+impl RR for MX<'_> {
     const TYPE_CODE: u16 = 15;
 }
 
-impl<'a> MX<'a> {
+impl MX<'_> {
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> MX<'b> {
         MX {

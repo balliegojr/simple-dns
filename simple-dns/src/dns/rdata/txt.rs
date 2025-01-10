@@ -15,11 +15,11 @@ pub struct TXT<'a> {
     size: usize,
 }
 
-impl<'a> RR for TXT<'a> {
+impl RR for TXT<'_> {
     const TYPE_CODE: u16 = 16;
 }
 
-impl<'a> Default for TXT<'a> {
+impl Default for TXT<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -131,7 +131,7 @@ impl<'a> TXT<'a> {
     }
 }
 
-impl<'a> TryFrom<HashMap<String, Option<String>>> for TXT<'a> {
+impl TryFrom<HashMap<String, Option<String>>> for TXT<'_> {
     type Error = crate::SimpleDnsError;
 
     fn try_from(value: HashMap<String, Option<String>>) -> Result<Self, Self::Error> {
