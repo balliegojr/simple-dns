@@ -98,16 +98,4 @@ mod tests {
         assert_eq!(sample_rdata.hostname, "hostname.sample".try_into()?);
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "1 afsdb.hostname.com.";
-        let rdata = AFSDB {
-            subtype: 1,
-            hostname: Name::new("afsdb.hostname.com").unwrap(),
-        };
-
-        super::super::check_bind9!(AFSDB, rdata, &text);
-    }
 }

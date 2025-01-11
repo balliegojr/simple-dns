@@ -137,20 +137,4 @@ mod tests {
         assert_eq!(-1930943648, sample_rdata.latitude);
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "60 9 0.000 N 24 39 0.000 E 10.05m 20m 2000m 20m";
-        let rdata = LOC {
-            version: 0,
-            size: 35,
-            vertical_precision: 35,
-            horizontal_precision: 37,
-            altitude: 10001005,
-            longitude: -2058743648,
-            latitude: -1930943648,
-        };
-        super::super::check_bind9!(LOC, rdata, &text);
-    }
 }

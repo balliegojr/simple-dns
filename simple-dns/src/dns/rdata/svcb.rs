@@ -106,7 +106,7 @@ impl<'a> SVCB<'a> {
     /// Gets a read-only reference to the [`SVCParam`]
     ///
     /// Returns `None` if the key does not exist.
-    pub fn get_param(&'a self, key: u16) -> Option<&'a SVCParam> {
+    pub fn get_param(&'a self, key: u16) -> Option<&'a SVCParam<'a>> {
         self.params.get(&key)
     }
 
@@ -495,21 +495,5 @@ mod tests {
             let svcb2 = SVCB::parse(&data, &mut 0).unwrap();
             assert_eq!(svcb, &svcb2, "Test {name}");
         }
-    }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = r#"3 svc4.example.net. alpn="bar" port=8004 key667="hello\210qoo""#;
-
-        let rdata = SVCB::new(3, Name::new_unchecked("svc4.example.net"))
-            .with_param(SVCParam::Alpn(vec!["bar".try_into().unwrap()]))
-            .with_param(SVCParam::Port(8004))
-            .with_param(SVCParam::Unknown(
-                667,
-                (&[0x68, 0x65, 0x6c, 0x6c, 0x6f, 0xd2, 0x71, 0x6f, 0x6f]).into(),
-            ));
-
-        super::super::check_bind9!(SVCB, rdata, text);
     }
 }

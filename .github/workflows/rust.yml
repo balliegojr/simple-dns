@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Clippy
-      run: cargo clippy --all-features -- -D warnings 
+      run: cargo clippy --workspace --exclude bind9-tests --all-features -- -D warnings 
 
   test-dev:
     name: Test Dev on ${{ matrix.os }}
@@ -28,9 +28,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --workspace --exclude simple-dns-fuzz --verbose --all-features
+      run: cargo build --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --all-features
     - name: Run tests
-      run: cargo test --workspace --exclude simple-dns-fuzz --verbose --all-features
+      run: cargo test --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --all-features
 
   test-release:
     name: Test Release on ${{ matrix.os }}
@@ -42,9 +42,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo build --workspace --exclude simple-dns-fuzz --verbose --release --all-features
+      run: cargo build --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --release --all-features
     - name: Run tests
-      run: cargo test --workspace --exclude simple-dns-fuzz --verbose --release --all-features
+      run: cargo test --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --release --all-features
 
   fuzzing:
     name: Fuzz 
@@ -63,3 +63,17 @@ jobs:
       run: |
         cd simple-dns
         cargo fuzz run packet_parse -- -max_total_time=300
+
+  text-bind-check:
+    name: Test Bind9 check
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install bind9
+      run: sudo apt-get install bind9-dev 
+    - name: Build
+      run: cargo build --verbose --all-features
+    - name: Run tests
+      run: |
+        cd simple-dns/bind9-tests
+        cargo test --verbose 

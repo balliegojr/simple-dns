@@ -4,15 +4,11 @@ use std::path::{Path, PathBuf};
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
 
-    if cfg!(feature = "bind9-check") {
-        println!("cargo:rustc-link-lib=dns");
-        println!("cargo:rustc-link-lib=isc");
-        println!("cargo:rustc-link-lib=atomic");
+    println!("cargo:rustc-link-lib=dns");
+    println!("cargo:rustc-link-lib=isc");
+    println!("cargo:rustc-link-lib=atomic");
 
-        generate_bindings(&out_path);
-    } else {
-        std::fs::File::create(&out_path).expect("Failed to create bindings.rs");
-    }
+    generate_bindings(&out_path);
 }
 
 fn generate_bindings(out_path: &Path) {

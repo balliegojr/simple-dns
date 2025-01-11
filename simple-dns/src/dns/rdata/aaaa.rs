@@ -84,15 +84,4 @@ mod tests {
         assert_eq!(sample_rdata.address, sample_ip);
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "fd92:7065:b8e:ffff::5";
-        let rdata = AAAA {
-            address: text.parse::<Ipv6Addr>().unwrap().into(),
-        };
-
-        super::super::check_bind9!(AAAA, rdata, text);
-    }
 }

@@ -86,18 +86,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        use super::*;
-        let text = "10.0.0.1 tcp telnet ftp 0 1 2";
-        let rdata = WKS {
-            address: Ipv4Addr::new(10, 0, 0, 1).into(),
-            protocol: 6,
-            bit_map: (&[224, 0, 5]).into(),
-        };
-
-        super::super::check_bind9!(WKS, rdata, text, "10.0.0.1 6 0 1 2 21 23");
-    }
 }

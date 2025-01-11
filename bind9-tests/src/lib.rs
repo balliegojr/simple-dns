@@ -1,6 +1,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(clippy::all)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
@@ -107,6 +108,9 @@ unsafe fn buffer_init(buffer: &mut [u8]) -> isc_buffer_t {
 
     b
 }
+
+#[cfg(test)]
+mod rr_tests;
 
 #[cfg(test)]
 mod tests {

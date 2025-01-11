@@ -193,23 +193,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        use base64::prelude::*;
-
-        let text = "10 3 2 mygateway.example.com. AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==";
-        let rdata = IPSECKEY {
-            precedence: 10,
-            algorithm: 2,
-            gateway: Gateway::Domain(Name::new_unchecked("mygateway.example.com")),
-            public_key: Cow::Owned(
-                BASE64_STANDARD
-                    .decode("AQNRU3mG7TVTO2BkR47usntb102uFJtugbo6BSGvgqt4AQ==")
-                    .unwrap(),
-            ),
-        };
-        super::super::check_bind9!(IPSECKEY, rdata, &text);
-    }
 }

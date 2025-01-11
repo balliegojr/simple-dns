@@ -114,20 +114,4 @@ mod tests {
         assert_eq!("@\\w+\\.\\w{2,3}(\\.\\w{2,3})?", naptr.regexp.to_string());
         assert_eq!("e.exchange.com", naptr.replacement.to_string());
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = r#"65535 65535 "blurgh" "blorf" "blllbb" foo."#;
-        let rdata = NAPTR {
-            order: 65535,
-            preference: 65535,
-            flags: CharacterString::new(b"blurgh").unwrap(),
-            services: CharacterString::new(b"blorf").unwrap(),
-            regexp: CharacterString::new(b"blllbb").unwrap(),
-            replacement: Name::new_unchecked("foo"),
-        };
-
-        super::super::check_bind9!(NAPTR, rdata, &text);
-    }
 }

@@ -81,15 +81,4 @@ mod tests {
         assert_eq!("r.mailbox.com", minfo.rmailbox.to_string());
         assert_eq!("e.mailbox.com", minfo.emailbox.to_string());
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "rmailbx. emailbx.";
-        let rdata = MINFO {
-            rmailbox: Name::new_unchecked("rmailbx"),
-            emailbox: Name::new_unchecked("emailbx"),
-        };
-        super::super::check_bind9!(MINFO, rdata, &text);
-    }
 }

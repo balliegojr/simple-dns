@@ -96,15 +96,4 @@ mod tests {
         assert_eq!(sample_rdata.sa, "subaddress".try_into()?);
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = r#""isdn-address" "subaddress""#;
-        let rdata = ISDN {
-            address: "isdn-address".try_into().unwrap(),
-            sa: "subaddress".try_into().unwrap(),
-        };
-        super::super::check_bind9!(ISDN, rdata, &text);
-    }
 }

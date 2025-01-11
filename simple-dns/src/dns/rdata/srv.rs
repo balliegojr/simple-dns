@@ -137,18 +137,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "65535 65535 65535 old-slow-box.";
-        let rdata = SRV {
-            priority: 65535,
-            weight: 65535,
-            port: 65535,
-            target: Name::new_unchecked("old-slow-box"),
-        };
-
-        super::super::check_bind9!(SRV, rdata, text);
-    }
 }

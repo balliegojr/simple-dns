@@ -83,15 +83,4 @@ mod tests {
         assert_eq!(sample_a_rdata.address, sample_ip);
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "127.0.0.1";
-        let rdata = A {
-            address: std::net::Ipv4Addr::new(127, 0, 0, 1).into(),
-        };
-
-        super::super::check_bind9!(A, rdata, &text);
-    }
 }

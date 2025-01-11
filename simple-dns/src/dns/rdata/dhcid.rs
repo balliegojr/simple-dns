@@ -103,20 +103,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = r"AAABxLmlskllE0MVjd57zHcWmEH3pCQ6VytcKD//7es/deY=";
-        let rdata = DHCID {
-            identifier: 0,
-            digest_type: 1,
-            digest: Cow::Borrowed(&[
-                196, 185, 165, 178, 73, 101, 19, 67, 21, 141, 222, 123, 204, 119, 22, 152, 65, 247,
-                164, 36, 58, 87, 43, 92, 40, 63, 255, 237, 235, 63, 117, 230,
-            ]),
-        };
-
-        super::super::check_bind9!(DHCID, rdata, text);
-    }
 }
