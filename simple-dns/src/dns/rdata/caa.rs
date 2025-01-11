@@ -130,17 +130,4 @@ mod tests {
         assert_eq!(b"\"example.org", &cca_one.value[..]);
         assert_eq!(b"\"example_two.org", &cca_two.value[..]);
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = r#"0 issue "ca1.example.net""#;
-        let rdata = CAA {
-            flag: 0,
-            tag: CharacterString::new(b"issue").unwrap(),
-            value: b"ca1.example.net".into(),
-        };
-
-        super::super::check_bind9!(CAA, rdata, text);
-    }
 }

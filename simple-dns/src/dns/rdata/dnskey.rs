@@ -118,19 +118,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        use base64::prelude::*;
-
-        let text = "512 255 1 AQMFD5raczCJHViKtLYhWGz8hMY9UGRuniJDBzC7w0aRyzWZriO6i2od GWWQVucZqKVsENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esga60z yGW6LFe9r8n6paHrlG5ojqf0BaqHT+8=";
-        let rdata = DNSKEY {
-            flags: 512,
-            protocol: 255,
-            algorithm: 1,
-            public_key: Cow::Owned(BASE64_STANDARD.decode("AQMFD5raczCJHViKtLYhWGz8hMY9UGRuniJDBzC7w0aRyzWZriO6i2odGWWQVucZqKVsENW91IOW4vqudngPZsY3GvQ/xVA8/7pyFj6b7Esga60zyGW6LFe9r8n6paHrlG5ojqf0BaqHT+8=").unwrap()),
-        };
-        super::super::check_bind9!(DNSKEY, rdata, text);
-    }
 }

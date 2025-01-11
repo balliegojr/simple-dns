@@ -15,7 +15,7 @@ use header::Header;
 pub mod header_buffer;
 
 mod wire_format;
-use wire_format::WireFormat;
+pub(crate) use wire_format::WireFormat;
 
 mod question;
 pub use question::Question;

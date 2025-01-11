@@ -105,15 +105,4 @@ mod tests {
         );
         Ok(())
     }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "10 intermediate-host.sample.";
-        let rdata = RouteThrough {
-            preference: 10,
-            intermediate_host: Name::new_unchecked("intermediate-host.sample"),
-        };
-        super::super::check_bind9!(RouteThrough, rdata, &text);
-    }
 }

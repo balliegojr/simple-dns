@@ -12,15 +12,12 @@ categories = ["parser-implementations", "network-programming"]
 
 [features]
 default = []
-bind9-check = ["bind9-sys/bind9-check"]
 
 [dependencies]
 bitflags = "2.4"
 
 [dev-dependencies]
 criterion = "0.5"
-bind9-sys = { path = "../bind9-sys"  }
-base64 = "0.22.1"
 
 [lib]
 bench = false

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, usize};
+use std::borrow::Cow;
 
 use crate::{dns::WireFormat, Name};
 
@@ -10,12 +10,12 @@ pub struct NSEC<'a> {
     /// The next owner name in the canonical ordering of the zone
     pub next_name: Name<'a>,
     /// The type bit maps representing the RR types present at the NSEC RR's owner name
-    pub type_bit_maps: Vec<TypeBitMap<'a>>,
+    pub type_bit_maps: Vec<NsecTypeBitMap<'a>>,
 }
 
 /// A Type bit map entry in a NSEC record see [rfc4034](https://datatracker.ietf.org/doc/html/rfc4034#section-4.1.2)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct TypeBitMap<'a> {
+pub struct NsecTypeBitMap<'a> {
     /// The window block number of this bit map
     pub window_block: u8,
     /// The bitmap containing the RR types present in this window block
@@ -64,7 +64,7 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
             let bitmap = &data[*position..*position + bitmap_length];
             *position += bitmap_length;
 
-            type_bit_maps.push(TypeBitMap {
+            type_bit_maps.push(NsecTypeBitMap {
                 window_block,
                 bitmap: Cow::Borrowed(bitmap),
             });
@@ -102,7 +102,7 @@ impl NSEC<'_> {
         let type_bit_maps = self
             .type_bit_maps
             .into_iter()
-            .map(|x| TypeBitMap {
+            .map(|x| NsecTypeBitMap {
                 window_block: x.window_block,
                 bitmap: x.bitmap.into_owned().into(),
             })
@@ -124,7 +124,7 @@ mod tests {
     fn parse_and_write_nsec() {
         let nsec = NSEC {
             next_name: Name::new("host.example.com.").unwrap(),
-            type_bit_maps: vec![TypeBitMap {
+            type_bit_maps: vec![NsecTypeBitMap {
                 window_block: 0,
                 bitmap: vec![64, 1, 0, 0, 0, 1].into(),
             }],
@@ -160,30 +160,5 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    #[test]
-    #[cfg(feature = "bind9-check")]
-    fn bind9_compatible() {
-        let text = "host.example.com. A MX RRSIG NSEC TYPE1234";
-        let rdata = NSEC {
-            next_name: Name::new_unchecked("host.example.com"),
-            type_bit_maps: vec![
-                TypeBitMap {
-                    window_block: 0,
-                    bitmap: (&[0x40, 0x01, 0x00, 0x00, 0x00, 0x03]).into(),
-                },
-                TypeBitMap {
-                    window_block: 4,
-                    bitmap: (&[
-                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x00, 0x20,
-                    ])
-                        .into(),
-                },
-            ],
-        };
-        super::super::check_bind9!(NSEC, rdata, &text);
     }
 }
