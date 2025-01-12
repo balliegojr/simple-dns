@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{borrow::Cow, convert::TryInto};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -21,18 +21,13 @@ impl RR for DHCID<'_> {
 impl<'a> WireFormat<'a> for DHCID<'a> {
     const MINIMUM_LEN: usize = 3;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let identifier = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-
-        let digest_type = data[*position];
-        *position += 1;
-
-        let digest = Cow::Borrowed(&data[*position..]);
-        *position += digest.len();
+        let identifier = data.get_u16()?;
+        let digest_type = data.get_u8()?;
+        let digest = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self {
             identifier,
@@ -82,7 +77,7 @@ mod tests {
         let mut data = Vec::new();
         ds.write_to(&mut data).unwrap();
 
-        let ds = DHCID::parse(&data, &mut 0).unwrap();
+        let ds = DHCID::parse(&mut (&data[..]).into()).unwrap();
         assert_eq!(ds.identifier, 0);
         assert_eq!(ds.digest_type, 0);
         assert_eq!(ds.digest, Cow::Borrowed(&[0, 0, 0, 0]));
@@ -92,7 +87,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/DHCID.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::DHCID(rdata) => rdata,
             _ => unreachable!(),
         };

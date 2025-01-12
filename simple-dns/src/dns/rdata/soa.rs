@@ -1,6 +1,9 @@
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -56,22 +59,18 @@ impl SOA<'_> {
 impl<'a> WireFormat<'a> for SOA<'a> {
     const MINIMUM_LEN: usize = 20;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let mname = Name::parse(data, position)?;
-        let rname = Name::parse(data, position)?;
+        let mname = Name::parse(data)?;
+        let rname = Name::parse(data)?;
 
-        Self::check_len(data, position)?;
-
-        let serial = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        let refresh = i32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
-        let retry = i32::from_be_bytes(data[*position + 8..*position + 12].try_into()?);
-        let expire = i32::from_be_bytes(data[*position + 12..*position + 16].try_into()?);
-        let minimum = u32::from_be_bytes(data[*position + 16..*position + 20].try_into()?);
-
-        *position += 20;
+        let serial = data.get_u32()?;
+        let refresh = data.get_i32()?;
+        let retry = data.get_i32()?;
+        let expire = data.get_i32()?;
+        let minimum = data.get_u32()?;
 
         Ok(Self {
             mname,
@@ -125,7 +124,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(soa.write_to(&mut data).is_ok());
 
-        let soa = SOA::parse(&data, &mut 0);
+        let soa = SOA::parse(&mut data[..].into());
         assert!(soa.is_ok());
         let soa = soa.unwrap();
 
@@ -136,7 +135,7 @@ mod tests {
     fn parse_soa_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/SOA.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::SOA(rdata) => rdata,
             _ => unreachable!(),
         };

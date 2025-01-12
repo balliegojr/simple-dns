@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -29,12 +32,13 @@ impl RP<'_> {
 
 impl<'a> WireFormat<'a> for RP<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let mbox = Name::parse(data, position)?;
-        let txt = Name::parse(data, position)?;
+        let mbox = Name::parse(data)?;
+        let txt = Name::parse(data)?;
+
         Ok(RP { mbox, txt })
     }
 
@@ -73,7 +77,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(rp.write_to(&mut data).is_ok());
 
-        let rp = RP::parse(&data, &mut 0);
+        let rp = RP::parse(&mut data[..].into());
         assert!(rp.is_ok());
         let rp = rp.unwrap();
 
@@ -86,7 +90,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/RP.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::RP(rdata) => rdata,
             _ => unreachable!(),
         };

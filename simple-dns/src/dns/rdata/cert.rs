@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{borrow::Cow, convert::TryInto};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -23,18 +23,14 @@ impl RR for CERT<'_> {
 impl<'a> WireFormat<'a> for CERT<'a> {
     const MINIMUM_LEN: usize = 5;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let type_code = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let key_tag = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let algorithm = data[*position];
-        *position += 1;
-        let certificate = &data[*position..];
-        *position += certificate.len();
+        let type_code = data.get_u16()?;
+        let key_tag = data.get_u16()?;
+        let algorithm = data.get_u8()?;
+        let certificate = data.get_remaining()?;
 
         Ok(Self {
             type_code,
@@ -90,7 +86,7 @@ mod tests {
         };
         let mut writer = Vec::new();
         rdata.write_to(&mut writer).unwrap();
-        let rdata = CERT::parse(&writer, &mut 0).unwrap();
+        let rdata = CERT::parse(&mut (&writer[..]).into()).unwrap();
         assert_eq!(rdata.type_code, type_code);
         assert_eq!(rdata.key_tag, key_tag);
         assert_eq!(rdata.algorithm, algorithm);
@@ -101,7 +97,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/CERT.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::CERT(rdata) => rdata,
             _ => unreachable!(),
         };

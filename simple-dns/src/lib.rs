@@ -1,8 +1,10 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
 
+mod bytes_buffer;
 mod dns;
 mod simple_dns_error;
+
 pub use simple_dns_error::SimpleDnsError;
 
 pub use dns::*;
@@ -24,7 +26,8 @@ pub mod testing {
 
     #[allow(private_bounds)]
     pub fn parse<'a, T: WireFormat<'a>>(bytes: &'a [u8]) -> T {
-        T::parse(bytes, &mut 0).expect("Failed to parse")
+        let mut data = crate::bytes_buffer::BytesBuffer::new(bytes);
+        T::parse(&mut data).expect("Failed to parse")
     }
 
     #[allow(private_bounds)]

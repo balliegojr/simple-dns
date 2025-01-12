@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, CharacterString, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, CharacterString, WireFormat},
+};
 
 use super::RR;
 
@@ -29,12 +32,12 @@ impl ISDN<'_> {
 
 impl<'a> WireFormat<'a> for ISDN<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = CharacterString::parse(data, position)?;
-        let sa = CharacterString::parse(data, position)?;
+        let address = CharacterString::parse(data)?;
+        let sa = CharacterString::parse(data)?;
 
         Ok(Self { address, sa })
     }
@@ -74,7 +77,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(isdn.write_to(&mut data).is_ok());
 
-        let isdn = ISDN::parse(&data, &mut 0);
+        let isdn = ISDN::parse(&mut (&data[..]).into());
         assert!(isdn.is_ok());
         let isdn = isdn.unwrap();
 
@@ -87,7 +90,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/ISDN.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::ISDN(rdata) => rdata,
             _ => unreachable!(),
         };

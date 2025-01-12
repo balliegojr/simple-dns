@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::dns::{CharacterString, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{CharacterString, WireFormat},
+};
 
 use super::RR;
 
@@ -35,16 +38,14 @@ impl CAA<'_> {
 impl<'a> WireFormat<'a> for CAA<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let flag = u8::from_be_bytes(data[*position..*position + 1].try_into()?);
-        *position += 1;
-        let tag = CharacterString::parse(data, position)?;
+        let flag = data.get_u8()?;
+        let tag = CharacterString::parse(data)?;
         // FIXME: remove quotes if they are the first and last characters
-        let value = Cow::Borrowed(&data[*position..]);
-        *position += value.len();
+        let value = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self { flag, tag, value })
     }
@@ -79,7 +80,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(caa.write_to(&mut data).is_ok());
 
-        let caa = CAA::parse(&data, &mut 0);
+        let caa = CAA::parse(&mut (&data[..]).into());
         assert!(caa.is_ok());
         let caa = caa.unwrap();
 

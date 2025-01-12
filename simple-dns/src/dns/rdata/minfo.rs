@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -30,12 +33,12 @@ impl MINFO<'_> {
 
 impl<'a> WireFormat<'a> for MINFO<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let rmailbox = Name::parse(data, position)?;
-        let emailbox = Name::parse(data, position)?;
+        let rmailbox = Name::parse(data)?;
+        let emailbox = Name::parse(data)?;
 
         Ok(Self { rmailbox, emailbox })
     }
@@ -73,7 +76,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(minfo.write_to(&mut data).is_ok());
 
-        let minfo = MINFO::parse(&data, &mut 0);
+        let minfo = MINFO::parse(&mut (&data[..]).into());
         assert!(minfo.is_ok());
         let minfo = minfo.unwrap();
 

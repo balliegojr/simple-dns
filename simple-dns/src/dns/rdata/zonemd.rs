@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{borrow::Cow, convert::TryInto};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -23,18 +23,14 @@ impl RR for ZONEMD<'_> {
 impl<'a> WireFormat<'a> for ZONEMD<'a> {
     const MINIMUM_LEN: usize = 6;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let serial = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        *position += 4;
-        let scheme = data[*position];
-        *position += 1;
-        let algorithm = data[*position];
-        *position += 1;
-        let digest = Cow::Borrowed(&data[*position..]);
-        *position += digest.len();
+        let serial = data.get_u32()?;
+        let scheme = data.get_u8()?;
+        let algorithm = data.get_u8()?;
+        let digest = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self {
             serial,
@@ -91,7 +87,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(zonemd.write_to(&mut bytes).is_ok());
 
-        let zonemd = ZONEMD::parse(&bytes, &mut 0);
+        let zonemd = ZONEMD::parse(&mut bytes[..].into());
         assert!(zonemd.is_ok());
         let zonemd = zonemd.unwrap();
 
@@ -105,7 +101,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/ZONEMD.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::ZONEMD(rdata) => rdata,
             _ => unreachable!(),
         };

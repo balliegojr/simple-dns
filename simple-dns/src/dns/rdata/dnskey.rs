@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{borrow::Cow, convert::TryInto};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -23,21 +23,14 @@ impl RR for DNSKEY<'_> {
 impl<'a> WireFormat<'a> for DNSKEY<'a> {
     const MINIMUM_LEN: usize = 4;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let flags = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-
-        let protocol = data[*position];
-        *position += 1;
-
-        let algorithm = data[*position];
-        *position += 1;
-
-        let public_key = Cow::Borrowed(&data[*position..]);
-        *position += public_key.len();
+        let flags = data.get_u16()?;
+        let protocol = data.get_u8()?;
+        let algorithm = data.get_u8()?;
+        let public_key = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self {
             flags,
@@ -92,7 +85,7 @@ mod tests {
         };
         let mut writer = Vec::new();
         rdata.write_to(&mut writer).unwrap();
-        let rdata = DNSKEY::parse(&writer, &mut 0).unwrap();
+        let rdata = DNSKEY::parse(&mut (&writer[..]).into()).unwrap();
         assert_eq!(rdata.flags, flags);
         assert_eq!(rdata.protocol, protocol);
         assert_eq!(rdata.algorithm, algorithm);
@@ -103,7 +96,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/DNSKEY.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::DNSKEY(rdata) => rdata,
             _ => unreachable!(),
         };

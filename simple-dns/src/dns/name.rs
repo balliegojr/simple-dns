@@ -1,10 +1,6 @@
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-    fmt::Display,
-    hash::Hash,
-};
+use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display, hash::Hash};
+
+use crate::bytes_buffer::BytesBuffer;
 
 use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
@@ -172,74 +168,58 @@ impl<'a> Name<'a> {
 impl<'a> WireFormat<'a> for Name<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let mut following_compression_pointer = false;
+        // Parse labels will extract labels until it finds a 0 len label
+        // or a pointer  to another label
+        fn parse_labels<'a>(
+            data: &mut BytesBuffer<'a>,
+            name_len: &mut usize,
+            labels: &mut Vec<Label<'a>>,
+        ) -> crate::Result<Option<usize>> {
+            loop {
+                match data.get_u8()? {
+                    0 => break Ok(None),
+                    len if len & POINTER_MASK == POINTER_MASK => {
+                        let mut pointer = len as u16;
+                        pointer <<= 8;
+                        pointer += data.get_u8()? as u16;
+                        pointer &= !POINTER_MASK_U16;
+
+                        break Ok(Some(pointer as usize));
+                    }
+                    len => {
+                        *name_len += 1 + len as usize;
+
+                        // Checking the full name len to avoid circular pointers
+                        if *name_len >= MAX_NAME_LENGTH {
+                            return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                        }
+
+                        if len as usize > MAX_LABEL_LENGTH {
+                            return Err(crate::SimpleDnsError::InvalidServiceLabel);
+                        }
+
+                        // Parsing allow invalid characters in the label.
+                        // However, the length of the label must be validated (above)
+                        labels.push(Label::new_unchecked(data.get_slice(len as usize)?));
+                    }
+                }
+            }
+        }
+
         let mut labels = Vec::new();
+        let mut name_len = 0usize;
 
-        let mut pointer_position = *position;
-
-        // avoid invalid data caused oom
-        let mut name_size = 0usize;
-
-        loop {
-            if pointer_position >= data.len() {
-                return Err(crate::SimpleDnsError::InsufficientData);
-            }
-
-            // domain name max size is 255
-            if name_size >= MAX_NAME_LENGTH {
-                return Err(crate::SimpleDnsError::InvalidDnsPacket);
-            }
-
-            match data[pointer_position] {
-                0 => {
-                    *position += 1;
-                    break;
-                }
-                len if len & POINTER_MASK == POINTER_MASK => {
-                    if !following_compression_pointer {
-                        *position += 1;
-                    }
-
-                    following_compression_pointer = true;
-                    if pointer_position + 2 > data.len() {
-                        return Err(crate::SimpleDnsError::InsufficientData);
-                    }
-
-                    // avoid pointer forward (RFC 1035)
-                    let pointer = (u16::from_be_bytes(
-                        data[pointer_position..pointer_position + 2].try_into()?,
-                    ) & !POINTER_MASK_U16) as usize;
-                    if pointer >= pointer_position {
-                        return Err(crate::SimpleDnsError::InvalidDnsPacket);
-                    }
-                    pointer_position = pointer;
-                }
-                len => {
-                    name_size += 1 + len as usize;
-                    if pointer_position + 1 + len as usize > data.len() {
-                        return Err(crate::SimpleDnsError::InsufficientData);
-                    }
-
-                    if len as usize > MAX_LABEL_LENGTH {
-                        return Err(crate::SimpleDnsError::InvalidServiceLabel);
-                    }
-
-                    // Parsing allow invalid characters in the label.
-                    // However, the length of the label must be validated (above)
-                    labels.push(Label::new_unchecked(
-                        &data[pointer_position + 1..pointer_position + 1 + len as usize],
-                    ));
-
-                    if !following_compression_pointer {
-                        *position += len as usize + 1;
-                    }
-                    pointer_position += len as usize + 1;
-                }
-            }
+        let mut pointer = parse_labels(data, &mut name_len, &mut labels)?;
+        while let Some(p) = pointer {
+            // By creating a new buffer, it is possible to simplify the parse routine since
+            // the original buffer position will remain intact when iterating throught the
+            // pointers
+            let data = &mut data.previous_offset_ptr(p)?;
+            pointer = parse_labels(data, &mut name_len, &mut labels)?;
         }
 
         Ok(Self { labels })
@@ -493,31 +473,41 @@ mod tests {
 
     #[test]
     fn parse_without_compression() {
-        let data =
-            b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00";
-        let mut position = 3;
-        let name = Name::parse(data, &mut position).unwrap();
+        let mut data = BytesBuffer::new(
+            b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\x01F\x03ISI\x04ARPA\x00\x04ARPA\x00",
+        );
+        data.advance(3).unwrap();
+        let name = Name::parse(&mut data).unwrap();
         assert_eq!("F.ISI.ARPA", name.to_string());
 
-        let name = Name::parse(data, &mut position).unwrap();
+        let name = Name::parse(&mut data).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", name.to_string());
     }
 
     #[test]
     fn parse_with_compression() {
-        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03\x07INVALID\xc0\x1b";
-        let mut offset = 3usize;
+        let mut data = BytesBuffer::new(b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03\x07INVALID\xc0\x1b" );
+        data.advance(3).unwrap();
 
-        let name = Name::parse(data, &mut offset).unwrap();
+        let name = Name::parse(&mut data).unwrap();
         assert_eq!("F.ISI.ARPA", name.to_string());
 
-        let name = Name::parse(data, &mut offset).unwrap();
+        let name = Name::parse(&mut data).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", name.to_string());
 
-        let name = Name::parse(data, &mut offset).unwrap();
+        let name = Name::parse(&mut data).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", name.to_string());
 
-        assert!(Name::parse(data, &mut offset).is_err());
+        assert!(Name::parse(&mut data).is_err());
+    }
+
+    #[test]
+    fn parse_handle_circular_pointers() {
+        let mut data = BytesBuffer::new(b"\x01F\x03ISI\x04ARPA\xc0\x00");
+        assert_eq!(
+            Name::parse(&mut data),
+            Err(SimpleDnsError::InvalidDnsPacket)
+        );
     }
 
     #[test]
@@ -606,14 +596,15 @@ mod tests {
         let expected = b"\x03ISI\x04ARPA\x00\x01F\xc0\x00\x03FOO\xc0\x0a\x03BAR\xc0\x0a";
         assert_eq!(expected[..], buf.get_ref()[..]);
 
-        let mut position = 0;
-        let first = Name::parse(buf.get_ref(), &mut position).unwrap();
+        let mut data = BytesBuffer::new(buf.get_ref());
+
+        let first = Name::parse(&mut data).unwrap();
         assert_eq!("ISI.ARPA", first.to_string());
-        let second = Name::parse(buf.get_ref(), &mut position).unwrap();
+        let second = Name::parse(&mut data).unwrap();
         assert_eq!("F.ISI.ARPA", second.to_string());
-        let third = Name::parse(buf.get_ref(), &mut position).unwrap();
+        let third = Name::parse(&mut data).unwrap();
         assert_eq!("FOO.F.ISI.ARPA", third.to_string());
-        let fourth = Name::parse(buf.get_ref(), &mut position).unwrap();
+        let fourth = Name::parse(&mut data).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", fourth.to_string());
     }
 
@@ -647,13 +638,11 @@ mod tests {
         assert_ne!(Name::new("example.co")?, Name::new("example.com")?);
         assert_ne!(Name::new("example.com.org")?, Name::new("example.com")?);
 
-        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
-        let mut position = 3;
-        assert_eq!(Name::new("F.ISI.ARPA")?, Name::parse(data, &mut position)?);
-        assert_eq!(
-            Name::new("FOO.F.ISI.ARPA")?,
-            Name::parse(data, &mut position)?
-        );
+        let mut data =
+            BytesBuffer::new(b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03");
+        data.advance(3)?;
+        assert_eq!(Name::new("F.ISI.ARPA")?, Name::parse(&mut data)?);
+        assert_eq!(Name::new("FOO.F.ISI.ARPA")?, Name::parse(&mut data)?);
         Ok(())
     }
 
@@ -665,7 +654,10 @@ mod tests {
 
         assert_eq!(8, bytes.get_ref().len());
         assert_eq!(bytes.get_ref().len(), name_one.len());
-        assert_eq!(8, Name::parse(bytes.get_ref(), &mut 0)?.len());
+        assert_eq!(
+            8,
+            Name::parse(&mut BytesBuffer::new(bytes.get_ref()))?.len()
+        );
 
         let mut name_refs = HashMap::new();
         let mut bytes = Cursor::new(Vec::new());
@@ -678,16 +670,18 @@ mod tests {
 
     #[test]
     fn hash() -> crate::Result<()> {
-        let data = b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03";
+        let mut data =
+            BytesBuffer::new(b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03");
+        data.advance(3)?;
 
         assert_eq!(
             get_hash(&Name::new("F.ISI.ARPA")?),
-            get_hash(&Name::parse(data, &mut 3)?)
+            get_hash(&Name::parse(&mut data)?)
         );
 
         assert_eq!(
             get_hash(&Name::new("FOO.F.ISI.ARPA")?),
-            get_hash(&Name::parse(data, &mut 15)?)
+            get_hash(&Name::parse(&mut data)?)
         );
 
         Ok(())

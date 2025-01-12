@@ -1,4 +1,4 @@
-use crate::{QCLASS, QTYPE};
+use crate::{bytes_buffer::BytesBuffer, QCLASS, QTYPE};
 
 use super::{name::Label, rdata::RData, Name, WireFormat, CLASS, TYPE};
 use core::fmt::Debug;
@@ -103,22 +103,16 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
     const MINIMUM_LEN: usize = 10;
 
     // Disable redundant length check.
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
-        Self::parse_after_check(data, position)
-    }
-
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let name = Name::parse(data, position)?;
-        if *position + 8 > data.len() {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
+        let name = Name::parse(data)?;
 
-        let class_value = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
-        let ttl = u32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
-        let rdata = RData::parse(data, position)?;
+        let class_value = data.peek_u16_in(2)?;
+        let ttl = data.peek_u32_in(4)?;
+
+        let rdata = RData::parse(data)?;
 
         if rdata.type_code() == TYPE::OPT {
             Ok(Self {
@@ -203,7 +197,7 @@ mod tests {
     #[test]
     fn test_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
-        let rr = ResourceRecord::parse(&bytes[..], &mut 0).unwrap();
+        let rr = ResourceRecord::parse(&mut BytesBuffer::new(bytes)).unwrap();
 
         assert_eq!("_srv._udp.local", rr.name.to_string());
         assert_eq!(CLASS::IN, rr.class);
@@ -233,7 +227,8 @@ mod tests {
         let mut data = Vec::new();
         rr.write_to(&mut data).expect("failed to write");
 
-        let parsed_rr = ResourceRecord::parse(&data, &mut 0).expect("failed to parse");
+        let parsed_rr =
+            ResourceRecord::parse(&mut BytesBuffer::new(&data)).expect("failed to parse");
         assert_eq!(parsed_rr.rdata.type_code(), TYPE::A);
         assert_eq!(parsed_rr.rdata.len(), 0);
         assert!(matches!(parsed_rr.rdata, RData::Empty(TYPE::A)));
@@ -242,7 +237,7 @@ mod tests {
     #[test]
     fn test_cache_flush_parse() {
         let bytes = b"\x04_srv\x04_udp\x05local\x00\x00\x01\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff";
-        let rr = ResourceRecord::parse(&bytes[..], &mut 0).unwrap();
+        let rr = ResourceRecord::parse(&mut BytesBuffer::new(bytes)).unwrap();
 
         assert_eq!(CLASS::IN, rr.class);
         assert!(rr.cache_flush);
@@ -369,10 +364,10 @@ mod tests {
     #[test]
     fn parse_sample_files() -> Result<(), Box<dyn std::error::Error>> {
         for file_path in std::fs::read_dir("samples/zonefile")? {
-            let data = std::fs::read(file_path?.path())?;
-            let mut pos = 0;
-            while pos < data.len() {
-                crate::ResourceRecord::parse(&data, &mut pos)?;
+            let bytes = std::fs::read(file_path?.path())?;
+            let mut data = BytesBuffer::new(&bytes);
+            while data.has_remaining() {
+                crate::ResourceRecord::parse(&mut data)?;
             }
         }
 

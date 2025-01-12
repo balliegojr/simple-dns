@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{convert::TryInto, net::Ipv4Addr};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::net::Ipv4Addr;
 
 use super::RR;
 
@@ -17,13 +17,11 @@ impl RR for A {
 impl<'a> WireFormat<'a> for A {
     const MINIMUM_LEN: usize = 4;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        *position += 4;
-        Ok(Self { address })
+        data.get_u32().map(|address| Self { address })
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
@@ -62,7 +60,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(a.write_to(&mut bytes).is_ok());
 
-        let a = A::parse(&bytes, &mut 0);
+        let a = A::parse(&mut BytesBuffer::new(&bytes));
         assert!(a.is_ok());
         let a = a.unwrap();
 
@@ -75,7 +73,7 @@ mod tests {
         let sample_a = std::fs::read("samples/zonefile/A.sample.A")?;
         let sample_ip: u32 = "26.3.0.103".parse::<Ipv4Addr>()?.into();
 
-        let sample_a_rdata = match ResourceRecord::parse(&sample_a, &mut 0)?.rdata {
+        let sample_a_rdata = match ResourceRecord::parse(&mut BytesBuffer::new(&sample_a))?.rdata {
             RData::A(a) => a,
             _ => unreachable!(),
         };

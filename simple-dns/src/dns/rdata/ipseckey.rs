@@ -1,4 +1,4 @@
-use crate::{dns::WireFormat, Name};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, Name};
 use std::{
     borrow::Cow,
     net::{Ipv4Addr, Ipv6Addr},
@@ -51,48 +51,21 @@ impl RR for IPSECKEY<'_> {
 impl<'a> WireFormat<'a> for IPSECKEY<'a> {
     const MINIMUM_LEN: usize = 5;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let precedence = data[*position];
-        *position += 1;
-        let gateway_type = data[*position];
-        *position += 1;
-        let algorithm = data[*position];
-        *position += 1;
+        let precedence = data.get_u8()?;
+        let gateway_type = data.get_u8()?;
+        let algorithm = data.get_u8()?;
         let gateway = match gateway_type {
             0 => Gateway::None,
-            1 => {
-                if data.len() < *position + 4 {
-                    return Err(crate::SimpleDnsError::InsufficientData);
-                }
-                let x = Gateway::IPv4(Ipv4Addr::new(
-                    data[*position],
-                    data[*position + 1],
-                    data[*position + 2],
-                    data[*position + 3],
-                ));
-                *position += 4;
-                x
-            }
-            2 => {
-                let mut octets = [0u8; 16];
-                if data.len() < *position + 16 {
-                    return Err(crate::SimpleDnsError::InsufficientData);
-                }
-                octets.copy_from_slice(&data[*position..*position + 16]);
-                *position += 16;
-                Gateway::IPv6(Ipv6Addr::from(octets))
-            }
-            3 => {
-                let gateway = Name::parse(data, position)?;
-                Gateway::Domain(gateway)
-            }
+            1 => Gateway::IPv4(data.get_u32()?.into()),
+            2 => Gateway::IPv6(data.get_u128()?.into()),
+            3 => Gateway::Domain(Name::parse(data)?),
             _ => return Err(crate::SimpleDnsError::AttemptedInvalidOperation),
         };
-        let public_key = &data[*position..];
-        *position += public_key.len();
+        let public_key = data.get_remaining()?;
         Ok(Self {
             precedence,
             algorithm,
@@ -164,7 +137,7 @@ mod tests {
         let mut data = Vec::new();
         ipseckey.write_to(&mut data).unwrap();
 
-        let ipseckey = IPSECKEY::parse(&data, &mut 0).unwrap();
+        let ipseckey = IPSECKEY::parse(&mut (&data[..]).into()).unwrap();
         assert_eq!(ipseckey.precedence, 10);
         assert_eq!(ipseckey.algorithm, 2);
         assert_eq!(
@@ -178,7 +151,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/IPSECKEY.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::IPSECKEY(rdata) => rdata,
             _ => unreachable!(),
         };

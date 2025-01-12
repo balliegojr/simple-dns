@@ -1,6 +1,6 @@
-use std::{convert::TryInto, io::Write};
+use std::io::Write;
 
-use crate::{rdata::OPT, ResourceRecord};
+use crate::{bytes_buffer::BytesBuffer, rdata::OPT, ResourceRecord};
 
 use super::{PacketFlag, OPCODE, RCODE};
 
@@ -22,6 +22,11 @@ pub(crate) struct Header<'a> {
     pub z_flags: PacketFlag,
 
     pub opt: Option<OPT<'a>>,
+
+    pub questions: u16,
+    pub answers: u16,
+    pub name_servers: u16,
+    pub additional_records: u16,
 }
 
 impl<'a> Header<'a> {
@@ -33,6 +38,11 @@ impl<'a> Header<'a> {
             response_code: RCODE::NoError,
             z_flags: PacketFlag::empty(),
             opt: None,
+
+            questions: 0,
+            answers: 0,
+            name_servers: 0,
+            additional_records: 0,
         }
     }
 
@@ -44,6 +54,11 @@ impl<'a> Header<'a> {
             response_code: RCODE::NoError,
             z_flags: PacketFlag::RESPONSE,
             opt: None,
+
+            questions: 0,
+            answers: 0,
+            name_servers: 0,
+            additional_records: 0,
         }
     }
 
@@ -60,23 +75,26 @@ impl<'a> Header<'a> {
     }
 
     /// Parse a slice of 12 bytes into a Packet header
-    pub fn parse(data: &[u8]) -> crate::Result<Self> {
-        if data.len() < 12 {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
-
-        let flags = u16::from_be_bytes(data[2..4].try_into()?);
+    pub fn parse(data: &mut BytesBuffer) -> crate::Result<Self> {
+        let id = data.get_u16()?;
+        let flags = data.get_u16()?;
         if flags & masks::RESERVED_MASK != 0 {
             return Err(crate::SimpleDnsError::InvalidHeaderData);
         }
 
         let header = Self {
-            id: u16::from_be_bytes(data[..2].try_into()?),
+            id,
             opcode: ((flags & masks::OPCODE_MASK) >> masks::OPCODE_MASK.trailing_zeros()).into(),
             response_code: (flags & masks::RESPONSE_CODE_MASK).into(),
             z_flags: PacketFlag::from_bits_truncate(flags),
             opt: None,
+
+            questions: data.get_u16()?,
+            answers: data.get_u16()?,
+            name_servers: data.get_u16()?,
+            additional_records: data.get_u16()?,
         };
+
         Ok(header)
     }
 
@@ -154,7 +172,7 @@ mod tests {
     #[test]
     fn parse_example_query() {
         let buffer = b"\xff\xff\x03\x00\x00\x02\x00\x02\x00\x02\x00\x02";
-        let header = Header::parse(&buffer[..]).unwrap();
+        let header = Header::parse(&mut buffer[..].into()).unwrap();
 
         assert_eq!(u16::MAX, header.id);
         assert_eq!(OPCODE::StandardQuery, header.opcode);
@@ -209,7 +227,7 @@ mod tests {
 
         assert_ne!(RCODE::BADVERS, header_buffer::rcode(&buffer[..]).unwrap());
 
-        let header = Header::parse(&buffer[..]).expect("Header parsing failed");
+        let header = Header::parse(&mut buffer[..].into()).expect("Header parsing failed");
         assert_eq!(RCODE::NoError, header.response_code);
         assert!(header.has_flags(PacketFlag::RESPONSE));
     }

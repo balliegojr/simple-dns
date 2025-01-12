@@ -1,4 +1,4 @@
-use crate::dns::WireFormat;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;
 
@@ -40,25 +40,24 @@ impl NSAP {
 impl<'a> WireFormat<'a> for NSAP {
     const MINIMUM_LEN: usize = 20;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let data = &data[*position..*position + 20];
-        *position += 20;
+        let afi = data.get_u8()?;
+        let idi = data.get_u16()?;
 
-        let afi = u8::from_be(data[0]);
-        let idi = u16::from_be_bytes([data[1], data[2]]);
-        let dfi = u8::from_be(data[3]);
-        let aa = u32::from_be_bytes([0, data[4], data[5], data[6]]);
-        let rsvd = u16::from_be_bytes([data[7], data[8]]);
-        let rd = u16::from_be_bytes([data[9], data[10]]);
-        let area = u16::from_be_bytes([data[11], data[12]]);
+        let dfi = data.get_u8()?;
+        let aa: [u8; 3] = data.get_array()?;
+        let aa = u32::from_be_bytes([0, aa[0], aa[1], aa[2]]);
 
-        let id = u64::from_be_bytes([
-            0, 0, data[13], data[14], data[15], data[16], data[17], data[18],
-        ]);
-        let sel = u8::from_be(data[19]);
+        let rsvd = data.get_u16()?;
+        let rd = data.get_u16()?;
+
+        let area = data.get_u16()?;
+        let id: [u8; 6] = data.get_array()?;
+        let id = u64::from_be_bytes([0, 0, id[0], id[1], id[2], id[3], id[4], id[5]]);
+        let sel = data.get_u8()?;
 
         Ok(Self {
             afi,
@@ -110,8 +109,9 @@ mod tests {
 
         let mut data = Vec::new();
         assert!(nsap.write_to(&mut data).is_ok());
+        assert_eq!(20, data.len());
 
-        let nsap = NSAP::parse(&data, &mut 0);
+        let nsap = NSAP::parse(&mut data[..].into());
         assert!(nsap.is_ok());
         let nsap = nsap.unwrap();
 
@@ -131,7 +131,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/NSAP.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::NSAP(rdata) => rdata,
             _ => unreachable!(),
         };

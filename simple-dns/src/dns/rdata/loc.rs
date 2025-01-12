@@ -1,4 +1,4 @@
-use crate::{dns::WireFormat, SimpleDnsError};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, SimpleDnsError};
 
 use super::RR;
 
@@ -35,24 +35,21 @@ impl LOC {
 impl<'a> WireFormat<'a> for LOC {
     const MINIMUM_LEN: usize = 16;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let data = &data[*position..*position + 16];
-        *position += 16;
-
-        let version = u8::from_be(data[0]);
+        let version = data.get_u8()?;
         if version != 0 {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
 
-        let size = u8::from_be(data[1]);
-        let horizontal_precision = u8::from_be(data[2]);
-        let vertical_precision = u8::from_be(data[3]);
-        let latitude = i32::from_be_bytes(data[4..8].try_into()?);
-        let longitude = i32::from_be_bytes(data[8..12].try_into()?);
-        let altitude = i32::from_be_bytes(data[12..16].try_into()?);
+        let size = data.get_u8()?;
+        let horizontal_precision = data.get_u8()?;
+        let vertical_precision = data.get_u8()?;
+        let latitude = data.get_i32()?;
+        let longitude = data.get_i32()?;
+        let altitude = data.get_i32()?;
 
         Ok(LOC {
             version,
@@ -105,7 +102,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(loc.write_to(&mut data).is_ok());
 
-        let loc = LOC::parse(&data, &mut 0);
+        let loc = LOC::parse(&mut (&data[..]).into());
         assert!(loc.is_ok());
         let loc = loc.unwrap();
 
@@ -123,7 +120,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/LOC.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::LOC(rdata) => rdata,
             _ => unreachable!(),
         };

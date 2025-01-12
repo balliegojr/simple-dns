@@ -1,11 +1,12 @@
 #![allow(non_camel_case_types)]
 //! Contains RData implementations
 
+use crate::bytes_buffer::BytesBuffer;
 use crate::CharacterString;
 
 use super::{Name, WireFormat};
 use core::fmt::Debug;
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 
 mod macros;
 

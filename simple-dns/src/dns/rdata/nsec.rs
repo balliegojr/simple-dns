@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{dns::WireFormat, Name};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, Name};
 
 use super::RR;
 
@@ -28,16 +28,16 @@ impl RR for NSEC<'_> {
 
 impl<'a> WireFormat<'a> for NSEC<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let next_name = Name::parse(data, position)?;
+        let next_name = Name::parse(data)?;
         let mut type_bit_maps = Vec::new();
         let mut prev_window_block = None;
 
-        while data.len() > *position {
-            let window_block = data[*position];
+        while data.has_remaining() {
+            let window_block = data.get_u8()?;
             if let Some(prev_window_block) = prev_window_block {
                 if window_block <= prev_window_block {
                     return Err(crate::SimpleDnsError::InvalidDnsPacket);
@@ -45,24 +45,13 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
             }
 
             prev_window_block = Some(window_block);
-            *position += 1;
 
-            if *position >= data.len() {
-                return Err(crate::SimpleDnsError::InsufficientData);
-            }
-
-            let bitmap_length = data[*position] as usize;
+            let bitmap_length = data.get_u8()? as usize;
             if bitmap_length > 32 {
                 return Err(crate::SimpleDnsError::InvalidDnsPacket);
             }
-            *position += 1;
 
-            if *position + bitmap_length > data.len() {
-                return Err(crate::SimpleDnsError::InsufficientData);
-            }
-
-            let bitmap = &data[*position..*position + bitmap_length];
-            *position += bitmap_length;
+            let bitmap = data.get_slice(bitmap_length)?;
 
             type_bit_maps.push(NsecTypeBitMap {
                 window_block,
@@ -132,7 +121,7 @@ mod tests {
         let mut data = Vec::new();
         nsec.write_to(&mut data).unwrap();
 
-        let nsec = NSEC::parse(&data, &mut 0).unwrap();
+        let nsec = NSEC::parse(&mut data[..].into()).unwrap();
         assert_eq!(nsec.next_name, Name::new("host.example.com.").unwrap());
         assert_eq!(nsec.type_bit_maps.len(), 1);
         assert_eq!(nsec.type_bit_maps[0].window_block, 0);
@@ -143,7 +132,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/NSEC.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::NSEC(rdata) => rdata,
             _ => unreachable!(),
         };

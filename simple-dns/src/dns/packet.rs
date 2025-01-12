@@ -3,9 +3,8 @@ use std::{
     io::{Cursor, Seek, Write},
 };
 
-use crate::{header_buffer, rdata::OPT, RCODE};
-
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
+use crate::{bytes_buffer::BytesBuffer, rdata::OPT, RCODE};
 
 /// Represents a DNS message packet
 ///
@@ -113,15 +112,14 @@ impl<'a> Packet<'a> {
 
     /// Parses a packet from a slice of bytes
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
-        let mut header = Header::parse(data)?;
+        let mut data = BytesBuffer::new(data);
+        let mut header = Header::parse(&mut data)?;
 
-        let mut offset = 12;
-        let questions = Self::parse_section(data, &mut offset, header_buffer::questions(data)?)?;
-        let answers = Self::parse_section(data, &mut offset, header_buffer::answers(data)?)?;
-        let name_servers =
-            Self::parse_section(data, &mut offset, header_buffer::name_servers(data)?)?;
+        let questions = Self::parse_section(&mut data, header.questions)?;
+        let answers = Self::parse_section(&mut data, header.answers)?;
+        let name_servers = Self::parse_section(&mut data, header.name_servers)?;
         let mut additional_records: Vec<ResourceRecord> =
-            Self::parse_section(data, &mut offset, header_buffer::additional_records(data)?)?;
+            Self::parse_section(&mut data, header.additional_records)?;
 
         header.extract_info_from_opt_rr(
             additional_records
@@ -140,14 +138,13 @@ impl<'a> Packet<'a> {
     }
 
     fn parse_section<T: WireFormat<'a>>(
-        data: &'a [u8],
-        offset: &mut usize,
+        data: &mut BytesBuffer<'a>,
         items_count: u16,
     ) -> crate::Result<Vec<T>> {
         let mut section_items = Vec::with_capacity(items_count as usize);
 
         for _ in 0..items_count {
-            section_items.push(T::parse(data, offset)?);
+            section_items.push(T::parse(data)?);
         }
 
         Ok(section_items)

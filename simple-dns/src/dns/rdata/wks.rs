@@ -1,6 +1,6 @@
-use std::{borrow::Cow, convert::TryInto};
+use std::borrow::Cow;
 
-use crate::dns::WireFormat;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;
 
@@ -33,15 +33,13 @@ impl WKS<'_> {
 impl<'a> WireFormat<'a> for WKS<'a> {
     const MINIMUM_LEN: usize = 5;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        let protocol = data[*position + 4];
-        let bit_map = Cow::Borrowed(&data[*position + 5..]);
-
-        *position += 5 + bit_map.len();
+        let address = data.get_u32()?;
+        let protocol = data.get_u8()?;
+        let bit_map = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self {
             address,
@@ -73,7 +71,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/WKS.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::WKS(rdata) => rdata,
             _ => unreachable!(),
         };

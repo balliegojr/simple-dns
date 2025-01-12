@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, CharacterString, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, CharacterString, WireFormat},
+};
 
 use super::RR;
 
@@ -32,12 +35,12 @@ impl HINFO<'_> {
 impl<'a> WireFormat<'a> for HINFO<'a> {
     const MINIMUM_LEN: usize = 0;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let cpu = CharacterString::parse(data, position)?;
-        let os = CharacterString::parse(data, position)?;
+        let cpu = CharacterString::parse(data)?;
+        let os = CharacterString::parse(data)?;
 
         Ok(Self { cpu, os })
     }
@@ -77,7 +80,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(hinfo.write_to(&mut data).is_ok());
 
-        let hinfo = HINFO::parse(&data, &mut 0);
+        let hinfo = HINFO::parse(&mut (&data[..]).into());
         assert!(hinfo.is_ok());
         let hinfo = hinfo.unwrap();
 
@@ -90,7 +93,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/HINFO.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::HINFO(rdata) => rdata,
             _ => unreachable!(),
         };

@@ -23,11 +23,11 @@ macro_rules! rr_wrapper {
 
         impl<'a> WireFormat<'a> for $t<'a> {
             const MINIMUM_LEN: usize = 0;
-            fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+            fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
             where
                 Self: Sized,
             {
-                $w::parse(data, position).map(|n| $t(n))
+                $w::parse(data).map(|n| $t(n))
             }
 
             fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
@@ -80,33 +80,27 @@ macro_rules! rdata_enum {
         impl<'a> WireFormat<'a> for RData<'a> {
             const MINIMUM_LEN: usize = 10;
 
-            fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+            fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
             where
                 Self: Sized,
             {
-                let rdatatype = u16::from_be_bytes(data[*position..*position + 2].try_into()?).into();
-                let rdatalen = u16::from_be_bytes(data[*position + 8..*position + 10].try_into()?) as usize;
+                let rdatatype = data.get_u16()?.into();
+                let rdatalen = data.peek_u16_in(6)? as usize;
 
                 // OPT needs to look the ttl and class values, hence position will be advanced by OPT
                 // parsing code
                 if rdatatype == TYPE::OPT {
-                    if *position + rdatalen + 10 > data.len() {
-                        return Err(crate::SimpleDnsError::InsufficientData);
-                    }
-
-                    return Ok(RData::OPT(OPT::parse(&data[..*position + rdatalen + 10], position)?))
+                    let mut opt_data = data.limit_to(rdatalen + 8)?;
+                    return Ok(RData::OPT(OPT::parse(&mut opt_data)?))
                 }
-                *position += 10;
 
+                data.advance(8)?;
                 if rdatalen == 0 {
                     return Ok(RData::Empty(rdatatype));
                 }
 
-                if *position + rdatalen > data.len() {
-                    return Err(crate::SimpleDnsError::InsufficientData);
-                }
-
-                parse_rdata(&data[..*position + rdatalen], position, rdatatype)
+                let mut data = data.limit_to(rdatalen)?;
+                parse_rdata(&mut data, rdatatype)
             }
 
             fn write_to<T: std::io::Write>(
@@ -178,14 +172,14 @@ macro_rules! rdata_enum {
             }
         }
 
-        fn parse_rdata<'a>(data: &'a [u8], position: &mut usize, rdatatype: TYPE) -> crate::Result<RData<'a>> {
+        fn parse_rdata<'a>(data: &mut BytesBuffer<'a>, rdatatype: TYPE) -> crate::Result<RData<'a>> {
             let rdata = match rdatatype {
                 $(
-                    TYPE::$i => RData::$i($i::parse(data, position)?),
+                    TYPE::$i => RData::$i($i::parse(data)?),
                 )+
 
-                TYPE::NULL => RData::NULL(rdatatype.into(), NULL::parse(data, position)?),
-                TYPE::Unknown(rdatatype) => RData::NULL(rdatatype, NULL::parse(data, position)?),
+                TYPE::NULL => RData::NULL(rdatatype.into(), NULL::parse(data)?),
+                TYPE::Unknown(rdatatype) => RData::NULL(rdatatype, NULL::parse(data)?),
             };
 
             Ok(rdata)
