@@ -1,6 +1,9 @@
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -31,13 +34,12 @@ impl RouteThrough<'_> {
 
 impl<'a> WireFormat<'a> for RouteThrough<'a> {
     const MINIMUM_LEN: usize = 2;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let intermediate_host = Name::parse(data, position)?;
+        let preference = data.get_u16()?;
+        let intermediate_host = Name::parse(data)?;
 
         Ok(Self {
             preference,
@@ -80,7 +82,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(rt.write_to(&mut data).is_ok());
 
-        let rt = RouteThrough::parse(&data, &mut 0);
+        let rt = RouteThrough::parse(&mut data[..].into());
         assert!(rt.is_ok());
         let rt = rt.unwrap();
 
@@ -93,7 +95,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/RT.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::RouteThrough(rdata) => rdata,
             _ => unreachable!(),
         };

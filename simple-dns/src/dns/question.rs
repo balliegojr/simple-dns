@@ -1,7 +1,6 @@
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-};
+use std::{collections::HashMap, convert::TryFrom};
+
+use crate::bytes_buffer::BytesBuffer;
 
 use super::{name::Label, Name, WireFormat, QCLASS, QTYPE};
 
@@ -56,19 +55,11 @@ impl<'a> WireFormat<'a> for Question<'a> {
     const MINIMUM_LEN: usize = 4;
 
     // Disable redundant length check.
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
-        Self::parse_after_check(data, position)
-    }
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self> {
+        let qname = Name::parse(data)?;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self> {
-        let qname = Name::parse(data, position)?;
-
-        Self::check_len(data, position)?;
-
-        let qtype = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        let qclass = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
-
-        *position += 4;
+        let qtype = data.get_u16()?;
+        let qclass = data.get_u16()?;
 
         Ok(Self {
             qname,
@@ -106,8 +97,9 @@ mod tests {
 
     #[test]
     fn parse_question() {
-        let bytes = b"\x00\x00\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01";
-        let question = Question::parse(bytes, &mut 2);
+        let mut bytes = BytesBuffer::new(b"\x00\x00\x04_srv\x04_udp\x05local\x00\x00\x10\x00\x01");
+        bytes.advance(2).unwrap();
+        let question = Question::parse(&mut bytes);
 
         assert!(question.is_ok());
         let question = question.unwrap();
@@ -143,7 +135,7 @@ mod tests {
         )
         .write_to(&mut bytes)
         .unwrap();
-        let parsed = Question::parse(&bytes, &mut 0).unwrap();
+        let parsed = Question::parse(&mut BytesBuffer::new(&bytes)).unwrap();
 
         assert!(parsed.unicast_response);
     }

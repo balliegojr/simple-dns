@@ -1,5 +1,8 @@
-use crate::dns::{Name, WireFormat};
-use std::{borrow::Cow, convert::TryInto};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{Name, WireFormat},
+};
+use std::borrow::Cow;
 
 use super::RR;
 
@@ -33,34 +36,20 @@ impl RR for RRSIG<'_> {
 impl<'a> WireFormat<'a> for RRSIG<'a> {
     const MINIMUM_LEN: usize = 18;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let type_covered = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
+        let type_covered = data.get_u16()?;
+        let algorithm = data.get_u8()?;
+        let labels = data.get_u8()?;
+        let original_ttl = data.get_u32()?;
+        let signature_expiration = data.get_u32()?;
+        let signature_inception = data.get_u32()?;
+        let key_tag = data.get_u16()?;
 
-        let algorithm = data[*position];
-        *position += 1;
-
-        let labels = data[*position];
-        *position += 1;
-
-        let original_ttl = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        *position += 4;
-
-        let signature_expiration = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        *position += 4;
-
-        let signature_inception = u32::from_be_bytes(data[*position..*position + 4].try_into()?);
-        *position += 4;
-
-        let key_tag = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-
-        let signer_name = Name::parse(data, position)?;
-        let signature = Cow::Borrowed(&data[*position..]);
-        *position += signature.len();
+        let signer_name = Name::parse(data)?;
+        let signature = Cow::Borrowed(data.get_remaining()?);
 
         Ok(Self {
             type_covered,
@@ -135,7 +124,7 @@ mod tests {
 
         let mut data = Vec::new();
         rrsig.write_to(&mut data).unwrap();
-        let rrsig2 = RRSIG::parse(&data, &mut 0).unwrap();
+        let rrsig2 = RRSIG::parse(&mut data[..].into()).unwrap();
         assert_eq!(rrsig, rrsig2);
     }
 
@@ -143,7 +132,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/RRSIG.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::RRSIG(rdata) => rdata,
             _ => unreachable!(),
         };

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -30,13 +33,12 @@ impl AFSDB<'_> {
 impl<'a> WireFormat<'a> for AFSDB<'a> {
     const MINIMUM_LEN: usize = 2;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let subtype = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let hostname = Name::parse(data, position)?;
+        let subtype = data.get_u16()?;
+        let hostname = Name::parse(data)?;
 
         Ok(Self { subtype, hostname })
     }
@@ -76,7 +78,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(afsdb.write_to(&mut data).is_ok());
 
-        let afsdb = AFSDB::parse(&data, &mut 0);
+        let afsdb = AFSDB::parse(&mut BytesBuffer::new(&data));
         assert!(afsdb.is_ok());
         let afsdb = afsdb.unwrap();
 
@@ -89,7 +91,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/AFSDB.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut BytesBuffer::new(&sample_file))?.rdata {
             RData::AFSDB(rdata) => rdata,
             _ => unreachable!(),
         };

@@ -1,4 +1,5 @@
 use crate::{
+    bytes_buffer::BytesBuffer,
     dns::{header::Header, WireFormat},
     RCODE,
 };
@@ -35,39 +36,30 @@ impl RR for OPT<'_> {
 impl<'a> WireFormat<'a> for OPT<'a> {
     const MINIMUM_LEN: usize = 10;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
+        // first 2 bytes where already skiped in the RData parse
+
         // udp packet size comes from CLASS
-        let udp_packet_size = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
+        let udp_packet_size = data.get_u16()?;
         // version comes from ttl
-        let ttl = u32::from_be_bytes(data[*position + 4..*position + 8].try_into()?);
+        let ttl = data.get_u32()?;
         let version = ((ttl & masks::VERSION_MASK) >> masks::VERSION_MASK.trailing_zeros()) as u8;
 
-        *position += 10;
+        data.advance(2)?;
 
         let mut opt_codes = Vec::new();
-        while *position < data.len() {
-            if *position + 4 > data.len() {
-                return Err(crate::SimpleDnsError::InsufficientData);
-            }
+        while data.has_remaining() {
+            let code = data.get_u16()?;
+            let length = data.get_u16()? as usize; // length is the length of the data field in bytes
 
-            let code = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-            let length =
-                u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?) as usize;
-
-            if *position + 4 + length > data.len() {
-                return Err(crate::SimpleDnsError::InsufficientData);
-            }
-
-            let inner_data = Cow::Borrowed(&data[*position + 4..*position + 4 + length]);
+            let inner_data = Cow::Borrowed(data.get_slice(length)?);
             opt_codes.push(OPTCode {
                 code,
                 data: inner_data,
             });
-
-            *position += 4 + length;
         }
 
         Ok(Self {
@@ -161,7 +153,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(opt_rr.write_to(&mut data).is_ok());
 
-        let opt = match ResourceRecord::parse(&data, &mut 0)
+        let opt = match ResourceRecord::parse(&mut data[..].into())
             .expect("failed to parse")
             .rdata
         {
@@ -205,7 +197,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(opt_rr.write_to(&mut data).is_ok());
 
-        let mut opt = match ResourceRecord::parse(&data, &mut 0)
+        let mut opt = match ResourceRecord::parse(&mut data[..].into())
             .expect("failed to parse")
             .rdata
         {

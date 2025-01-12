@@ -1,6 +1,9 @@
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 
-use crate::dns::{name::Label, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{name::Label, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -32,13 +35,12 @@ impl MX<'_> {
 impl<'a> WireFormat<'a> for MX<'a> {
     const MINIMUM_LEN: usize = 2;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let exchange = Name::parse(data, position)?;
+        let preference = data.get_u16()?;
+        let exchange = Name::parse(data)?;
 
         Ok(Self {
             preference,
@@ -81,7 +83,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(mx.write_to(&mut data).is_ok());
 
-        let mx = MX::parse(&data, &mut 0);
+        let mx = MX::parse(&mut data[..].into());
         assert!(mx.is_ok());
         let mx = mx.unwrap();
 
@@ -94,7 +96,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/MX.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::MX(rdata) => rdata,
             _ => unreachable!(),
         };

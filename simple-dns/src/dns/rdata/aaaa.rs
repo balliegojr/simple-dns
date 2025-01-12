@@ -1,5 +1,5 @@
-use crate::dns::WireFormat;
-use std::{convert::TryInto, net::Ipv6Addr};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use std::net::Ipv6Addr;
 
 use super::RR;
 
@@ -14,16 +14,14 @@ impl RR for AAAA {
     const TYPE_CODE: u16 = 28;
 }
 
-impl<'a> WireFormat<'a> for AAAA {
+impl WireFormat<'_> for AAAA {
     const MINIMUM_LEN: usize = 16;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = u128::from_be_bytes(data[*position..*position + 16].try_into()?);
-        *position += 16;
-        Ok(Self { address })
+        data.get_u128().map(|address| Self { address })
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
@@ -63,7 +61,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(aaaa.write_to(&mut bytes).is_ok());
 
-        let aaaa = AAAA::parse(&bytes, &mut 0);
+        let aaaa = AAAA::parse(&mut BytesBuffer::new(&bytes));
         assert!(aaaa.is_ok());
         let aaaa = aaaa.unwrap();
 
@@ -76,7 +74,7 @@ mod tests {
         let sample_file = std::fs::read("samples/zonefile/AAAA.sample")?;
         let sample_ip: u128 = "fd92:7065:b8e:ffff::5".parse::<Ipv6Addr>()?.into();
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut BytesBuffer::new(&sample_file))?.rdata {
             RData::AAAA(rdata) => rdata,
             _ => unreachable!(),
         };

@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::dns::{WireFormat, MAX_NULL_LENGTH};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{WireFormat, MAX_NULL_LENGTH},
+};
 
 use super::RR;
 
@@ -44,13 +47,11 @@ impl<'a> NULL<'a> {
 
 impl<'a> WireFormat<'a> for NULL<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let data = &data[*position..];
-        *position += data.len();
-        Self::new(data)
+        data.get_remaining().and_then(Self::new)
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

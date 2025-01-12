@@ -1,5 +1,4 @@
-use crate::dns::WireFormat;
-use std::convert::TryInto;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;
 
@@ -25,15 +24,14 @@ impl RR for EUI64 {
     const TYPE_CODE: u16 = 109;
 }
 
-impl<'a> WireFormat<'a> for EUI48 {
+impl WireFormat<'_> for EUI48 {
     const MINIMUM_LEN: usize = 6;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = data[*position..*position + 6].try_into()?;
-        *position += 6;
+        let address = data.get_array()?;
         Ok(Self { address })
     }
 
@@ -43,15 +41,14 @@ impl<'a> WireFormat<'a> for EUI48 {
     }
 }
 
-impl<'a> WireFormat<'a> for EUI64 {
+impl WireFormat<'_> for EUI64 {
     const MINIMUM_LEN: usize = 8;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let address = data[*position..*position + 8].try_into()?;
-        *position += 8;
+        let address = data.get_array()?;
         Ok(Self { address })
     }
 
@@ -99,7 +96,7 @@ mod tests {
         let rdata = EUI48 { address: mac };
         let mut writer = Vec::new();
         rdata.write_to(&mut writer).unwrap();
-        let rdata = EUI48::parse(&writer, &mut 0).unwrap();
+        let rdata = EUI48::parse(&mut BytesBuffer::new(&writer)).unwrap();
         assert_eq!(rdata.address, mac);
     }
 
@@ -109,7 +106,7 @@ mod tests {
         let rdata = EUI64 { address: mac };
         let mut writer = Vec::new();
         rdata.write_to(&mut writer).unwrap();
-        let rdata = EUI64::parse(&writer, &mut 0).unwrap();
+        let rdata = EUI64::parse(&mut (&writer[..]).into()).unwrap();
         assert_eq!(rdata.address, mac);
     }
 
@@ -117,7 +114,7 @@ mod tests {
     fn parse_sample_eui48() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/EUI48.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::EUI48(rdata) => rdata,
             _ => unreachable!(),
         };
@@ -131,7 +128,7 @@ mod tests {
     fn parse_sample_eui64() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/EUI64.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::EUI64(rdata) => rdata,
             _ => unreachable!(),
         };

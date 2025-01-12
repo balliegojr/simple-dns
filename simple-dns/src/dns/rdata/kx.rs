@@ -1,5 +1,4 @@
-use crate::{dns::WireFormat, Name};
-use std::convert::TryInto;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, Name};
 
 use super::RR;
 
@@ -19,13 +18,12 @@ impl RR for KX<'_> {
 impl<'a> WireFormat<'a> for KX<'a> {
     const MINIMUM_LEN: usize = 2;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let exchanger = Name::parse(data, position)?;
+        let preference = data.get_u16()?;
+        let exchanger = Name::parse(data)?;
         Ok(Self {
             preference,
             exchanger,
@@ -69,7 +67,7 @@ mod tests {
         let mut data = Vec::new();
         kx.write_to(&mut data).unwrap();
 
-        let kx = KX::parse(&data, &mut 0).unwrap();
+        let kx = KX::parse(&mut (&data[..]).into()).unwrap();
         assert_eq!(kx.preference, 5);
         assert_eq!(kx.exchanger, Name::new("example.com.").unwrap());
     }
@@ -78,7 +76,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/KX.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {
             RData::KX(rdata) => rdata,
             _ => unreachable!(),
         };

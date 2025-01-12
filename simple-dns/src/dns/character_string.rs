@@ -1,6 +1,6 @@
 use std::{borrow::Cow, convert::TryFrom, fmt::Display};
 
-use crate::SimpleDnsError;
+use crate::{bytes_buffer::BytesBuffer, SimpleDnsError};
 
 use super::{WireFormat, MAX_CHARACTER_STRING_LENGTH};
 
@@ -50,21 +50,16 @@ impl<'a> TryFrom<CharacterString<'a>> for String {
 impl<'a> WireFormat<'a> for CharacterString<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let length = data[*position] as usize;
-        if length > MAX_CHARACTER_STRING_LENGTH || length + *position > data.len() {
+        let length = data.get_u8()? as usize;
+        if length > MAX_CHARACTER_STRING_LENGTH {
             return Err(SimpleDnsError::InvalidCharacterString);
         }
 
-        if *position + 1 + length > data.len() {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
-
-        let data = &data[*position + 1..*position + 1 + length];
-        *position += length + 1;
+        let data = data.get_slice(length)?;
 
         Ok(Self {
             data: Cow::Borrowed(data),
@@ -135,7 +130,7 @@ mod tests {
 
     #[test]
     fn parse() {
-        let c_string = CharacterString::parse(b"\x0esome_long_text", &mut 0);
+        let c_string = CharacterString::parse(&mut BytesBuffer::new(b"\x0esome_long_text"));
         assert!(c_string.is_ok());
         let c_string = c_string.unwrap();
         assert_eq!(15, c_string.len());

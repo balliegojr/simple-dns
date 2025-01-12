@@ -3,6 +3,8 @@ use std::{
     io::{Seek, Write},
 };
 
+use crate::bytes_buffer::BytesBuffer;
+
 use super::name::Label;
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
@@ -12,24 +14,7 @@ pub(crate) trait WireFormat<'a> {
     /// Parse the contents of the data buffer starting at the given `position`
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
     /// The implementor must `position` to ensure that is at the end of the data just parsed
-    fn parse(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
-    where
-        Self: Sized,
-    {
-        Self::check_len(data, position)?;
-        Self::parse_after_check(data, position)
-    }
-
-    fn check_len(data: &'a [u8], position: &mut usize) -> crate::Result<()> {
-        if *position + Self::MINIMUM_LEN > data.len() {
-            return Err(crate::SimpleDnsError::InsufficientData);
-        }
-
-        Ok(())
-    }
-
-    /// Parse the contenst after checking that `data[*position..]` is at least [Self::MINIMUM_LEN].
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized;
 

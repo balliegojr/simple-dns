@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
-use std::{borrow::Cow, collections::BTreeMap, convert::TryInto};
+use std::{borrow::Cow, collections::BTreeMap};
 
+use crate::bytes_buffer::BytesBuffer;
 use crate::dns::WireFormat;
 use crate::{CharacterString, Name};
 
@@ -132,19 +133,18 @@ impl<'a> SVCB<'a> {
 impl<'a> WireFormat<'a> for SVCB<'a> {
     const MINIMUM_LEN: usize = 2;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let priority = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
+        let priority = data.get_u16()?;
 
-        let target = Name::parse(data, position)?;
+        let target = Name::parse(data)?;
         let mut params = BTreeMap::new();
 
         let mut previous_key: Option<u16> = None;
-        while *position < data.len() {
-            let param = SVCParam::parse(data, position)?;
+        while data.has_remaining() {
+            let param = SVCParam::parse(data)?;
             let key = param.key_code();
 
             if let Some(p_key) = previous_key {
@@ -251,70 +251,49 @@ impl SVCParam<'_> {
 
 impl<'a> WireFormat<'a> for SVCParam<'a> {
     const MINIMUM_LEN: usize = 4;
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let key = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
+        let key = data.get_u16()?;
+        let len = data.get_u16()? as usize;
 
-        let len = u16::from_be_bytes(data[*position..*position + 2].try_into()?) as usize;
-        *position += 2;
-
-        let limit = *position + len;
+        let mut data = data.limit_to(len)?;
         match key {
             0 => {
                 let mut keys = BTreeSet::new();
-                while *position < limit {
-                    keys.insert(u16::from_be_bytes(
-                        data[*position..*position + 2].try_into()?,
-                    ));
-                    *position += 2;
+                while data.has_remaining() {
+                    keys.insert(data.get_u16()?);
                 }
                 Ok(SVCParam::Mandatory(keys))
             }
             1 => {
                 let mut alpns = Vec::new();
-                while *position < limit {
-                    let alpn = dbg!(CharacterString::parse(data, position)?);
-                    alpns.push(alpn);
+                while data.has_remaining() {
+                    alpns.push(CharacterString::parse(&mut data)?);
                 }
                 Ok(SVCParam::Alpn(alpns))
             }
             2 => Ok(SVCParam::NoDefaultAlpn),
-            3 => {
-                let port = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-                *position += 2;
-                Ok(SVCParam::Port(port))
-            }
+            3 => Ok(SVCParam::Port(data.get_u16()?)),
             4 => {
                 let mut ips = Vec::new();
-                while *position < limit {
-                    ips.push(u32::from_be_bytes(
-                        data[*position..*position + 4].try_into()?,
-                    ));
-                    *position += 4;
+                while data.has_remaining() {
+                    ips.push(data.get_u32()?);
                 }
                 Ok(SVCParam::Ipv4Hint(ips))
             }
-            5 => {
-                let ech = Cow::Borrowed(&data[*position..*position + len]);
-                *position += len;
-                Ok(SVCParam::Ech(ech))
-            }
+            5 => Ok(SVCParam::Ech(Cow::Borrowed(data.get_remaining()?))),
             6 => {
                 let mut ips = Vec::new();
-                while *position < limit {
-                    ips.push(u128::from_be_bytes(
-                        data[*position..*position + 16].try_into()?,
-                    ));
-                    *position += 16;
+                while data.has_remaining() {
+                    ips.push(data.get_u128()?);
                 }
                 Ok(SVCParam::Ipv6Hint(ips))
             }
             _ => {
-                let value = Cow::Borrowed(&data[*position..*position + len]);
-                *position += len;
+                let value = Cow::Borrowed(data.get_remaining()?);
                 Ok(SVCParam::Unknown(key, value))
             }
         }
@@ -390,7 +369,7 @@ mod tests {
         // Copy of the answer from `dig crypto.cloudflare.com -t HTTPS`.
         let sample_file = std::fs::read("samples/zonefile/HTTPS.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::HTTPS(rdata) => rdata,
             _ => unreachable!(),
         };
@@ -492,7 +471,7 @@ mod tests {
             svcb.write_to(&mut data).unwrap();
             assert_eq!(expected_bytes, &data, "Test {name}");
 
-            let svcb2 = SVCB::parse(&data, &mut 0).unwrap();
+            let svcb2 = SVCB::parse(&mut data[..].into()).unwrap();
             assert_eq!(svcb, &svcb2, "Test {name}");
         }
     }

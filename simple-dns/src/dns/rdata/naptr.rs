@@ -1,4 +1,7 @@
-use crate::dns::{CharacterString, Name, WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::{CharacterString, Name, WireFormat},
+};
 
 use super::RR;
 
@@ -43,18 +46,16 @@ impl NAPTR<'_> {
 impl<'a> WireFormat<'a> for NAPTR<'a> {
     const MINIMUM_LEN: usize = 4;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let order = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let preference = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        *position += 2;
-        let flags = CharacterString::parse(data, position)?;
-        let services = CharacterString::parse(data, position)?;
-        let regexp = CharacterString::parse(data, position)?;
-        let replacement = Name::parse(data, position)?;
+        let order = data.get_u16()?;
+        let preference = data.get_u16()?;
+        let flags = CharacterString::parse(data)?;
+        let services = CharacterString::parse(data)?;
+        let regexp = CharacterString::parse(data)?;
+        let replacement = Name::parse(data)?;
 
         Ok(Self {
             order,
@@ -102,7 +103,7 @@ mod tests {
         let mut data = Vec::new();
         assert!(naptr.write_to(&mut data).is_ok());
 
-        let naptr = NAPTR::parse(&data, &mut 0);
+        let naptr = NAPTR::parse(&mut data[..].into());
         assert!(naptr.is_ok());
         let naptr = naptr.unwrap();
 

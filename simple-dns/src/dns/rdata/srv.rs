@@ -1,5 +1,4 @@
-use std::convert::TryInto;
-
+use crate::bytes_buffer::BytesBuffer;
 use crate::dns::WireFormat;
 use crate::Name;
 
@@ -41,15 +40,14 @@ impl SRV<'_> {
 impl<'a> WireFormat<'a> for SRV<'a> {
     const MINIMUM_LEN: usize = 6;
 
-    fn parse_after_check(data: &'a [u8], position: &mut usize) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
     where
         Self: Sized,
     {
-        let priority = u16::from_be_bytes(data[*position..*position + 2].try_into()?);
-        let weight = u16::from_be_bytes(data[*position + 2..*position + 4].try_into()?);
-        let port = u16::from_be_bytes(data[*position + 4..*position + 6].try_into()?);
-        *position += 6;
-        let target = Name::parse(data, position)?;
+        let priority = data.get_u16()?;
+        let weight = data.get_u16()?;
+        let port = data.get_u16()?;
+        let target = Name::parse(data)?;
 
         Ok(Self {
             priority,
@@ -92,7 +90,7 @@ mod tests {
         let mut bytes = Vec::new();
         assert!(srv.write_to(&mut bytes).is_ok());
 
-        let srv = SRV::parse(&bytes, &mut 0);
+        let srv = SRV::parse(&mut bytes[..].into());
         assert!(srv.is_ok());
         let srv = srv.unwrap();
 
@@ -125,7 +123,7 @@ mod tests {
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/SRV.sample")?;
 
-        let sample_rdata = match ResourceRecord::parse(&sample_file, &mut 0)?.rdata {
+        let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
             RData::SRV(rdata) => rdata,
             _ => unreachable!(),
         };
