@@ -1,3 +1,8 @@
+# 0.9.3 (2025-01-18)
+
+### Fix
+- Fix Name and Label display implementation
+
 # 0.9.2 (2025-01-12)
 
 ### Fix
