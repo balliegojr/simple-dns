@@ -157,6 +157,16 @@ impl<'a> Name<'a> {
         out.write_all(&[0])?;
         Ok(())
     }
+
+    /// Returns `true` if the name is valid.
+    pub fn is_valid(&self) -> bool {
+        self.labels.iter().all(|label| label.is_valid())
+    }
+
+    /// Returns the bytes of each of the labels that compose this Name
+    pub fn as_bytes(&self) -> impl Iterator<Item = &[u8]> {
+        self.labels.iter().map(|label| label.as_ref())
+    }
 }
 
 impl<'a> WireFormat<'a> for Name<'a> {
@@ -351,6 +361,12 @@ impl<'a> Iterator for LabelsIter<'a> {
 /// A valid label is consists of A-Z, a-z, 0-9, and hyphen (-), and must be at most 63 characters
 /// in length.
 /// This library also considers valid any label starting with underscore (_), to be able to parse mDNS domain names.
+///
+/// Microsoft implementation allows unicode characters in the label content.
+/// To create a label with unicode characters, use [`Label::new_unchecked`]
+///
+/// The `Display` implementation uses [`std::string::String::from_utf8_lossy`] to display the
+/// label.
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub struct Label<'a> {
     data: Cow<'a, [u8]>,
@@ -360,7 +376,7 @@ impl<'a> Label<'a> {
     /// Create a new [`Label`] if given data is valid and within the limits
     pub fn new<T: Into<Cow<'a, [u8]>>>(data: T) -> crate::Result<Self> {
         let label = Self::new_unchecked(data);
-        if !Self::is_valid_label(&label.data) {
+        if !label.is_valid() {
             return Err(crate::SimpleDnsError::InvalidServiceLabel);
         }
 
@@ -390,18 +406,20 @@ impl<'a> Label<'a> {
         }
     }
 
-    fn is_valid_label(data: &[u8]) -> bool {
-        if data.is_empty() || data.len() > MAX_LABEL_LENGTH {
+    /// Returns `true` if the label is valid.
+    pub fn is_valid(&self) -> bool {
+        if self.data.is_empty() || self.data.len() > MAX_LABEL_LENGTH {
             return false;
         }
 
-        if let Some(first) = data.first() {
+        if let Some(first) = self.data.first() {
             if !first.is_ascii_alphanumeric() && *first != b'_' {
                 return false;
             }
         }
 
-        if !data
+        if !self
+            .data
             .iter()
             .skip(1)
             .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_')
@@ -409,7 +427,7 @@ impl<'a> Label<'a> {
             return false;
         }
 
-        if let Some(last) = data.last() {
+        if let Some(last) = self.data.last() {
             if !last.is_ascii_alphanumeric() {
                 return false;
             }
@@ -421,10 +439,8 @@ impl<'a> Label<'a> {
 
 impl Display for Label<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match std::str::from_utf8(&self.data) {
-            Ok(s) => f.write_str(s),
-            Err(_) => Err(std::fmt::Error),
-        }
+        let s = std::string::String::from_utf8_lossy(&self.data);
+        f.write_str(&s)
     }
 }
 
@@ -433,6 +449,12 @@ impl std::fmt::Debug for Label<'_> {
         f.debug_struct("Label")
             .field("data", &self.to_string())
             .finish()
+    }
+}
+
+impl AsRef<[u8]> for Label<'_> {
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_ref()
     }
 }
 
@@ -718,5 +740,13 @@ mod tests {
                 .to_string(),
             "some.longer.domain"
         );
+    }
+
+    #[test]
+    fn display_invalid_label() {
+        let input = b"invalid\xF0\x90\x80label";
+        let label = Label::new_unchecked(input);
+
+        assert_eq!(label.to_string(), "invalid�label");
     }
 }
