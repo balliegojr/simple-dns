@@ -14,7 +14,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Clippy
       run: cargo clippy --workspace --exclude bind9-tests --all-features -- -D warnings 
 
@@ -26,7 +26,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
       
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Build
       run: cargo build --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --all-features
     - name: Run tests
@@ -40,7 +40,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Build
       run: cargo build --workspace --exclude simple-dns-fuzz --exclude bind9-tests --verbose --release --all-features
     - name: Run tests
@@ -50,7 +50,7 @@ jobs:
     name: Fuzz 
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -68,7 +68,9 @@ jobs:
     name: Test Bind9 check
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
     - name: Install bind9
       run: |
         cd bind9
