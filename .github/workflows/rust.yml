@@ -64,16 +64,17 @@ jobs:
         cd simple-dns
         cargo fuzz run packet_parse -- -max_total_time=300
 
-  text-bind-check:
+  test-bind-check:
     name: Test Bind9 check
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Install bind9
-      run: sudo apt-get install bind9-dev 
-    - name: Build
-      run: cargo build --verbose --all-features
-    - name: Run tests
+      run: |
+        cd simple-dns/bind9
+        autoreconf -fi 
+        ./configure --disable-doh 
+        make 
       run: |
         cd simple-dns/bind9-tests
-        cargo test --verbose 
+        cargo test --verbose --all-features

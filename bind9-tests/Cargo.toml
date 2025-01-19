@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[features]
+local-lib = []
+
 [build-dependencies]
 bindgen = "0.70.1"
 
