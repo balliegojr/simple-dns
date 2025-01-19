@@ -5,7 +5,7 @@
 /// size of the value read.
 ///
 /// `peek_*` functions return the value at the specified offset without advancing the buffer position.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BytesBuffer<'a> {
     data: &'a [u8],
     offset: usize,
@@ -31,9 +31,9 @@ impl<'a> BytesBuffer<'a> {
 
     /// Returns a new buffer that with the offset set to the specified position.
     ///
-    /// `postion` must be less than the current offset.
-    pub fn previous_offset_ptr(&mut self, position: usize) -> crate::Result<Self> {
-        if position >= self.offset {
+    /// `position` must be less than the current offset - 2.
+    pub fn new_at(&self, position: usize) -> crate::Result<Self> {
+        if position >= self.offset - 2 {
             return Err(crate::SimpleDnsError::InvalidDnsPacket);
         }
 
