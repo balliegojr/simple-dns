@@ -71,11 +71,11 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install bind9
       run: |
-        cd simple-dns/bind9
+        cd bind9
         autoreconf -fi 
         ./configure --disable-doh 
         make 
     - name: Run tests
       run: |
-        cd simple-dns/bind9-tests
+        cd bind9-tests
         cargo test --verbose --all-features
