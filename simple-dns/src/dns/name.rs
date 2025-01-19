@@ -214,12 +214,14 @@ impl<'a> WireFormat<'a> for Name<'a> {
         let mut name_len = 0usize;
 
         let mut pointer = parse_labels(data, &mut name_len, &mut labels)?;
+
+        let mut data = data.clone();
         while let Some(p) = pointer {
             // By creating a new buffer, it is possible to simplify the parse routine since
             // the original buffer position will remain intact when iterating throught the
             // pointers
-            let data = &mut data.previous_offset_ptr(p)?;
-            pointer = parse_labels(data, &mut name_len, &mut labels)?;
+            data = data.new_at(p)?;
+            pointer = parse_labels(&mut data, &mut name_len, &mut labels)?;
         }
 
         Ok(Self { labels })
@@ -503,7 +505,9 @@ mod tests {
 
     #[test]
     fn parse_handle_circular_pointers() {
-        let mut data = BytesBuffer::new(b"\x01F\x03ISI\x04ARPA\xc0\x00");
+        let mut data = BytesBuffer::new(&[249, 0, 37, 1, 1, 139, 192, 6, 1, 1, 1, 139, 192, 6]);
+        data.advance(12).unwrap();
+
         assert_eq!(
             Name::parse(&mut data),
             Err(SimpleDnsError::InvalidDnsPacket)
