@@ -45,7 +45,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
         let flag = data.get_u8()?;
         let tag = CharacterString::parse(data)?;
         // FIXME: remove quotes if they are the first and last characters
-        let value = Cow::Borrowed(data.get_remaining()?);
+        let value = Cow::Borrowed(data.get_remaining());
 
         Ok(Self { flag, tag, value })
     }

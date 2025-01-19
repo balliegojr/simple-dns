@@ -49,7 +49,7 @@ impl<'a> WireFormat<'a> for RRSIG<'a> {
         let key_tag = data.get_u16()?;
 
         let signer_name = Name::parse(data)?;
-        let signature = Cow::Borrowed(data.get_remaining()?);
+        let signature = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             type_covered,

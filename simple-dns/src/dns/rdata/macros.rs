@@ -90,7 +90,7 @@ macro_rules! rdata_enum {
                 // OPT needs to look the ttl and class values, hence position will be advanced by OPT
                 // parsing code
                 if rdatatype == TYPE::OPT {
-                    let mut opt_data = data.limit_to(rdatalen + 8)?;
+                    let mut opt_data = data.new_limited_to(rdatalen + 8)?;
                     return Ok(RData::OPT(OPT::parse(&mut opt_data)?))
                 }
 
@@ -99,7 +99,7 @@ macro_rules! rdata_enum {
                     return Ok(RData::Empty(rdatatype));
                 }
 
-                let mut data = data.limit_to(rdatalen)?;
+                let mut data = data.new_limited_to(rdatalen)?;
                 parse_rdata(&mut data, rdatatype)
             }
 

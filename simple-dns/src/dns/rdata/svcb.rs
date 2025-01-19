@@ -259,7 +259,7 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
         let key = data.get_u16()?;
         let len = data.get_u16()? as usize;
 
-        let mut data = data.limit_to(len)?;
+        let mut data = data.new_limited_to(len)?;
         match key {
             0 => {
                 let mut keys = BTreeSet::new();
@@ -284,7 +284,7 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
                 }
                 Ok(SVCParam::Ipv4Hint(ips))
             }
-            5 => Ok(SVCParam::Ech(Cow::Borrowed(data.get_remaining()?))),
+            5 => Ok(SVCParam::Ech(Cow::Borrowed(data.get_remaining()))),
             6 => {
                 let mut ips = Vec::new();
                 while data.has_remaining() {
@@ -293,7 +293,7 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
                 Ok(SVCParam::Ipv6Hint(ips))
             }
             _ => {
-                let value = Cow::Borrowed(data.get_remaining()?);
+                let value = Cow::Borrowed(data.get_remaining());
                 Ok(SVCParam::Unknown(key, value))
             }
         }

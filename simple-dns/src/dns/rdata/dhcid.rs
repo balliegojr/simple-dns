@@ -27,7 +27,7 @@ impl<'a> WireFormat<'a> for DHCID<'a> {
     {
         let identifier = data.get_u16()?;
         let digest_type = data.get_u8()?;
-        let digest = Cow::Borrowed(data.get_remaining()?);
+        let digest = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             identifier,

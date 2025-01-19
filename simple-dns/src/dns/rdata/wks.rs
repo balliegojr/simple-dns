@@ -39,7 +39,7 @@ impl<'a> WireFormat<'a> for WKS<'a> {
     {
         let address = data.get_u32()?;
         let protocol = data.get_u8()?;
-        let bit_map = Cow::Borrowed(data.get_remaining()?);
+        let bit_map = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             address,

@@ -43,33 +43,37 @@ impl<'a> BytesBuffer<'a> {
         })
     }
 
-    /// Returns a new buffer with the end of the buffer set to the current offset plus `length`.
+    /// Returns a new buffer with the end of the buffer set to the relative `offset` position
+    /// The current offset is advanced by `offset`.
+    ///
     /// Used when parsing data where the length is not known inside the function receiving the
     /// buffer.
-    pub fn limit_to(&mut self, length: usize) -> crate::Result<Self> {
-        self.bounds_check(length)?;
+    pub fn new_limited_to(&mut self, offset: usize) -> crate::Result<Self> {
+        self.bounds_check(offset)?;
 
-        let data = &self.data[..self.offset + length];
-        let offset = self.offset;
-        self.offset += length;
+        let buffer = Self {
+            data: &self.data[..self.offset + offset],
+            offset: self.offset,
+        };
+        self.offset += offset;
 
-        Ok(Self { data, offset })
+        Ok(buffer)
     }
 
     /// Returns a slice of the remaining bytes in the buffer.
-    pub fn get_remaining(&mut self) -> crate::Result<&'a [u8]> {
+    pub fn get_remaining(&mut self) -> &'a [u8] {
         let value = &self.data[self.offset..];
         self.offset = self.data.len();
 
-        Ok(value)
+        value
     }
 
-    /// Returns a slice of the next `length` bytes in the buffer.
-    pub fn get_slice(&mut self, length: usize) -> crate::Result<&'a [u8]> {
-        self.bounds_check(length)?;
+    /// Returns a slice of the next `offset` bytes in the buffer.
+    pub fn get_slice(&mut self, offset: usize) -> crate::Result<&'a [u8]> {
+        self.bounds_check(offset)?;
 
-        let value = &self.data[self.offset..self.offset + length];
-        self.offset += length;
+        let value = &self.data[self.offset..self.offset + offset];
+        self.offset += offset;
 
         Ok(value)
     }
@@ -147,5 +151,175 @@ impl<'a> BytesBuffer<'a> {
 impl<'a> From<&'a [u8]> for BytesBuffer<'a> {
     fn from(value: &'a [u8]) -> BytesBuffer<'a> {
         Self::new(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_has_remaining_returns_true_when_there_are_bytes() {
+        let buffer = BytesBuffer::new(&[1, 2, 3]);
+        assert!(buffer.has_remaining());
+    }
+
+    #[test]
+    pub fn test_has_remaining_returns_false_when_there_are_no_bytes() {
+        let buffer = BytesBuffer::new(&[]);
+        assert!(!buffer.has_remaining());
+    }
+
+    #[test]
+    pub fn test_advance_advances_the_buffer_position() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.advance(2).unwrap();
+        assert_eq!(2, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_advance_returns_error_when_advancing_past_end() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        assert!(buffer.advance(4).is_err());
+    }
+
+    #[test]
+    pub fn test_new_at_returns_new_buffer_with_offset() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.advance(3).unwrap();
+        let new_buffer = buffer.new_at(0).unwrap();
+        assert_eq!(0, new_buffer.offset);
+    }
+
+    #[test]
+    pub fn test_new_at_returns_error_when_position_is_greater_than_offset() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.advance(2).unwrap();
+        assert!(buffer.new_at(2).is_err());
+    }
+
+    #[test]
+    pub fn test_new_limited_to_returns_new_buffer_with_limited_size() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3, 4]);
+        buffer.advance(1).unwrap();
+        let new_buffer = buffer.new_limited_to(2).unwrap();
+
+        assert_eq!(1, new_buffer.offset);
+        assert_eq!(3, new_buffer.data.len());
+    }
+
+    #[test]
+    pub fn test_new_limited_to_advances_source_buffer() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.new_limited_to(2).unwrap();
+        assert_eq!(2, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_new_limited_to_returns_error_when_length_exceeds_remaining() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        assert!(buffer.new_limited_to(4).is_err());
+    }
+
+    #[test]
+    pub fn test_get_remaining_returns_remaining_bytes() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        let remaining = buffer.get_remaining();
+        assert_eq!(&[1, 2, 3], remaining);
+    }
+
+    #[test]
+    pub fn test_get_remaining_advances_offset_to_end() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.get_remaining();
+        assert_eq!(3, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_get_remaining_returns_empty_slice_when_no_bytes_remaining() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.advance(3).unwrap();
+        assert_eq!(0, buffer.get_remaining().len());
+    }
+
+    #[test]
+    pub fn test_get_slice_returns_slice_of_specified_length() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        let slice = buffer.get_slice(2).unwrap();
+        assert_eq!(&[1, 2], slice);
+    }
+
+    #[test]
+    pub fn test_get_slice_advances_offset_by_length() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.get_slice(2).unwrap();
+        assert_eq!(2, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_get_slice_returns_error_when_length_exceeds_remaining() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        assert!(buffer.get_slice(4).is_err());
+    }
+
+    #[test]
+    pub fn test_peek_array_returns_u32_at_offset() {
+        let buffer = BytesBuffer::new(&[0, 0, 0, 0, 0, 0, 1]);
+        let value = buffer.peek_array(3).unwrap();
+        assert_eq!([0, 0, 0, 1], value);
+    }
+
+    #[test]
+    pub fn test_peek_array_returns_error_when_offset_exceeds_remaining() {
+        let buffer = BytesBuffer::new(&[0, 0, 0, 1, 2, 3]);
+        assert!(buffer.peek_array::<4>(4).is_err());
+    }
+
+    #[test]
+    pub fn test_peek_array_does_not_advance_buffer() {
+        let buffer = BytesBuffer::new(&[0, 0, 0, 1, 2, 3]);
+        buffer.peek_array::<1>(0).unwrap();
+        assert_eq!(0, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_get_array_returns_an_array_of_bytes() {
+        let mut buffer = BytesBuffer::new(&[0, 0, 0, 1, 2, 3]);
+        let value = buffer.get_array();
+        assert_eq!(Ok([0, 0, 0, 1]), value);
+    }
+
+    #[test]
+    pub fn test_get_array_returns_error_when_length_exceeds_remaining() {
+        let mut buffer = BytesBuffer::new(&[0, 0, 0]);
+        let value = buffer.get_array::<4>();
+        assert!(value.is_err());
+    }
+
+    #[test]
+    pub fn test_get_array_advances_the_buffer() {
+        let mut buffer = BytesBuffer::new(&[0, 0, 0, 1, 2, 3]);
+        buffer.get_array::<4>().unwrap();
+        assert_eq!(4, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_get_u8_returns_u8_at_offset() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        let value = buffer.get_u8().unwrap();
+        assert_eq!(1, value);
+    }
+
+    #[test]
+    pub fn test_get_u8_advances_the_offset() {
+        let mut buffer = BytesBuffer::new(&[1, 2, 3]);
+        buffer.get_u8().unwrap();
+        assert_eq!(1, buffer.offset);
+    }
+
+    #[test]
+    pub fn test_get_u8_returns_error_when_no_bytes_remaining() {
+        let mut buffer = BytesBuffer::new(&[]);
+        assert!(buffer.get_u8().is_err());
     }
 }

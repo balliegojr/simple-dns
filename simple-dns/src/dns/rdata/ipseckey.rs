@@ -65,7 +65,7 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
             3 => Gateway::Domain(Name::parse(data)?),
             _ => return Err(crate::SimpleDnsError::AttemptedInvalidOperation),
         };
-        let public_key = data.get_remaining()?;
+        let public_key = data.get_remaining();
         Ok(Self {
             precedence,
             algorithm,
