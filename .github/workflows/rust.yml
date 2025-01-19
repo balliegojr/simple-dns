@@ -79,8 +79,8 @@ jobs:
         autoreconf -fi 
         ./configure --disable-doh 
         make 
-        make install
-        ldconfig
+        sudo make install
+        sudo ldconfig
     - name: Run tests
       run: |
         cd bind9-tests
