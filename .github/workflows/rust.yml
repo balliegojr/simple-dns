@@ -75,6 +75,7 @@ jobs:
         autoreconf -fi 
         ./configure --disable-doh 
         make 
+    - name: Run tests
       run: |
         cd simple-dns/bind9-tests
         cargo test --verbose --all-features
