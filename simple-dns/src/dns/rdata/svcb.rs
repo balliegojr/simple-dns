@@ -301,7 +301,6 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.key_code().to_be_bytes())?;
-        // TODO: move len to inside match
         out.write_all(&(self.len() as u16 - 4).to_be_bytes())?;
 
         match self {

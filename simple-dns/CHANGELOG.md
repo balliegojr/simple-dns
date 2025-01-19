@@ -1,3 +1,15 @@
+# Unreleased
+
+### Changes
+- Changes internal implementation to use a Buffer struct instead of a byte slice
+- Add bind9 compatibility tests
+
+### Fix
+- Fix NSec parsing code
+
+### Breaking changes
+- Add SVCB Params for SVCB resource records
+
 # 0.9.3 (2025-01-18)
 
 ### Fix
