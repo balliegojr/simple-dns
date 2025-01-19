@@ -30,7 +30,7 @@ impl<'a> WireFormat<'a> for DS<'a> {
         let key_tag = data.get_u16()?;
         let algorithm = data.get_u8()?;
         let digest_type = data.get_u8()?;
-        let digest = Cow::Borrowed(data.get_remaining()?);
+        let digest = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             key_tag,

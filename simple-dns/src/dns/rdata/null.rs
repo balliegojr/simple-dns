@@ -51,7 +51,7 @@ impl<'a> WireFormat<'a> for NULL<'a> {
     where
         Self: Sized,
     {
-        data.get_remaining().and_then(Self::new)
+        Self::new(data.get_remaining())
     }
 
     fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {

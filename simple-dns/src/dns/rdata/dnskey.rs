@@ -30,7 +30,7 @@ impl<'a> WireFormat<'a> for DNSKEY<'a> {
         let flags = data.get_u16()?;
         let protocol = data.get_u8()?;
         let algorithm = data.get_u8()?;
-        let public_key = Cow::Borrowed(data.get_remaining()?);
+        let public_key = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             flags,

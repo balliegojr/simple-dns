@@ -30,7 +30,7 @@ impl<'a> WireFormat<'a> for CERT<'a> {
         let type_code = data.get_u16()?;
         let key_tag = data.get_u16()?;
         let algorithm = data.get_u8()?;
-        let certificate = data.get_remaining()?;
+        let certificate = data.get_remaining();
 
         Ok(Self {
             type_code,

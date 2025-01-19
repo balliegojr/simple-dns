@@ -30,7 +30,7 @@ impl<'a> WireFormat<'a> for ZONEMD<'a> {
         let serial = data.get_u32()?;
         let scheme = data.get_u8()?;
         let algorithm = data.get_u8()?;
-        let digest = Cow::Borrowed(data.get_remaining()?);
+        let digest = Cow::Borrowed(data.get_remaining());
 
         Ok(Self {
             serial,
