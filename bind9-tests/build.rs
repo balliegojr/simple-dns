@@ -6,14 +6,14 @@ use bindgen::Builder;
 fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap()).join("bindings.rs");
 
-    println!("cargo:rustc-link-lib=dns");
-    println!("cargo:rustc-link-lib=isc");
-    println!("cargo:rustc-link-lib=atomic");
-
     if cfg!(feature = "local-lib") {
         link_local("dns");
         link_local("isc");
     }
+
+    println!("cargo:rustc-link-lib=dns");
+    println!("cargo:rustc-link-lib=isc");
+    println!("cargo:rustc-link-lib=atomic");
 
     let builder = get_bindings_builder();
     let bindings = builder.generate().expect("Failed to generate bindings");
@@ -28,10 +28,7 @@ fn link_local(lib: &str) {
         .canonicalize()
         .expect("bind9 directory not found");
 
-    println!(
-        "cargo:rustc-link-search=native={}",
-        libdir_path.to_str().unwrap()
-    );
+    println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
 }
 
 fn get_bindings_builder() -> Builder {
