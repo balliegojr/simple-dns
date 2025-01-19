@@ -62,7 +62,7 @@ jobs:
     - name: Run Fuzzing
       run: |
         cd simple-dns
-        cargo fuzz run packet_parse -- -max_total_time=300
+        cargo fuzz run packet_parse -- -max_total_time=300 -timeout=5
 
   test-bind-check:
     name: Test Bind9 check
