@@ -353,7 +353,7 @@ fn srv_bind9_compatible() {
 
 #[test]
 fn svcb_bind9_compatible() {
-    let text = r#"3 svc4.example.net. alpn="bar" port=8004 key667="hello\210qoo""#;
+    let text = r#"3 svc4.example.net. alpn="bar" port=8004 ech=AAPTTTQ= key667="hello\210qoo""#;
 
     let rdata = SVCB::new(3, Name::new_unchecked("svc4.example.net"))
         .with_param(SVCParam::Alpn(vec!["bar".try_into().unwrap()]))
@@ -361,7 +361,7 @@ fn svcb_bind9_compatible() {
         .with_param(SVCParam::Unknown(
             667,
             (&[0x68, 0x65, 0x6c, 0x6c, 0x6f, 0xd2, 0x71, 0x6f, 0x6f]).into(),
-        ));
+        )).with_param(SVCParam::Ech((&[211, 77, 52]).into()));
 
     check_bind9!(SVCB, rdata, text);
 }

@@ -284,7 +284,15 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
                 }
                 Ok(SVCParam::Ipv4Hint(ips))
             }
-            5 => Ok(SVCParam::Ech(Cow::Borrowed(data.get_remaining()))),
+            5 => {
+                let len = data.get_u16()? as usize;
+                let data = data.get_remaining();
+                if data.len() != len {
+                    Err(crate::SimpleDnsError::InvalidDnsPacket)
+                } else {
+                    Ok(SVCParam::Ech(Cow::Borrowed(data)))
+                }
+            }
             6 => {
                 let mut ips = Vec::new();
                 while data.has_remaining() {
