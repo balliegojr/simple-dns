@@ -1,4 +1,4 @@
-# Unreleased
+# 0.10.0 (2025-02-22)
 
 ### Changes
 - Changes internal implementation to use a Buffer struct instead of a byte slice
