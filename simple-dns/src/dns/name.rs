@@ -115,7 +115,7 @@ impl<'a> Name<'a> {
     }
 
     /// Get the labels that compose this name
-    pub fn get_labels(&'_ self) -> &'_ [Label<'_>] {
+    pub fn get_labels(&'_ self) -> &'_ [Label<'a>] {
         &self.labels[..]
     }
 
