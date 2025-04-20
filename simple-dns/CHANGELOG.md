@@ -1,3 +1,8 @@
+# 0.10.1 (2025-04-20)
+
+### Fix
+- Change Name::get_labels lifetime anotation to be less restrictive
+
 # 0.10.0 (2025-02-22)
 
 ### Changes
