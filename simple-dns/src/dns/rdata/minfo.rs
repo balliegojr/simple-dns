@@ -1,8 +1,9 @@
-use std::collections::HashMap;
-
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{name::Label, Name, WireFormat},
+    lib::HashMap,
+    seek::Seek,
+    write::Write,
 };
 
 use super::RR;
@@ -43,12 +44,12 @@ impl<'a> WireFormat<'a> for MINFO<'a> {
         Ok(Self { rmailbox, emailbox })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         self.rmailbox.write_to(out)?;
         self.emailbox.write_to(out)
     }
 
-    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
@@ -65,6 +66,7 @@ impl<'a> WireFormat<'a> for MINFO<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_minfo() {

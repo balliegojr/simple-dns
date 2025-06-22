@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{name::Label, Name, WireFormat},
+    lib::HashMap,
+    seek::Seek,
     write::Write,
 };
 
@@ -53,7 +53,7 @@ impl<'a> WireFormat<'a> for RouteThrough<'a> {
         self.intermediate_host.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
@@ -69,9 +69,9 @@ impl<'a> WireFormat<'a> for RouteThrough<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
 
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_route_through() {
@@ -93,7 +93,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/RT.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

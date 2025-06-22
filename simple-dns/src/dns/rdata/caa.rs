@@ -1,8 +1,8 @@
-use std::borrow::Cow;
-
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{CharacterString, WireFormat},
+    lib::Cow,
+    write::Write,
 };
 
 use super::RR;
@@ -50,7 +50,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
         Ok(Self { flag, tag, value })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.flag.to_be_bytes())?;
         self.tag.write_to(out)?;
         //FIXME: add quotes if the value is not already quoted
@@ -65,6 +65,7 @@ impl<'a> WireFormat<'a> for CAA<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::Vec;
     use crate::{rdata::RData, Packet, ResourceRecord, CLASS};
 
     use super::*;

@@ -1,6 +1,7 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{CharacterString, Name, WireFormat},
+    write::Write,
 };
 
 use super::RR;
@@ -67,7 +68,7 @@ impl<'a> WireFormat<'a> for NAPTR<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.order.to_be_bytes())?;
         out.write_all(&self.preference.to_be_bytes())?;
         self.flags.write_to(out)?;
@@ -88,6 +89,7 @@ impl<'a> WireFormat<'a> for NAPTR<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_naptr() {

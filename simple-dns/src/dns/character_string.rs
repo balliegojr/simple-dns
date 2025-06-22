@@ -76,7 +76,6 @@ impl<'a> WireFormat<'a> for CharacterString<'a> {
     fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&[self.data.len() as u8])?;
         out.write_all(&self.data)
-            .map_err(crate::SimpleDnsError::from)
     }
 
     fn len(&self) -> usize {

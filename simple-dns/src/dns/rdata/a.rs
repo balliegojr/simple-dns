@@ -1,4 +1,5 @@
 use crate::lib::Ipv4Addr;
+use crate::write::Write;
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;
@@ -24,9 +25,8 @@ impl<'a> WireFormat<'a> for A {
         data.get_u32().map(|address| Self { address })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address.to_be_bytes())
-            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -47,7 +47,7 @@ impl From<Ipv4Addr> for A {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::lib::Vec;
 
     use super::*;
 
@@ -69,7 +69,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_a = std::fs::read("samples/zonefile/A.sample.A")?;
         let sample_ip: u32 = "26.3.0.103".parse::<Ipv4Addr>()?.into();
 

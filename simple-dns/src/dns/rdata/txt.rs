@@ -1,11 +1,7 @@
-use std::{
-    collections::HashMap,
-    convert::{TryFrom, TryInto},
-};
-
 use crate::CharacterString;
 use crate::{
     dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
+    lib::{format, vec, FromUtf8Error, HashMap, String, Vec},
     write::Write,
 };
 
@@ -65,7 +61,7 @@ impl<'a> TXT<'a> {
     /// - key=value
     /// - key=
     /// - key
-    pub fn iter_raw(&self) -> impl Iterator<Item=(&[u8], Option<&[u8]>)> {
+    pub fn iter_raw(&self) -> impl Iterator<Item = (&[u8], Option<&[u8]>)> {
         self.strings.iter().filter_map(|char_str| {
             let mut splited = char_str.data.splitn(2, |c| *c == b'=');
             let key = splited.next()?;
@@ -81,12 +77,12 @@ impl<'a> TXT<'a> {
     ///
     /// If a key is duplicated, only the first one will be considered
     pub fn attributes(&self) -> HashMap<String, Option<String>> {
-        let mut attributes = HashMap::new();
+        let mut attributes = HashMap::default();
 
         for char_str in &self.strings {
             let mut splited = char_str.data.splitn(2, |c| *c == b'=');
             let key = match splited.next() {
-                Some(key) => match std::str::from_utf8(key) {
+                Some(key) => match crate::lib::str::from_utf8(key) {
                     Ok(key) => key.to_owned(),
                     Err(_) => continue,
                 },
@@ -94,7 +90,7 @@ impl<'a> TXT<'a> {
             };
 
             let value = match splited.next() {
-                Some(value) if !value.is_empty() => match std::str::from_utf8(value) {
+                Some(value) if !value.is_empty() => match crate::lib::str::from_utf8(value) {
                     Ok(v) => Some(v.to_owned()),
                     Err(_) => Some(String::new()),
                 },
@@ -111,7 +107,7 @@ impl<'a> TXT<'a> {
     /// Similar to [`attributes()`](TXT::attributes) but it parses the full TXT record as a single string,
     /// instead of expecting each attribute to be a separate [`CharacterString`](`CharacterString`)
     pub fn long_attributes(self) -> crate::Result<HashMap<String, Option<String>>> {
-        let mut attributes = HashMap::new();
+        let mut attributes = HashMap::default();
 
         let full_string: String = match self.try_into() {
             Ok(string) => string,
@@ -177,7 +173,7 @@ impl<'a> TryFrom<&'a str> for TXT<'a> {
 }
 
 impl<'a> TryFrom<TXT<'a>> for String {
-    type Error = std::string::FromUtf8Error;
+    type Error = FromUtf8Error;
 
     fn try_from(val: TXT<'a>) -> Result<Self, Self::Error> {
         let init = Vec::with_capacity(val.len());
@@ -231,13 +227,11 @@ impl<'a> WireFormat<'a> for TXT<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
-    use std::convert::TryInto;
-
     use super::*;
+    use crate::lib::{Box, Error};
 
     #[test]
-    pub fn parse_and_write_txt() -> Result<(), Box<dyn std::error::Error>> {
+    pub fn parse_and_write_txt() -> Result<(), Box<dyn Error>> {
         let mut out = vec![];
         let txt = TXT::new()
             .with_char_string("version=0.1".try_into()?)
@@ -255,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    pub fn get_attributes() -> Result<(), Box<dyn std::error::Error>> {
+    pub fn get_attributes() -> Result<(), Box<dyn Error>> {
         let txt = TXT::new()
             .with_string("version=0.1")?
             .with_string("flag")?
@@ -270,18 +264,23 @@ mod tests {
         assert_eq!(Some(String::new()), attributes["empty"]);
         assert_eq!(None, attributes["flag"]);
 
-        assert_eq!(txt.iter_raw().collect::<Vec<_>>(), vec![
-            ("version".as_bytes(), Some("0.1".as_bytes())),
-            ("flag".as_bytes(), None),
-            ("with_eq".as_bytes(), Some("eq=".as_bytes())),
-            ("version".as_bytes(), Some("dup".as_bytes())),
-            ("empty".as_bytes(), Some("".as_bytes()))
-        ]);
+        assert_eq!(
+            txt.iter_raw().collect::<Vec<_>>(),
+            vec![
+                ("version".as_bytes(), Some("0.1".as_bytes())),
+                ("flag".as_bytes(), None),
+                ("with_eq".as_bytes(), Some("eq=".as_bytes())),
+                ("version".as_bytes(), Some("dup".as_bytes())),
+                ("empty".as_bytes(), Some("".as_bytes()))
+            ]
+        );
         Ok(())
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/TXT.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {
@@ -296,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn write_and_parse_large_txt() -> Result<(), Box<dyn std::error::Error>> {
+    fn write_and_parse_large_txt() -> Result<(), Box<dyn Error>> {
         let string = "X".repeat(1000);
         let txt: TXT = string.as_str().try_into()?;
 
@@ -312,10 +311,10 @@ mod tests {
     }
 
     #[test]
-    fn write_and_parse_large_attributes() -> Result<(), Box<dyn std::error::Error>> {
+    fn write_and_parse_large_attributes() -> Result<(), Box<dyn Error>> {
         let big_value = "f".repeat(1000);
 
-        let string = format!("foo={};;flag;bar={}", big_value, big_value);
+        let string = format!("foo={big_value};;flag;bar={big_value}");
         let txt: TXT = string.as_str().try_into()?;
         let attributes = txt.long_attributes()?;
 

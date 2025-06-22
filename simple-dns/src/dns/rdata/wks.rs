@@ -63,13 +63,14 @@ impl<'a> WireFormat<'a> for WKS<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::dns::WireFormat;
-    use crate::lib::*;
-    use crate::{rdata::RData, ResourceRecord};
 
     #[test]
     #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn Error>> {
+        use crate::dns::WireFormat;
+        use crate::lib::*;
+        use crate::{rdata::RData, ResourceRecord};
+
         let sample_file = std::fs::read("samples/zonefile/WKS.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

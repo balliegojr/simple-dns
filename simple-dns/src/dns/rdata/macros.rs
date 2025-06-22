@@ -30,14 +30,14 @@ macro_rules! rr_wrapper {
                 $w::parse(data).map(|n| $t(n))
             }
 
-            fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+            fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
                 self.0.write_to(out)
             }
 
-            fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+            fn write_compressed_to<T: Write + Seek>(
                 &'a self,
                 out: &mut T,
-                name_refs: &mut std::collections::HashMap<&'a [crate::dns::name::Label<'a>], usize>,
+                name_refs: &mut crate::lib::HashMap<&'a [crate::dns::name::Label<'a>], usize>,
             ) -> crate::Result<()> {
                 self.0.write_compressed_to(out, name_refs)
             }
@@ -47,7 +47,7 @@ macro_rules! rr_wrapper {
             }
         }
 
-        impl<'a> std::ops::Deref for $t<'a> {
+        impl<'a> crate::lib::Deref for $t<'a> {
             type Target = $w<'a>;
 
             fn deref(&self) -> &Self::Target {
@@ -55,7 +55,7 @@ macro_rules! rr_wrapper {
             }
         }
 
-        impl<'a> std::ops::DerefMut for $t<'a> {
+        impl<'a> crate::lib::DerefMut for $t<'a> {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.0
             }
@@ -103,7 +103,7 @@ macro_rules! rdata_enum {
                 parse_rdata(&mut data, rdatatype)
             }
 
-            fn write_to<T: std::io::Write>(
+            fn write_to<T: Write>(
                 &self,
                 out: &mut T,
             ) -> crate::Result<()> {
@@ -117,7 +117,7 @@ macro_rules! rdata_enum {
                 }
             }
 
-            fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+            fn write_compressed_to<T: Write + Seek>(
                 &'a self,
                 out: &mut T,
                 name_refs: &mut  HashMap<&'a [crate::dns::name::Label<'a>], usize>,
