@@ -4,6 +4,7 @@ use std::{
 };
 
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
+use crate::lib::Vec;
 use crate::{bytes_buffer::BytesBuffer, rdata::OPT, RCODE};
 
 /// Represents a DNS message packet

@@ -1,9 +1,6 @@
-use std::{
-    collections::HashMap,
-    io::{Seek, Write},
-};
+use std::{collections::HashMap, io::Seek};
 
-use crate::bytes_buffer::BytesBuffer;
+use crate::{bytes_buffer::BytesBuffer, write::Write};
 
 use super::name::Label;
 

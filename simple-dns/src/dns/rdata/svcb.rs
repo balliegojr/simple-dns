@@ -1,9 +1,5 @@
-use std::collections::BTreeSet;
-use std::{borrow::Cow, collections::BTreeMap};
-
-use crate::bytes_buffer::BytesBuffer;
-use crate::dns::WireFormat;
-use crate::{CharacterString, Name};
+use crate::lib::{BTreeMap, BTreeSet, Cow};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, CharacterString, Name};
 
 use super::RR;
 
@@ -163,7 +159,7 @@ impl<'a> WireFormat<'a> for SVCB<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.priority.to_be_bytes())?;
         self.target.write_to(out)?;
         for param in self.params.values() {
@@ -307,7 +303,7 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
         }
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.key_code().to_be_bytes())?;
         out.write_all(&(self.len() as u16 - 4).to_be_bytes())?;
 

@@ -1,4 +1,7 @@
-use std::{array::TryFromSliceError, error::Error, fmt::Display};
+use crate::lib::fmt::{Display, Formatter, Result};
+use crate::lib::Error;
+use crate::lib::FromUtf8Error;
+use crate::lib::TryFromSliceError;
 
 /// Error types for SimpleDns
 #[derive(Debug, PartialEq, Eq)]
@@ -27,7 +30,7 @@ pub enum SimpleDnsError {
     /// Failed to write the packet to the provided buffer
     FailedToWrite,
     /// Invalid utf8 string
-    InvalidUtf8String(std::string::FromUtf8Error),
+    InvalidUtf8String(FromUtf8Error),
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
@@ -36,6 +39,9 @@ impl From<TryFromSliceError> for SimpleDnsError {
     }
 }
 
+// TODO: come back to this after deciding what to do with the Write trait
+// This may not be necessary anymore
+#[cfg(feature = "std")]
 impl From<std::io::Error> for SimpleDnsError {
     fn from(_value: std::io::Error) -> Self {
         Self::FailedToWrite
@@ -45,7 +51,7 @@ impl From<std::io::Error> for SimpleDnsError {
 impl Error for SimpleDnsError {}
 
 impl Display for SimpleDnsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SimpleDnsError::InvalidClass(class) => {
                 write!(f, "Provided class is invalid: {0}", class)

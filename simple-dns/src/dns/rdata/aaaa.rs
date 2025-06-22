@@ -1,5 +1,5 @@
+use crate::lib::Ipv6Addr;
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
-use std::net::Ipv6Addr;
 
 use super::RR;
 

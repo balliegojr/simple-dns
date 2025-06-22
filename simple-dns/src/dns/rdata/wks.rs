@@ -1,5 +1,5 @@
-use std::borrow::Cow;
-
+use crate::lib::Cow;
+use crate::write::Write;
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;
@@ -48,7 +48,7 @@ impl<'a> WireFormat<'a> for WKS<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address.to_be_bytes())?;
         out.write_all(&[self.protocol])?;
         out.write_all(&self.bit_map)?;
@@ -63,12 +63,13 @@ impl<'a> WireFormat<'a> for WKS<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
-
-    use crate::{dns::WireFormat, rdata::RData, ResourceRecord};
+    use crate::dns::WireFormat;
+    use crate::lib::*;
+    use crate::{rdata::RData, ResourceRecord};
 
     #[test]
-    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "std")]
+    fn parse_sample() -> Result<(), Box<dyn Error>> {
         let sample_file = std::fs::read("samples/zonefile/WKS.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

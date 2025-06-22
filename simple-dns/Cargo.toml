@@ -11,7 +11,10 @@ categories = ["parser-implementations", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = []
+# default = ["alloc"]
+default = ["std"]
+std = []
+alloc = []
 
 [dependencies]
 bitflags = "2.4"
