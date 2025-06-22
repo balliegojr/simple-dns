@@ -1,6 +1,4 @@
-use std::io::Write;
-
-use crate::{bytes_buffer::BytesBuffer, rdata::OPT, ResourceRecord};
+use crate::{bytes_buffer::BytesBuffer, rdata::OPT, write::Write, ResourceRecord};
 
 use super::{PacketFlag, OPCODE, RCODE};
 
@@ -151,6 +149,7 @@ impl<'a> Header<'a> {
 #[cfg(test)]
 mod tests {
     use crate::header_buffer;
+    use crate::lib::vec;
 
     use super::*;
 

@@ -1,6 +1,7 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{Name, WireFormat},
+    write::Write,
 };
 use std::borrow::Cow;
 
@@ -64,7 +65,7 @@ impl<'a> WireFormat<'a> for RRSIG<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.type_covered.to_be_bytes())?;
         out.write_all(&[self.algorithm])?;
         out.write_all(&[self.labels])?;

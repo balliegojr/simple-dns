@@ -1,8 +1,15 @@
-use std::{borrow::Cow, convert::TryFrom, fmt::Display};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::WireFormat,
+    lib::{
+        fmt::{Debug, Display, Formatter},
+        Cow, String, TryFrom,
+    },
+    write::Write,
+    SimpleDnsError,
+};
 
-use crate::{bytes_buffer::BytesBuffer, SimpleDnsError};
-
-use super::{WireFormat, MAX_CHARACTER_STRING_LENGTH};
+use super::MAX_CHARACTER_STRING_LENGTH;
 
 /// CharacterString is expressed in one or two ways:
 /// - as a contiguous set of characters without interior spaces,
@@ -66,7 +73,7 @@ impl<'a> WireFormat<'a> for CharacterString<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&[self.data.len() as u8])?;
         out.write_all(&self.data)
             .map_err(crate::SimpleDnsError::from)
@@ -94,14 +101,14 @@ impl TryFrom<String> for CharacterString<'_> {
 }
 
 impl Display for CharacterString<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = std::str::from_utf8(&self.data).unwrap();
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::lib::fmt::Result {
+        let s = crate::lib::str::from_utf8(&self.data).unwrap();
         f.write_str(s)
     }
 }
 
-impl std::fmt::Debug for CharacterString<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for CharacterString<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> crate::lib::fmt::Result {
         f.debug_struct("CharacterString")
             .field("data", &self.to_string())
             .finish()
@@ -116,6 +123,7 @@ mod tests {
     };
 
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn construct_valid_character_string() {

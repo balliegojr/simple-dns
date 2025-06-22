@@ -1,5 +1,5 @@
+use crate::lib::Ipv4Addr;
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
-use std::net::Ipv4Addr;
 
 use super::RR;
 

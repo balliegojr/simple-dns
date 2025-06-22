@@ -1,6 +1,6 @@
-use std::{collections::HashMap, convert::TryFrom};
-
 use crate::bytes_buffer::BytesBuffer;
+use crate::lib::TryFrom;
+use std::collections::HashMap;
 
 use super::{name::Label, Name, WireFormat, QCLASS, QTYPE};
 

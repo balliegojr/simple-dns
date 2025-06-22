@@ -1,5 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
-use std::borrow::Cow;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Cow, write::Write};
 
 use super::RR;
 
@@ -40,7 +39,7 @@ impl<'a> WireFormat<'a> for ZONEMD<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.serial.to_be_bytes())?;
         out.write_all(&[self.scheme])?;
         out.write_all(&[self.algorithm])?;
@@ -68,6 +67,7 @@ impl ZONEMD<'_> {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::{Box, Error, Vec};
     use crate::{
         rdata::{RData, ZONEMD},
         ResourceRecord,
@@ -98,7 +98,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "std")]
+    fn parse_sample() -> Result<(), Box<dyn Error>> {
         let sample_file = std::fs::read("samples/zonefile/ZONEMD.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

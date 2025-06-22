@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{name::Label, Name, WireFormat},
+    write::Write,
 };
 
 use super::RR;
@@ -83,13 +84,13 @@ impl<'a> WireFormat<'a> for SOA<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         self.mname.write_to(out)?;
         self.rname.write_to(out)?;
         self.write_common(out)
     }
 
-    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + std::io::Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,

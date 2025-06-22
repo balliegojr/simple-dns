@@ -3,8 +3,11 @@ use std::{
     convert::{TryFrom, TryInto},
 };
 
-use crate::dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH};
 use crate::CharacterString;
+use crate::{
+    dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
+    write::Write,
+};
 
 use super::RR;
 
@@ -214,7 +217,7 @@ impl<'a> WireFormat<'a> for TXT<'a> {
         }
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         if self.strings.is_empty() {
             out.write_all(&[0])?;
         } else {

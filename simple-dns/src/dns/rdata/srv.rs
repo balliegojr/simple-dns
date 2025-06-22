@@ -1,6 +1,4 @@
-use crate::bytes_buffer::BytesBuffer;
-use crate::dns::WireFormat;
-use crate::Name;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, Name};
 
 use super::RR;
 
@@ -57,7 +55,7 @@ impl<'a> WireFormat<'a> for SRV<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.priority.to_be_bytes())?;
         out.write_all(&self.weight.to_be_bytes())?;
         out.write_all(&self.port.to_be_bytes())?;
