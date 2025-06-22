@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write};
 
 use super::RR;
 
@@ -35,9 +35,8 @@ impl WireFormat<'_> for EUI48 {
         Ok(Self { address })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address)
-            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -52,9 +51,8 @@ impl WireFormat<'_> for EUI64 {
         Ok(Self { address })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.address)
-            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -86,6 +84,8 @@ impl From<EUI64> for [u8; 8] {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::Vec;
+    #[cfg(feature = "std")]
     use crate::{rdata::RData, ResourceRecord};
 
     use super::*;
@@ -111,6 +111,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample_eui48() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/EUI48.sample")?;
 
@@ -125,6 +126,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample_eui64() -> Result<(), Box<dyn std::error::Error>> {
         let sample_file = std::fs::read("samples/zonefile/EUI64.sample")?;
 

@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, SimpleDnsError};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, SimpleDnsError};
 
 use super::RR;
 
@@ -62,7 +62,7 @@ impl<'a> WireFormat<'a> for LOC {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         if self.version != 0 {
             return Err(SimpleDnsError::InvalidDnsPacket);
         }
@@ -83,9 +83,8 @@ impl<'a> WireFormat<'a> for LOC {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
-
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_loc() {
@@ -117,7 +116,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/LOC.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {

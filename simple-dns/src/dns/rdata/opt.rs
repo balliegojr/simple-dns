@@ -1,9 +1,11 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{header::Header, WireFormat},
+    lib::Cow,
+    lib::Vec,
+    write::Write,
     RCODE,
 };
-use std::borrow::Cow;
 
 use super::RR;
 
@@ -69,7 +71,7 @@ impl<'a> WireFormat<'a> for OPT<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         for code in self.opt_codes.iter() {
             out.write_all(&code.code.to_be_bytes())?;
             out.write_all(&(code.data.len() as u16).to_be_bytes())?;
@@ -129,6 +131,7 @@ impl OPTCode<'_> {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::vec;
     use crate::{rdata::RData, Name, ResourceRecord};
 
     use super::*;

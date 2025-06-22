@@ -39,28 +39,19 @@ impl From<TryFromSliceError> for SimpleDnsError {
     }
 }
 
-// TODO: come back to this after deciding what to do with the Write trait
-// This may not be necessary anymore
-#[cfg(feature = "std")]
-impl From<std::io::Error> for SimpleDnsError {
-    fn from(_value: std::io::Error) -> Self {
-        Self::FailedToWrite
-    }
-}
-
 impl Error for SimpleDnsError {}
 
 impl Display for SimpleDnsError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             SimpleDnsError::InvalidClass(class) => {
-                write!(f, "Provided class is invalid: {0}", class)
+                write!(f, "Provided class is invalid: {class}")
             }
             SimpleDnsError::InvalidQClass(qclass) => {
-                write!(f, "Provided Qclass is invalid: {0}", qclass)
+                write!(f, "Provided Qclass is invalid: {qclass}")
             }
             SimpleDnsError::InvalidQType(qtype) => {
-                write!(f, "Provided QType is invalid: {0}", qtype)
+                write!(f, "Provided QType is invalid: {qtype}")
             }
             SimpleDnsError::InvalidServiceName => write!(f, "Provided service name is not valid"),
             SimpleDnsError::InvalidServiceLabel => {
@@ -83,7 +74,7 @@ impl Display for SimpleDnsError {
                 write!(f, "Failed to write the packet to provided buffer")
             }
             SimpleDnsError::InvalidUtf8String(e) => {
-                write!(f, "Invalid utf8 string: {}", e)
+                write!(f, "Invalid utf8 string: {e}")
             }
         }
     }

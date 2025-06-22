@@ -1,8 +1,8 @@
-use std::borrow::Cow;
-
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{WireFormat, MAX_NULL_LENGTH},
+    lib::Cow,
+    write::Write,
 };
 
 use super::RR;
@@ -54,9 +54,8 @@ impl<'a> WireFormat<'a> for NULL<'a> {
         Self::new(data.get_remaining())
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.data)
-            .map_err(crate::SimpleDnsError::from)
     }
 
     fn len(&self) -> usize {

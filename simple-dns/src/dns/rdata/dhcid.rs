@@ -1,5 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
-use std::borrow::Cow;
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Cow, write::Write};
 
 use super::RR;
 
@@ -36,7 +35,7 @@ impl<'a> WireFormat<'a> for DHCID<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&self.identifier.to_be_bytes())?;
         out.write_all(&[self.digest_type])?;
         out.write_all(&self.digest)?;
@@ -62,7 +61,7 @@ impl DHCID<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::lib::Vec;
 
     use super::*;
 
@@ -84,7 +83,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/DHCID.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {

@@ -1,6 +1,12 @@
-use std::{borrow::Cow, collections::HashMap, convert::TryFrom, fmt::Display, hash::Hash};
-
-use crate::bytes_buffer::BytesBuffer;
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{
+        fmt::{Debug, Display, Formatter, Result as FmtResult},
+        format, Cow, Hash, HashEntry, HashMap, Hasher, Iter, String, TryFrom, Vec,
+    },
+    seek::Seek,
+    write::Write,
+};
 
 use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
@@ -69,7 +75,7 @@ impl<'a> Name<'a> {
     }
 
     /// Returns an Iter of this Name Labels
-    pub fn iter(&'a self) -> std::slice::Iter<'a, Label<'a>> {
+    pub fn iter(&'a self) -> Iter<'a, Label<'a>> {
         self.labels.iter()
     }
 
@@ -119,7 +125,7 @@ impl<'a> Name<'a> {
         &self.labels[..]
     }
 
-    fn plain_append<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn plain_append<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         for label in self.iter() {
             out.write_all(&[label.len() as u8])?;
             out.write_all(&label.data)?;
@@ -129,20 +135,20 @@ impl<'a> Name<'a> {
         Ok(())
     }
 
-    fn compress_append<T: std::io::Write + std::io::Seek>(
+    fn compress_append<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         for (i, label) in self.iter().enumerate() {
             match name_refs.entry(&self.labels[i..]) {
-                std::collections::hash_map::Entry::Occupied(e) => {
+                HashEntry::Occupied(e) => {
                     let p = *e.get() as u16;
                     out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
 
                     return Ok(());
                 }
-                std::collections::hash_map::Entry::Vacant(e) => {
+                HashEntry::Vacant(e) => {
                     e.insert(out.stream_position()? as usize);
                     out.write_all(&[label.len() as u8])?;
                     out.write_all(&label.data)?;
@@ -227,11 +233,11 @@ impl<'a> WireFormat<'a> for Name<'a> {
         Ok(Self { labels })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         self.plain_append(out)
     }
 
-    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
@@ -269,23 +275,23 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
 }
 
 impl Display for Name<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         for (i, label) in self.iter().enumerate() {
             if i != 0 {
                 f.write_str(".")?;
             }
 
-            f.write_fmt(format_args!("{}", label))?;
+            f.write_fmt(format_args!("{label}"))?;
         }
 
         Ok(())
     }
 }
 
-impl std::fmt::Debug for Name<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Name<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_tuple("Name")
-            .field(&format!("{}", self))
+            .field(&format!("{self}"))
             .field(&format!("{}", self.len()))
             .finish()
     }
@@ -298,7 +304,7 @@ impl PartialEq for Name<'_> {
 }
 
 impl Hash for Name<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.labels.hash(state);
     }
 }
@@ -321,7 +327,7 @@ impl<'a> Iterator for LabelsIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         for i in self.current..self.bytes.len() {
             if self.bytes[i] == b'.' {
-                let current = std::mem::replace(&mut self.current, i + 1);
+                let current = crate::lib::mem::replace(&mut self.current, i + 1);
                 if i - current == 0 {
                     continue;
                 }
@@ -330,7 +336,7 @@ impl<'a> Iterator for LabelsIter<'a> {
         }
 
         if self.current < self.bytes.len() {
-            let current = std::mem::replace(&mut self.current, self.bytes.len());
+            let current = crate::lib::mem::replace(&mut self.current, self.bytes.len());
             Some(self.bytes[current..].into())
         } else {
             None
@@ -420,14 +426,14 @@ impl<'a> Label<'a> {
 }
 
 impl Display for Label<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = std::string::String::from_utf8_lossy(&self.data);
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        let s = String::from_utf8_lossy(&self.data);
         f.write_str(&s)
     }
 }
 
-impl std::fmt::Debug for Label<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for Label<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         f.debug_struct("Label")
             .field("data", &self.to_string())
             .finish()
@@ -442,10 +448,8 @@ impl AsRef<[u8]> for Label<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-    use std::{collections::hash_map::DefaultHasher, hash::Hasher};
-
     use super::*;
+    use crate::lib::vec;
     use crate::SimpleDnsError;
 
     #[test]
@@ -556,7 +560,7 @@ mod tests {
         let mut buf = Cursor::new(vec![0, 0, 0]);
         buf.set_position(3);
 
-        let mut name_refs = HashMap::new();
+        let mut name_refs = HashMap::default();
 
         let f_isi_arpa = Name::new_unchecked("F.ISI.ARPA");
         f_isi_arpa

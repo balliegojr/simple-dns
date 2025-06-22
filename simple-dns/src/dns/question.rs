@@ -1,6 +1,9 @@
-use crate::bytes_buffer::BytesBuffer;
-use crate::lib::TryFrom;
-use std::collections::HashMap;
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{HashMap, TryFrom},
+    seek::Seek,
+    write::Write,
+};
 
 use super::{name::Label, Name, WireFormat, QCLASS, QTYPE};
 
@@ -39,7 +42,7 @@ impl<'a> Question<'a> {
         }
     }
 
-    fn write_common<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_common<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         let qclass: u16 = match self.unicast_response {
             true => Into::<u16>::into(self.qclass) | 0x8000,
             false => self.qclass.into(),
@@ -47,7 +50,6 @@ impl<'a> Question<'a> {
 
         out.write_all(&Into::<u16>::into(self.qtype).to_be_bytes())?;
         out.write_all(&qclass.to_be_bytes())
-            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -73,12 +75,12 @@ impl<'a> WireFormat<'a> for Question<'a> {
         self.qname.len() + Self::MINIMUM_LEN
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         self.qname.write_to(out)?;
         self.write_common(out)
     }
 
-    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
@@ -90,10 +92,10 @@ impl<'a> WireFormat<'a> for Question<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::lib::Vec;
     use crate::{CLASS, TYPE};
 
     use super::*;
-    use std::convert::TryInto;
 
     #[test]
     fn parse_question() {

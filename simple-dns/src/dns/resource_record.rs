@@ -1,8 +1,13 @@
-use crate::{bytes_buffer::BytesBuffer, QCLASS, QTYPE};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{Hash, HashMap, Hasher},
+    seek::{Seek, SeekFrom},
+    write::Write,
+    QCLASS, QTYPE,
+};
 
 use super::{name::Label, rdata::RData, Name, WireFormat, CLASS, TYPE};
 use core::fmt::Debug;
-use std::{collections::HashMap, convert::TryInto, hash::Hash};
 
 mod flag {
     pub const CACHE_FLUSH: u16 = 0b1000_0000_0000_0000;
@@ -79,7 +84,7 @@ impl<'a> ResourceRecord<'a> {
         }
     }
 
-    fn write_common<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_common<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&u16::from(self.rdata.type_code()).to_be_bytes())?;
 
         if let RData::OPT(ref opt) = self.rdata {
@@ -95,7 +100,6 @@ impl<'a> ResourceRecord<'a> {
         }
 
         out.write_all(&self.ttl.to_be_bytes())
-            .map_err(crate::SimpleDnsError::from)
     }
 }
 
@@ -140,14 +144,14 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.name.len() + self.rdata.len() + Self::MINIMUM_LEN
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         self.name.write_to(out)?;
         self.write_common(out)?;
         out.write_all(&(self.rdata.len() as u16).to_be_bytes())?;
         self.rdata.write_to(out)
     }
 
-    fn write_compressed_to<T: std::io::Write + std::io::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut HashMap<&'a [Label<'a>], usize>,
@@ -156,20 +160,19 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.write_common(out)?;
 
         let len_position = out.stream_position()?;
-        out.write_all(&[0, 0])?;
 
         self.rdata.write_compressed_to(out, name_refs)?;
         let end = out.stream_position()?;
 
-        out.seek(std::io::SeekFrom::Start(len_position))?;
+        out.seek(SeekFrom::Start(len_position))?;
         out.write_all(&((end - len_position - 2) as u16).to_be_bytes())?;
-        out.seek(std::io::SeekFrom::End(0))?;
+        out.seek(SeekFrom::End(0))?;
         Ok(())
     }
 }
 
 impl Hash for ResourceRecord<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.class.hash(state);
         self.rdata.hash(state);
@@ -184,11 +187,7 @@ impl PartialEq for ResourceRecord<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-        io::Cursor,
-    };
+    use std::{collections::hash_map::DefaultHasher, io::Cursor};
 
     use crate::{dns::rdata::NULL, rdata::TXT};
 

@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write};
 
 use super::RR;
 
@@ -72,7 +72,7 @@ impl<'a> WireFormat<'a> for NSAP {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         out.write_all(&[self.afi.to_be()])?;
         out.write_all(&self.idi.to_be_bytes())?;
         out.write_all(&[self.dfi.to_be()])?;
@@ -89,7 +89,7 @@ impl<'a> WireFormat<'a> for NSAP {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
+    use crate::lib::Vec;
 
     use super::*;
 
@@ -128,7 +128,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/NSAP.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

@@ -1,14 +1,16 @@
 #![warn(missing_docs)]
 #![doc = include_str!("../README.md")]
-// #![no_std]
-// #[cfg(feature = "std")]
-// extern crate std;
 #![cfg_attr(not(feature = "std"), no_std)]
+
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(feature = "std")]
+extern crate std;
+
 mod bytes_buffer;
 mod dns;
+mod seek;
 mod simple_dns_error;
 mod write;
 
@@ -53,20 +55,43 @@ mod lib {
     pub use std::boxed::Box;
 
     #[cfg(all(feature = "alloc", not(feature = "std")))]
-    pub use std::collections::BTreeMap;
+    pub use alloc::format;
+    #[cfg(feature = "std")]
+    pub use std::format;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use alloc::collections::BTreeMap;
     #[cfg(feature = "std")]
     pub use std::collections::BTreeMap;
 
     #[cfg(all(feature = "alloc", not(feature = "std")))]
-    pub use std::collections::BTreeSet;
+    pub use alloc::collections::BTreeSet;
     #[cfg(feature = "std")]
     pub use std::collections::BTreeSet;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use hashbrown::HashMap;
+    #[cfg(feature = "std")]
+    pub use std::collections::HashMap;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use hashbrown::hash_map::Entry as HashEntry;
+    #[cfg(feature = "std")]
+    pub use std::collections::hash_map::Entry as HashEntry;
 
     pub use self::core::array::TryFromSliceError;
     pub use self::core::error::Error;
     pub use self::core::result::Result;
 
+    pub use self::core::hash::Hash;
+    pub use self::core::hash::Hasher;
+    pub use self::core::slice::Iter;
+
+    pub use self::core::convert::Into;
     pub use self::core::convert::TryFrom;
+    pub use self::core::ops::Deref;
+    pub use self::core::ops::DerefMut;
+    pub use self::core::str::FromStr;
 
     pub mod fmt {
         pub use super::core::fmt::*;
@@ -74,6 +99,10 @@ mod lib {
 
     pub mod str {
         pub use super::core::str::*;
+    }
+
+    pub mod mem {
+        pub use super::core::mem::*;
     }
 }
 
@@ -85,8 +114,7 @@ pub type Result<T> = lib::Result<T, SimpleDnsError>;
 #[cfg(debug_assertions)]
 pub mod testing {
     use super::rdata::RR;
-    use super::WireFormat;
-    use crate::lib::Vec;
+    use crate::{lib::Vec, WireFormat};
 
     #[allow(private_bounds)]
     pub fn type_code<T: RR>() -> u16 {

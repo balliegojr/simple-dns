@@ -1,10 +1,11 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, Name};
-use std::{
-    borrow::Cow,
-    net::{Ipv4Addr, Ipv6Addr},
-};
-
 use super::RR;
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::WireFormat,
+    lib::{Cow, Ipv4Addr, Ipv6Addr},
+    write::Write,
+    Name,
+};
 
 /// IPSECKEY record type stores information about IPsec key material
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -74,7 +75,7 @@ impl<'a> WireFormat<'a> for IPSECKEY<'a> {
         })
     }
 
-    fn write_to<T: std::io::Write>(&self, out: &mut T) -> crate::Result<()> {
+    fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()> {
         match &self.gateway {
             Gateway::None => {
                 out.write_all(&[self.precedence, 0, self.algorithm])?;
@@ -121,9 +122,8 @@ impl IPSECKEY<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{rdata::RData, ResourceRecord};
-
     use super::*;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_ipseckey() {
@@ -148,7 +148,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/IPSECKEY.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut (&sample_file[..]).into())?.rdata {

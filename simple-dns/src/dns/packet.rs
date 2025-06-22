@@ -1,11 +1,12 @@
-use std::{
-    collections::HashMap,
-    io::{Cursor, Seek, Write},
-};
-
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
-use crate::lib::Vec;
-use crate::{bytes_buffer::BytesBuffer, rdata::OPT, RCODE};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{HashMap, Vec},
+    rdata::OPT,
+    seek::Seek,
+    write::Write,
+    RCODE,
+};
 
 /// Represents a DNS message packet
 ///
@@ -203,7 +204,7 @@ impl<'a> Packet<'a> {
     pub fn write_compressed_to<T: Write + Seek>(&self, out: &mut T) -> crate::Result<()> {
         self.write_header(out)?;
 
-        let mut name_refs = HashMap::new();
+        let mut name_refs = HashMap::default();
         for e in &self.questions {
             e.write_compressed_to(out, &mut name_refs)?;
         }
@@ -242,7 +243,6 @@ mod tests {
     use crate::{dns::CLASS, dns::TYPE, SimpleDnsError};
 
     use super::*;
-    use std::convert::TryInto;
 
     #[test]
     fn parse_without_data_should_not_panic() {

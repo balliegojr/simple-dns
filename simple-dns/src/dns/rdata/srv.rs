@@ -70,11 +70,9 @@ impl<'a> WireFormat<'a> for SRV<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, io::Cursor};
-
-    use crate::{rdata::RData, ResourceRecord};
-
     use super::*;
+    use crate::lib::HashMap;
+    use crate::lib::Vec;
 
     #[test]
     fn parse_and_write_srv() {
@@ -109,7 +107,7 @@ mod tests {
 
         let mut plain = Vec::new();
         let mut compressed = Cursor::new(Vec::new());
-        let mut names = HashMap::new();
+        let mut names = HashMap::default();
 
         assert!(srv.write_to(&mut plain).is_ok());
         assert!(srv.write_compressed_to(&mut compressed, &mut names).is_ok());
@@ -118,7 +116,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         let sample_file = std::fs::read("samples/zonefile/SRV.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

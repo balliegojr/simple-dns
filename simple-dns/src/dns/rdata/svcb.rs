@@ -1,4 +1,4 @@
-use crate::lib::{BTreeMap, BTreeSet, Cow};
+use crate::lib::{BTreeMap, BTreeSet, Cow, Vec};
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, CharacterString, Name};
 
 use super::RR;
@@ -365,10 +365,11 @@ impl<'a> WireFormat<'a> for SVCParam<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{rdata::RData, ResourceRecord};
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
         // Copy of the answer from `dig crypto.cloudflare.com -t HTTPS`.
         let sample_file = std::fs::read("samples/zonefile/HTTPS.sample")?;
 
