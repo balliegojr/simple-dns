@@ -65,10 +65,8 @@ impl<'a> WireFormat<'a> for CAA<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lib::Vec;
-    use crate::{rdata::RData, Packet, ResourceRecord, CLASS};
-
     use super::*;
+    use crate::lib::{ToString, Vec};
 
     #[test]
     fn parse_and_write_caa() {
@@ -92,7 +90,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "compression")]
     fn parse_rdata_with_multiple_caa_records() {
+        use crate::{rdata::RData, Packet, ResourceRecord, CLASS};
+
         let mut packet = Packet::new_query(0);
         packet.answers.push(ResourceRecord::new(
             "caa.xxx.com".try_into().unwrap(),

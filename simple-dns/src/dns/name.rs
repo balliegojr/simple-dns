@@ -2,9 +2,8 @@ use crate::{
     bytes_buffer::BytesBuffer,
     lib::{
         fmt::{Debug, Display, Formatter, Result as FmtResult},
-        format, Cow, Hash, HashEntry, HashMap, Hasher, Iter, String, TryFrom, Vec,
+        format, Cow, Hash, Hasher, Iter, String, ToString, TryFrom, Vec,
     },
-    seek::Seek,
     write::Write,
 };
 
@@ -135,20 +134,21 @@ impl<'a> Name<'a> {
         Ok(())
     }
 
-    fn compress_append<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn compress_append<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         for (i, label) in self.iter().enumerate() {
             match name_refs.entry(&self.labels[i..]) {
-                HashEntry::Occupied(e) => {
+                crate::lib::HashEntry::Occupied(e) => {
                     let p = *e.get() as u16;
                     out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
 
                     return Ok(());
                 }
-                HashEntry::Vacant(e) => {
+                crate::lib::HashEntry::Vacant(e) => {
                     e.insert(out.stream_position()? as usize);
                     out.write_all(&[label.len() as u8])?;
                     out.write_all(&label.data)?;
@@ -237,10 +237,11 @@ impl<'a> WireFormat<'a> for Name<'a> {
         self.plain_append(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -449,8 +450,9 @@ impl AsRef<[u8]> for Label<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::vec;
-    use crate::SimpleDnsError;
+    #[cfg(feature = "compression")]
+    use crate::lib::Cursor;
+    use crate::{lib::Vec, SimpleDnsError};
 
     #[test]
     fn construct_valid_names() {
@@ -520,19 +522,19 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let mut bytes = Cursor::new(Vec::with_capacity(30));
+        let mut bytes = Vec::with_capacity(30);
         Name::new_unchecked("_srv._udp.local")
             .write_to(&mut bytes)
             .unwrap();
 
-        assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes.get_ref()[..]);
+        assert_eq!(b"\x04_srv\x04_udp\x05local\x00", &bytes[..]);
 
-        let mut bytes = Cursor::new(Vec::with_capacity(30));
+        let mut bytes = Vec::with_capacity(30);
         Name::new_unchecked("_srv._udp.local2.")
             .write_to(&mut bytes)
             .unwrap();
 
-        assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes.get_ref()[..]);
+        assert_eq!(b"\x04_srv\x04_udp\x06local2\x00", &bytes[..]);
     }
 
     #[test]
@@ -549,18 +551,19 @@ mod tests {
 
     #[test]
     fn root_name_should_write_zero() {
-        let mut bytes = Cursor::new(Vec::with_capacity(30));
+        let mut bytes = Vec::with_capacity(30);
         Name::new_unchecked(".").write_to(&mut bytes).unwrap();
 
-        assert_eq!(b"\x00", &bytes.get_ref()[..]);
+        assert_eq!(b"\x00", &bytes[..]);
     }
 
     #[test]
+    #[cfg(feature = "compression")]
     fn append_to_vec_with_compression() {
-        let mut buf = Cursor::new(vec![0, 0, 0]);
+        let mut buf = Cursor::new(crate::lib::vec![0, 0, 0]);
         buf.set_position(3);
 
-        let mut name_refs = HashMap::default();
+        let mut name_refs = crate::lib::HashMap::default();
 
         let f_isi_arpa = Name::new_unchecked("F.ISI.ARPA");
         f_isi_arpa
@@ -580,9 +583,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "compression")]
     fn append_to_vec_with_compression_mult_names() {
-        let mut buf = Cursor::new(vec![]);
-        let mut name_refs = HashMap::new();
+        let mut buf = Cursor::new(Vec::new());
+        let mut name_refs = crate::lib::HashMap::new();
 
         let isi_arpa = Name::new_unchecked("ISI.ARPA");
         isi_arpa
@@ -617,9 +621,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "compression")]
     fn ensure_different_domains_are_not_compressed() {
-        let mut buf = Cursor::new(vec![]);
-        let mut name_refs = HashMap::new();
+        let mut buf = Cursor::new(Vec::new());
+        let mut name_refs = crate::lib::HashMap::new();
 
         let foo_bar_baz = Name::new_unchecked("FOO.BAR.BAZ");
         foo_bar_baz
@@ -656,18 +661,22 @@ mod tests {
 
     #[test]
     fn len() -> crate::Result<()> {
-        let mut bytes = Cursor::new(Vec::new());
+        let mut bytes = Vec::new();
         let name_one = Name::new_unchecked("ex.com.");
         name_one.write_to(&mut bytes)?;
 
-        assert_eq!(8, bytes.get_ref().len());
-        assert_eq!(bytes.get_ref().len(), name_one.len());
-        assert_eq!(
-            8,
-            Name::parse(&mut BytesBuffer::new(bytes.get_ref()))?.len()
-        );
+        assert_eq!(8, bytes.len());
+        assert_eq!(bytes.len(), name_one.len());
+        assert_eq!(8, Name::parse(&mut BytesBuffer::new(&bytes))?.len());
 
-        let mut name_refs = HashMap::new();
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "compression")]
+    fn len_compressed() -> crate::Result<()> {
+        let name_one = Name::new_unchecked("ex.com.");
+        let mut name_refs = crate::lib::HashMap::new();
         let mut bytes = Cursor::new(Vec::new());
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
@@ -677,7 +686,14 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn hash() -> crate::Result<()> {
+        fn get_hash(name: &Name) -> u64 {
+            let mut hasher = std::hash::DefaultHasher::default();
+            name.hash(&mut hasher);
+            hasher.finish()
+        }
+
         let mut data =
             BytesBuffer::new(b"\x00\x00\x00\x01F\x03ISI\x04ARPA\x00\x03FOO\xc0\x03\x03BAR\xc0\x03");
         data.advance(3)?;
@@ -693,12 +709,6 @@ mod tests {
         );
 
         Ok(())
-    }
-
-    fn get_hash(name: &Name) -> u64 {
-        let mut hasher = DefaultHasher::default();
-        name.hash(&mut hasher);
-        hasher.finish()
     }
 
     #[test]

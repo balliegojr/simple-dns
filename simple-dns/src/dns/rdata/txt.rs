@@ -1,7 +1,7 @@
 use crate::CharacterString;
 use crate::{
     dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
-    lib::{format, vec, FromUtf8Error, HashMap, String, Vec},
+    lib::{format, vec, FromUtf8Error, String, Vec},
     write::Write,
 };
 
@@ -70,14 +70,16 @@ impl<'a> TXT<'a> {
         })
     }
 
+    // FIXME: remove the std feature once the HashMap is sorted out
     /// Returns parsed attributes from this TXT Record, valid formats are:
     /// - key=value
     /// - key=
     /// - key
     ///
     /// If a key is duplicated, only the first one will be considered
-    pub fn attributes(&self) -> HashMap<String, Option<String>> {
-        let mut attributes = HashMap::default();
+    #[cfg(feature = "std")]
+    pub fn attributes(&self) -> crate::lib::HashMap<String, Option<String>> {
+        let mut attributes = crate::lib::HashMap::new();
 
         for char_str in &self.strings {
             let mut splited = char_str.data.splitn(2, |c| *c == b'=');
@@ -106,8 +108,9 @@ impl<'a> TXT<'a> {
 
     /// Similar to [`attributes()`](TXT::attributes) but it parses the full TXT record as a single string,
     /// instead of expecting each attribute to be a separate [`CharacterString`](`CharacterString`)
-    pub fn long_attributes(self) -> crate::Result<HashMap<String, Option<String>>> {
-        let mut attributes = HashMap::default();
+    #[cfg(feature = "std")]
+    pub fn long_attributes(self) -> crate::Result<crate::lib::HashMap<String, Option<String>>> {
+        let mut attributes = crate::lib::HashMap::new();
 
         let full_string: String = match self.try_into() {
             Ok(string) => string,
@@ -143,10 +146,11 @@ impl<'a> TXT<'a> {
     }
 }
 
-impl TryFrom<HashMap<String, Option<String>>> for TXT<'_> {
+#[cfg(feature = "std")]
+impl TryFrom<crate::lib::HashMap<String, Option<String>>> for TXT<'_> {
     type Error = crate::SimpleDnsError;
 
-    fn try_from(value: HashMap<String, Option<String>>) -> Result<Self, Self::Error> {
+    fn try_from(value: crate::lib::HashMap<String, Option<String>>) -> Result<Self, Self::Error> {
         let mut txt = TXT::new();
         for (key, value) in value {
             match value {
@@ -228,10 +232,10 @@ impl<'a> WireFormat<'a> for TXT<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::{Box, Error};
+    use crate::lib::Error;
 
     #[test]
-    pub fn parse_and_write_txt() -> Result<(), Box<dyn Error>> {
+    pub fn parse_and_write_txt() -> Result<(), crate::lib::Box<dyn Error>> {
         let mut out = vec![];
         let txt = TXT::new()
             .with_char_string("version=0.1".try_into()?)
@@ -249,6 +253,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     pub fn get_attributes() -> Result<(), Box<dyn Error>> {
         let txt = TXT::new()
             .with_string("version=0.1")?
@@ -295,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn write_and_parse_large_txt() -> Result<(), Box<dyn Error>> {
+    fn write_and_parse_large_txt() -> Result<(), crate::lib::Box<dyn Error>> {
         let string = "X".repeat(1000);
         let txt: TXT = string.as_str().try_into()?;
 
@@ -311,6 +316,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn write_and_parse_large_attributes() -> Result<(), Box<dyn Error>> {
         let big_value = "f".repeat(1000);
 

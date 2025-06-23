@@ -11,13 +11,13 @@ categories = ["parser-implementations", "network-programming"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["alloc"]
+default = ["std", "compression"]
 std = []
-alloc = ["hashbrown/alloc"]
+alloc = []
+compression = ["std"]
 
 [dependencies]
 bitflags = "2.4"
-hashbrown = { version="0.15.4", default-features = false, optional=true }
 
 [dev-dependencies]
 criterion = "0.5"

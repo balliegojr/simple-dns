@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn parse_sample() -> Result<(), Box<dyn Error>> {
+    fn parse_sample() -> Result<(), Box<dyn crate::lib::Error>> {
         use crate::dns::WireFormat;
         use crate::lib::*;
         use crate::{rdata::RData, ResourceRecord};

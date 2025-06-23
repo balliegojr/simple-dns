@@ -1,4 +1,5 @@
 #![no_main]
+#![cfg(feature = "compression")]
 
 use libfuzzer_sys::fuzz_target;
 

@@ -71,7 +71,6 @@ impl<'a> WireFormat<'a> for SRV<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::HashMap;
     use crate::lib::Vec;
 
     #[test]
@@ -97,7 +96,10 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "compression")]
     fn srv_should_not_be_compressed() {
+        use crate::lib::{Cursor, HashMap};
+
         let srv = SRV {
             priority: 1,
             weight: 2,

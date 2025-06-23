@@ -67,7 +67,7 @@ impl ZONEMD<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lib::{Box, Error, Vec};
+    use crate::lib::{Error, Vec};
     use crate::{
         rdata::{RData, ZONEMD},
         ResourceRecord,

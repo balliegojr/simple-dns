@@ -1,8 +1,6 @@
 use crate::{
     bytes_buffer::BytesBuffer,
-    dns::{name::Label, CharacterString, WireFormat},
-    lib::HashMap,
-    seek::Seek,
+    dns::{CharacterString, WireFormat},
     write::Write,
 };
 
@@ -48,10 +46,11 @@ impl<'a> WireFormat<'a> for ISDN<'a> {
         self.sa.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.address.write_compressed_to(out, name_refs)?;
         self.sa.write_compressed_to(out, name_refs)
@@ -65,7 +64,7 @@ impl<'a> WireFormat<'a> for ISDN<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::Vec;
+    use crate::lib::{ToString, Vec};
 
     #[test]
     fn parse_and_write_isdn() {

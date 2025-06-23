@@ -89,7 +89,7 @@ impl<'a> WireFormat<'a> for NAPTR<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::Vec;
+    use crate::lib::{ToString, Vec};
 
     #[test]
     fn parse_and_write_naptr() {
