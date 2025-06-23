@@ -1,4 +1,4 @@
-pub(crate) trait Seek {
+pub trait Seek {
     fn seek(&mut self, pos: SeekFrom) -> crate::Result<u64>;
 
     fn stream_position(&mut self) -> crate::Result<u64> {

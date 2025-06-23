@@ -1,12 +1,11 @@
 use crate::{
     bytes_buffer::BytesBuffer,
-    lib::{Hash, HashMap, Hasher},
-    seek::{Seek, SeekFrom},
+    lib::{Hash, Hasher},
     write::Write,
     QCLASS, QTYPE,
 };
 
-use super::{name::Label, rdata::RData, Name, WireFormat, CLASS, TYPE};
+use super::{rdata::RData, Name, WireFormat, CLASS, TYPE};
 use core::fmt::Debug;
 
 mod flag {
@@ -151,10 +150,11 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.rdata.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.name.write_compressed_to(out, name_refs)?;
         self.write_common(out)?;
@@ -164,9 +164,9 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.rdata.write_compressed_to(out, name_refs)?;
         let end = out.stream_position()?;
 
-        out.seek(SeekFrom::Start(len_position))?;
+        out.seek(crate::seek::SeekFrom::Start(len_position))?;
         out.write_all(&((end - len_position - 2) as u16).to_be_bytes())?;
-        out.seek(SeekFrom::End(0))?;
+        out.seek(crate::seek::SeekFrom::End(0))?;
         Ok(())
     }
 }
@@ -187,11 +187,12 @@ impl PartialEq for ResourceRecord<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::hash_map::DefaultHasher, io::Cursor};
-
-    use crate::{dns::rdata::NULL, rdata::TXT};
-
     use super::*;
+    use crate::{
+        dns::rdata::NULL,
+        lib::{ToString, Vec},
+        rdata::TXT,
+    };
 
     #[test]
     fn test_parse() {
@@ -244,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let mut out = Cursor::new(Vec::new());
+        let mut out = Vec::new();
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -258,14 +259,14 @@ mod tests {
         assert!(rr.write_to(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x00\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
-            &out.get_ref()[..]
+            &out[..]
         );
-        assert_eq!(out.get_ref().len(), rr.len());
+        assert_eq!(out.len(), rr.len());
     }
 
     #[test]
     fn test_append_to_vec_cache_flush() {
-        let mut out = Cursor::new(Vec::new());
+        let mut out = Vec::new();
         let rdata = [255u8; 4];
 
         let rr = ResourceRecord {
@@ -279,9 +280,9 @@ mod tests {
         assert!(rr.write_to(&mut out).is_ok());
         assert_eq!(
             b"\x04_srv\x04_udp\x05local\x00\x00\x00\x80\x01\x00\x00\x00\x0a\x00\x04\xff\xff\xff\xff",
-            &out.get_ref()[..]
+            &out[..]
         );
-        assert_eq!(out.get_ref().len(), rr.len());
+        assert_eq!(out.len(), rr.len());
     }
 
     #[test]
@@ -315,6 +316,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_eq() {
         let a = ResourceRecord::new(
             Name::new_unchecked("_srv.local"),
@@ -334,6 +336,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn test_hash_ignore_ttl() {
         let a = ResourceRecord::new(
             Name::new_unchecked("_srv.local"),
@@ -354,13 +357,15 @@ mod tests {
         assert_eq!(get_hash(&a), get_hash(&b));
     }
 
+    #[cfg(feature = "std")]
     fn get_hash(rr: &ResourceRecord) -> u64 {
-        let mut hasher = DefaultHasher::default();
+        let mut hasher = std::hash::DefaultHasher::default();
         rr.hash(&mut hasher);
         hasher.finish()
     }
 
     #[test]
+    #[cfg(feature = "std")]
     fn parse_sample_files() -> Result<(), Box<dyn std::error::Error>> {
         for file_path in std::fs::read_dir("samples/zonefile")? {
             let bytes = std::fs::read(file_path?.path())?;

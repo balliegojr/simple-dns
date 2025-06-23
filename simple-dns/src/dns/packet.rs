@@ -1,12 +1,5 @@
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
-use crate::{
-    bytes_buffer::BytesBuffer,
-    lib::{HashMap, Vec},
-    rdata::OPT,
-    seek::Seek,
-    write::Write,
-    RCODE,
-};
+use crate::{bytes_buffer::BytesBuffer, lib::Vec, rdata::OPT, write::Write, RCODE};
 
 /// Represents a DNS message packet
 ///
@@ -156,19 +149,19 @@ impl<'a> Packet<'a> {
     ///
     /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
     pub fn build_bytes_vec(&self) -> crate::Result<Vec<u8>> {
-        let mut out = Cursor::new(Vec::with_capacity(900));
-
+        let mut out = Vec::with_capacity(900);
         self.write_to(&mut out)?;
 
-        Ok(out.into_inner())
+        Ok(out)
     }
 
     /// Creates a new [Vec`<u8>`](`Vec<T>`) and write the contents of this package in wire format
     /// with compression enabled
     ///
     /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
+    #[cfg(feature = "compression")]
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
-        let mut out = Cursor::new(Vec::with_capacity(900));
+        let mut out = crate::lib::Cursor::new(Vec::with_capacity(900));
         self.write_compressed_to(&mut out)?;
 
         Ok(out.into_inner())
@@ -200,11 +193,15 @@ impl<'a> Packet<'a> {
         Ok(())
     }
 
+    #[cfg(feature = "compression")]
     /// Write the contents of this package in wire format with enabled compression into the provided writer
-    pub fn write_compressed_to<T: Write + Seek>(&self, out: &mut T) -> crate::Result<()> {
+    pub fn write_compressed_to<T: Write + crate::seek::Seek>(
+        &self,
+        out: &mut T,
+    ) -> crate::Result<()> {
         self.write_header(out)?;
 
-        let mut name_refs = HashMap::default();
+        let mut name_refs = crate::lib::HashMap::default();
         for e in &self.questions {
             e.write_compressed_to(out, &mut name_refs)?;
         }
@@ -240,7 +237,7 @@ impl<'a> Packet<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{dns::CLASS, dns::TYPE, SimpleDnsError};
+    use crate::{dns::CLASS, dns::TYPE, lib::ToString, SimpleDnsError};
 
     use super::*;
 

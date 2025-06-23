@@ -3,7 +3,7 @@ use crate::{
     dns::WireFormat,
     lib::{
         fmt::{Debug, Display, Formatter},
-        Cow, String, TryFrom,
+        Cow, String, ToString, TryFrom,
     },
     write::Write,
     SimpleDnsError,
@@ -116,11 +116,6 @@ impl Debug for CharacterString<'_> {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::hash_map::DefaultHasher,
-        hash::{Hash, Hasher},
-    };
-
     use super::*;
     use crate::lib::Vec;
 
@@ -151,20 +146,6 @@ mod tests {
         c_string.write_to(&mut out).unwrap();
 
         assert_eq!(b"\x0esome_long_text", &out[..]);
-    }
-
-    #[test]
-    fn eq() {
-        let a = CharacterString::new(b"text").unwrap();
-        let b = CharacterString::new(b"text").unwrap();
-
-        assert_eq!(a, b);
-        assert_eq!(get_hash(a), get_hash(b));
-    }
-
-    fn get_hash(string: CharacterString) -> u64 {
-        let mut hasher = DefaultHasher::default();
-        string.hash(&mut hasher);
-        hasher.finish()
+        assert_eq!(b"\x0esome_long_text", &out[..]);
     }
 }

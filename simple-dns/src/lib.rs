@@ -30,9 +30,9 @@ mod lib {
     pub use self::core::net::Ipv6Addr;
 
     #[cfg(all(feature = "alloc", not(feature = "std")))]
-    pub use alloc::borrow::{Cow, ToOwned};
+    pub use alloc::borrow::Cow;
     #[cfg(feature = "std")]
-    pub use std::borrow::{Cow, ToOwned};
+    pub use std::borrow::Cow;
 
     #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::string::{FromUtf8Error, String, ToString};
@@ -69,14 +69,15 @@ mod lib {
     #[cfg(feature = "std")]
     pub use std::collections::BTreeSet;
 
-    #[cfg(all(feature = "alloc", not(feature = "std")))]
-    pub use hashbrown::HashMap;
+    // #[cfg(all(feature = "alloc", not(feature = "std")))]
+    // pub use crate::cursor::Cursor;
     #[cfg(feature = "std")]
+    pub use std::io::Cursor;
+
+    #[cfg(feature = "compression")]
     pub use std::collections::HashMap;
 
-    #[cfg(all(feature = "alloc", not(feature = "std")))]
-    pub use hashbrown::hash_map::Entry as HashEntry;
-    #[cfg(feature = "std")]
+    #[cfg(feature = "compression")]
     pub use std::collections::hash_map::Entry as HashEntry;
 
     pub use self::core::array::TryFromSliceError;
@@ -87,7 +88,6 @@ mod lib {
     pub use self::core::hash::Hasher;
     pub use self::core::slice::Iter;
 
-    pub use self::core::convert::Into;
     pub use self::core::convert::TryFrom;
     pub use self::core::ops::Deref;
     pub use self::core::ops::DerefMut;

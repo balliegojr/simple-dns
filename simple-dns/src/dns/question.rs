@@ -1,11 +1,5 @@
-use crate::{
-    bytes_buffer::BytesBuffer,
-    lib::{HashMap, TryFrom},
-    seek::Seek,
-    write::Write,
-};
-
-use super::{name::Label, Name, WireFormat, QCLASS, QTYPE};
+use super::{Name, WireFormat, QCLASS, QTYPE};
+use crate::{bytes_buffer::BytesBuffer, lib::TryFrom, write::Write};
 
 /// Question represents a query in the DNS Packet
 #[derive(Debug, Clone)]
@@ -80,10 +74,11 @@ impl<'a> WireFormat<'a> for Question<'a> {
         self.write_common(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.qname.write_compressed_to(out, name_refs)?;
         self.write_common(out)
@@ -92,8 +87,7 @@ impl<'a> WireFormat<'a> for Question<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lib::Vec;
-    use crate::{CLASS, TYPE};
+    use crate::{lib::Vec, CLASS, TYPE};
 
     use super::*;
 

@@ -1,8 +1,6 @@
 use crate::{
     bytes_buffer::BytesBuffer,
-    dns::{name::Label, Name, WireFormat},
-    lib::HashMap,
-    seek::Seek,
+    dns::{Name, WireFormat},
     write::Write,
 };
 
@@ -90,10 +88,11 @@ impl<'a> WireFormat<'a> for SOA<'a> {
         self.write_common(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.mname.write_compressed_to(out, name_refs)?;
         self.rname.write_compressed_to(out, name_refs)?;
@@ -147,8 +146,8 @@ mod tests {
         assert_eq!(
             sample_rdata.rname,
             [
-                Label::new_unchecked(b"Action.domains"),
-                Label::new_unchecked(b"sample")
+                crate::Label::new_unchecked(b"Action.domains"),
+                crate::Label::new_unchecked(b"sample")
             ]
             .into()
         );

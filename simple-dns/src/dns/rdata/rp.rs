@@ -1,8 +1,6 @@
 use crate::{
     bytes_buffer::BytesBuffer,
-    dns::{name::Label, Name, WireFormat},
-    lib::HashMap,
-    seek::Seek,
+    dns::{Name, WireFormat},
     write::Write,
 };
 
@@ -48,10 +46,11 @@ impl<'a> WireFormat<'a> for RP<'a> {
         self.txt.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.mbox.write_compressed_to(out, name_refs)?;
         self.txt.write_compressed_to(out, name_refs)
@@ -66,7 +65,7 @@ impl<'a> WireFormat<'a> for RP<'a> {
 mod tests {
 
     use super::*;
-    use crate::lib::Vec;
+    use crate::lib::{ToString, Vec};
 
     #[test]
     fn parse_and_write_rp() {

@@ -34,10 +34,11 @@ macro_rules! rr_wrapper {
                 self.0.write_to(out)
             }
 
-            fn write_compressed_to<T: Write + Seek>(
+            #[cfg(feature = "compression")]
+            fn write_compressed_to<T: Write + crate::seek::Seek>(
                 &'a self,
                 out: &mut T,
-                name_refs: &mut crate::lib::HashMap<&'a [crate::dns::name::Label<'a>], usize>,
+                name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
             ) -> crate::Result<()> {
                 self.0.write_compressed_to(out, name_refs)
             }
@@ -117,10 +118,11 @@ macro_rules! rdata_enum {
                 }
             }
 
-            fn write_compressed_to<T: Write + Seek>(
+            #[cfg(feature = "compression")]
+            fn write_compressed_to<T: Write + crate::seek::Seek>(
                 &'a self,
                 out: &mut T,
-                name_refs: &mut  HashMap<&'a [crate::dns::name::Label<'a>], usize>,
+                name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
             ) -> crate::Result<()> {
                 match &self {
                     $(

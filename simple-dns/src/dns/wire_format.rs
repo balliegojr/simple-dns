@@ -1,6 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, lib::HashMap, seek::Seek, write::Write};
-
-use super::name::Label;
+use crate::{bytes_buffer::BytesBuffer, write::Write};
 
 /// Represents anything that can be part of a dns packet (Question, Resource Record, RData)
 pub(crate) trait WireFormat<'a> {
@@ -16,10 +14,11 @@ pub(crate) trait WireFormat<'a> {
     /// Write this part bytes to the writer
     fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()>;
 
-    fn write_compressed_to<T: Write + Seek>(
+    #[cfg(feature = "compression")]
+    fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        _name_refs: &mut HashMap<&'a [Label<'a>], usize>,
+        _name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
     ) -> crate::Result<()> {
         self.write_to(out)
     }

@@ -1,4 +1,4 @@
-pub(crate) trait Write {
+pub trait Write {
     fn write_all(&mut self, bytes: &[u8]) -> crate::Result<()>;
     fn flush(&mut self) -> crate::Result<()>;
 }
@@ -16,5 +16,17 @@ where
     fn flush(&mut self) -> crate::Result<()> {
         self.flush()
             .map_err(|_| crate::SimpleDnsError::FailedToWrite)
+    }
+}
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+impl Write for crate::lib::Vec<u8> {
+    fn write_all(&mut self, bytes: &[u8]) -> crate::Result<()> {
+        self.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn flush(&mut self) -> crate::Result<()> {
+        Ok(())
     }
 }
