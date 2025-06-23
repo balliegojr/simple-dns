@@ -49,8 +49,10 @@ mod lib {
     #[cfg(feature = "std")]
     pub use std::vec;
 
+    #[allow(unused)]
     #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::boxed::Box;
+    #[allow(unused)]
     #[cfg(feature = "std")]
     pub use std::boxed::Box;
 
@@ -91,6 +93,7 @@ mod lib {
     pub use self::core::convert::TryFrom;
     pub use self::core::ops::Deref;
     pub use self::core::ops::DerefMut;
+    #[allow(unused)]
     pub use self::core::str::FromStr;
 
     pub mod fmt {
