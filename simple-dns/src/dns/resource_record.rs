@@ -160,6 +160,7 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.write_common(out)?;
 
         let len_position = out.stream_position()?;
+        out.write_all(&[0, 0])?;
 
         self.rdata.write_compressed_to(out, name_refs)?;
         let end = out.stream_position()?;
