@@ -58,6 +58,19 @@ impl<'a> TXT<'a> {
         self
     }
 
+    /// Returns parsed attributes from this TXT Record as bytes, valid formats are:
+    /// - key=value
+    /// - key=
+    /// - key
+    pub fn iter_raw(&self) -> impl Iterator<Item=(&[u8], Option<&[u8]>)> {
+        self.strings.iter().filter_map(|char_str| {
+            let mut splited = char_str.data.splitn(2, |c| *c == b'=');
+            let key = splited.next()?;
+            let value = splited.next();
+            Some((key, value))
+        })
+    }
+
     /// Returns parsed attributes from this TXT Record, valid formats are:
     /// - key=value
     /// - key=
