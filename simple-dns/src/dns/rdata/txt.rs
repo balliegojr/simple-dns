@@ -253,13 +253,13 @@ mod tests {
 
     #[test]
     pub fn get_attributes() -> Result<(), Box<dyn std::error::Error>> {
-        let attributes = TXT::new()
+        let txt = TXT::new()
             .with_string("version=0.1")?
             .with_string("flag")?
             .with_string("with_eq=eq=")?
             .with_string("version=dup")?
-            .with_string("empty=")?
-            .attributes();
+            .with_string("empty=")?;
+        let attributes = txt.attributes();
 
         assert_eq!(4, attributes.len());
         assert_eq!(Some("0.1".to_owned()), attributes["version"]);
@@ -267,6 +267,13 @@ mod tests {
         assert_eq!(Some(String::new()), attributes["empty"]);
         assert_eq!(None, attributes["flag"]);
 
+        assert_eq!(txt.iter_raw().collect::<Vec<_>>(), vec![
+            ("version".as_bytes(), Some("0.1".as_bytes())),
+            ("flag".as_bytes(), None),
+            ("with_eq".as_bytes(), Some("eq=".as_bytes())),
+            ("version".as_bytes(), Some("dup".as_bytes())),
+            ("empty".as_bytes(), Some("".as_bytes()))
+        ]);
         Ok(())
     }
 
