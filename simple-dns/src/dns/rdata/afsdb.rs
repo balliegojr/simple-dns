@@ -51,7 +51,7 @@ impl<'a> WireFormat<'a> for AFSDB<'a> {
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<String, u16>,
+        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
     ) -> crate::Result<()> {
         out.write_all(&self.subtype.to_be_bytes())?;
         self.hostname.write_compressed_to(out, name_refs)

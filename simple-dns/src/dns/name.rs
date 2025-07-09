@@ -138,11 +138,11 @@ impl<'a> Name<'a> {
     fn compress_append<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<String, u16>,
+        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
     ) -> crate::Result<()> {
         use radix_trie::TrieCommon;
 
-        let rev_label = DisplayLabelsRev(&self.labels).to_string();
+        let rev_label = to_bytes(self.labels.iter().rev());
         let mut remaining = rev_label.len();
         let ancestor = name_refs.get_ancestor(&rev_label);
 
@@ -158,7 +158,7 @@ impl<'a> Name<'a> {
                     }
 
                     name_refs.insert(
-                        rev_label[..remaining].to_string(),
+                        rev_label[..remaining].to_vec(),
                         out.stream_position()? as u16,
                     );
 
@@ -171,7 +171,7 @@ impl<'a> Name<'a> {
             None => {
                 for label in self.labels.iter() {
                     name_refs.insert(
-                        rev_label[..remaining].to_string(),
+                        rev_label[..remaining].to_vec(),
                         out.stream_position()? as u16,
                     );
 
@@ -268,7 +268,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<String, u16>,
+        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -304,7 +304,17 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
 
 impl Display for Name<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        fmt_labels(self.labels.iter(), f)
+        let mut labels = self.labels.iter();
+
+        if let Some(label) = labels.next() {
+            f.write_fmt(format_args!("{label}"))?;
+        }
+
+        for label in labels {
+            f.write_fmt(format_args!(".{label}"))?;
+        }
+
+        Ok(())
     }
 }
 
@@ -329,26 +339,18 @@ impl Hash for Name<'_> {
     }
 }
 
-struct DisplayLabelsRev<'a>(&'a [Label<'a>]);
-impl Display for DisplayLabelsRev<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        fmt_labels(self.0.iter().rev(), f)
-    }
-}
-
-fn fmt_labels<'a>(
-    mut labels: impl Iterator<Item = &'a Label<'a>>,
-    f: &mut Formatter<'_>,
-) -> FmtResult {
+fn to_bytes<'a>(mut labels: impl Iterator<Item = &'a Label<'a>>) -> Vec<u8> {
+    let mut bytes = Vec::new();
     if let Some(label) = labels.next() {
-        f.write_fmt(format_args!("{label}"))?;
+        bytes.extend_from_slice(&label.data);
     }
 
     for label in labels {
-        f.write_fmt(format_args!(".{label}"))?;
+        bytes.push(b'.');
+        bytes.extend_from_slice(&label.data);
     }
 
-    Ok(())
+    bytes
 }
 
 /// An iterator over the labels in a domain name
