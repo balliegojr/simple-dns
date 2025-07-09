@@ -14,10 +14,11 @@ categories = ["parser-implementations", "network-programming"]
 default = ["std", "compression"]
 std = []
 alloc = []
-compression = ["std"]
+compression = ["radix_trie"]
 
 [dependencies]
 bitflags = "2.4"
+radix_trie = { version="0.2.1", optional=true}
 
 [dev-dependencies]
 criterion = "0.5"
@@ -28,3 +29,6 @@ bench = false
 [[bench]]
 name = "packet_bench"
 harness = false
+
+[package.metadata.docs.rs]
+all-features = true

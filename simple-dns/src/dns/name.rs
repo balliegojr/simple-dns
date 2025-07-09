@@ -88,6 +88,13 @@ impl<'a> Name<'a> {
                 .all(|(o, s)| *o == *s)
     }
 
+    /// Transforms the inner data into its owned type
+    pub fn into_owned<'b>(self) -> Name<'b> {
+        Name {
+            labels: self.labels.into_iter().map(|l| l.into_owned()).collect(),
+        }
+    }
+
     /// Returns the subdomain part of self, based on `domain`.
     /// If self is not a subdomain of `domain`, returns None
     ///
@@ -112,13 +119,6 @@ impl<'a> Name<'a> {
         }
     }
 
-    /// Transforms the inner data into its owned type
-    pub fn into_owned<'b>(self) -> Name<'b> {
-        Name {
-            labels: self.labels.into_iter().map(|l| l.into_owned()).collect(),
-        }
-    }
-
     /// Get the labels that compose this name
     pub fn get_labels(&'_ self) -> &'_ [Label<'a>] {
         &self.labels[..]
@@ -138,20 +138,47 @@ impl<'a> Name<'a> {
     fn compress_append<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut radix_trie::Trie<String, u16>,
     ) -> crate::Result<()> {
-        for (i, label) in self.iter().enumerate() {
-            match name_refs.entry(&self.labels[i..]) {
-                crate::lib::HashEntry::Occupied(e) => {
-                    let p = *e.get() as u16;
-                    out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
+        use radix_trie::TrieCommon;
 
-                    return Ok(());
-                }
-                crate::lib::HashEntry::Vacant(e) => {
-                    e.insert(out.stream_position()? as usize);
+        let rev_label = DisplayLabelsRev(&self.labels).to_string();
+        let mut remaining = rev_label.len();
+        let ancestor = name_refs.get_ancestor(&rev_label);
+
+        match ancestor {
+            Some(ancestor) => {
+                let p = *ancestor.value().unwrap();
+                let ancestor_len = ancestor.key().unwrap().len();
+
+                for label in self.labels.iter() {
+                    if remaining <= ancestor_len {
+                        out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
+                        return Ok(());
+                    }
+
+                    name_refs.insert(
+                        rev_label[..remaining].to_string(),
+                        out.stream_position()? as u16,
+                    );
+
                     out.write_all(&[label.len() as u8])?;
                     out.write_all(&label.data)?;
+
+                    remaining = remaining.saturating_sub(label.len() + 1);
+                }
+            }
+            None => {
+                for label in self.labels.iter() {
+                    name_refs.insert(
+                        rev_label[..remaining].to_string(),
+                        out.stream_position()? as u16,
+                    );
+
+                    out.write_all(&[label.len() as u8])?;
+                    out.write_all(&label.data)?;
+
+                    remaining = remaining.saturating_sub(label.len() + 1);
                 }
             }
         }
@@ -241,7 +268,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::HashMap<&'a [Label<'a>], usize>,
+        name_refs: &mut radix_trie::Trie<String, u16>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -277,15 +304,7 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
 
 impl Display for Name<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        for (i, label) in self.iter().enumerate() {
-            if i != 0 {
-                f.write_str(".")?;
-            }
-
-            f.write_fmt(format_args!("{label}"))?;
-        }
-
-        Ok(())
+        fmt_labels(self.labels.iter(), f)
     }
 }
 
@@ -308,6 +327,28 @@ impl Hash for Name<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.labels.hash(state);
     }
+}
+
+struct DisplayLabelsRev<'a>(&'a [Label<'a>]);
+impl Display for DisplayLabelsRev<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        fmt_labels(self.0.iter().rev(), f)
+    }
+}
+
+fn fmt_labels<'a>(
+    mut labels: impl Iterator<Item = &'a Label<'a>>,
+    f: &mut Formatter<'_>,
+) -> FmtResult {
+    if let Some(label) = labels.next() {
+        f.write_fmt(format_args!("{label}"))?;
+    }
+
+    for label in labels {
+        f.write_fmt(format_args!(".{label}"))?;
+    }
+
+    Ok(())
 }
 
 /// An iterator over the labels in a domain name
@@ -563,7 +604,7 @@ mod tests {
         let mut buf = Cursor::new(crate::lib::vec![0, 0, 0]);
         buf.set_position(3);
 
-        let mut name_refs = crate::lib::HashMap::default();
+        let mut name_refs = Default::default();
 
         let f_isi_arpa = Name::new_unchecked("F.ISI.ARPA");
         f_isi_arpa
@@ -586,7 +627,7 @@ mod tests {
     #[cfg(feature = "compression")]
     fn append_to_vec_with_compression_mult_names() {
         let mut buf = Cursor::new(Vec::new());
-        let mut name_refs = crate::lib::HashMap::new();
+        let mut name_refs = Default::default();
 
         let isi_arpa = Name::new_unchecked("ISI.ARPA");
         isi_arpa
@@ -624,7 +665,7 @@ mod tests {
     #[cfg(feature = "compression")]
     fn ensure_different_domains_are_not_compressed() {
         let mut buf = Cursor::new(Vec::new());
-        let mut name_refs = crate::lib::HashMap::new();
+        let mut name_refs = Default::default();
 
         let foo_bar_baz = Name::new_unchecked("FOO.BAR.BAZ");
         foo_bar_baz
@@ -676,10 +717,12 @@ mod tests {
     #[cfg(feature = "compression")]
     fn len_compressed() -> crate::Result<()> {
         let name_one = Name::new_unchecked("ex.com.");
-        let mut name_refs = crate::lib::HashMap::new();
+        let mut name_refs = Default::default();
         let mut bytes = Cursor::new(Vec::new());
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
+
+        dbg!(&bytes.get_ref());
 
         assert_eq!(10, bytes.get_ref().len());
         Ok(())

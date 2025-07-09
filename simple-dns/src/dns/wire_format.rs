@@ -18,7 +18,7 @@ pub(crate) trait WireFormat<'a> {
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        _name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
+        _name_refs: &mut radix_trie::Trie<String, u16>,
     ) -> crate::Result<()> {
         self.write_to(out)
     }

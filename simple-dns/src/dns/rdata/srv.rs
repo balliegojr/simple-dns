@@ -98,7 +98,7 @@ mod tests {
     #[test]
     #[cfg(feature = "compression")]
     fn srv_should_not_be_compressed() {
-        use crate::lib::{Cursor, HashMap};
+        use crate::lib::Cursor;
 
         let srv = SRV {
             priority: 1,
@@ -109,7 +109,7 @@ mod tests {
 
         let mut plain = Vec::new();
         let mut compressed = Cursor::new(Vec::new());
-        let mut names = HashMap::default();
+        let mut names = Default::default();
 
         assert!(srv.write_to(&mut plain).is_ok());
         assert!(srv.write_compressed_to(&mut compressed, &mut names).is_ok());
