@@ -108,7 +108,7 @@ impl<'a> SVCB<'a> {
     }
 
     /// Iterates over all parameters.
-    pub fn iter_params(&self) -> impl Iterator<Item = &SVCParam> {
+    pub fn iter_params(&self) -> impl Iterator<Item = &SVCParam<'a>> {
         self.params.values()
     }
 

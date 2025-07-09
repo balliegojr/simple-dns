@@ -124,7 +124,7 @@ impl<'a> Header<'a> {
         flags
     }
 
-    pub(crate) fn opt_rr(&self) -> Option<ResourceRecord> {
+    pub(crate) fn opt_rr(&self) -> Option<ResourceRecord<'a>> {
         self.opt.as_ref().map(|opt| {
             ResourceRecord::new(
                 [].into(),
