@@ -80,18 +80,13 @@ impl<'a> TXT<'a> {
     #[cfg(feature = "std")]
     pub fn attributes(&self) -> crate::lib::HashMap<String, Option<String>> {
         let mut attributes = crate::lib::HashMap::new();
-
-        for char_str in &self.strings {
-            let mut splited = char_str.data.splitn(2, |c| *c == b'=');
-            let key = match splited.next() {
-                Some(key) => match crate::lib::str::from_utf8(key) {
-                    Ok(key) => key.to_owned(),
-                    Err(_) => continue,
-                },
-                None => continue,
+        let iter = self.iter_raw().filter_map(|(key, value)| {
+            let key = match crate::lib::str::from_utf8(key) {
+                Ok(key) => key.to_owned(),
+                Err(_) => return None,
             };
 
-            let value = match splited.next() {
+            let value = match value {
                 Some(value) if !value.is_empty() => match crate::lib::str::from_utf8(value) {
                     Ok(v) => Some(v.to_owned()),
                     Err(_) => Some(String::new()),
@@ -100,6 +95,10 @@ impl<'a> TXT<'a> {
                 _ => None,
             };
 
+            Some((key, value))
+        });
+
+        for (key, value) in iter {
             attributes.entry(key).or_insert(value);
         }
 
@@ -253,21 +252,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "std")]
-    pub fn get_attributes() -> Result<(), Box<dyn Error>> {
+    pub fn iter_raw() -> Result<(), Box<dyn Error>> {
         let txt = TXT::new()
             .with_string("version=0.1")?
             .with_string("flag")?
             .with_string("with_eq=eq=")?
             .with_string("version=dup")?
             .with_string("empty=")?;
-        let attributes = txt.attributes();
-
-        assert_eq!(4, attributes.len());
-        assert_eq!(Some("0.1".to_owned()), attributes["version"]);
-        assert_eq!(Some("eq=".to_owned()), attributes["with_eq"]);
-        assert_eq!(Some(String::new()), attributes["empty"]);
-        assert_eq!(None, attributes["flag"]);
 
         assert_eq!(
             txt.iter_raw().collect::<Vec<_>>(),
@@ -279,6 +270,26 @@ mod tests {
                 ("empty".as_bytes(), Some("".as_bytes()))
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    pub fn get_attributes() -> Result<(), Box<dyn Error>> {
+        let attributes = TXT::new()
+            .with_string("version=0.1")?
+            .with_string("flag")?
+            .with_string("with_eq=eq=")?
+            .with_string("version=dup")?
+            .with_string("empty=")?
+            .attributes();
+
+        assert_eq!(4, attributes.len());
+        assert_eq!(Some("0.1".to_owned()), attributes["version"]);
+        assert_eq!(Some("eq=".to_owned()), attributes["with_eq"]);
+        assert_eq!(Some(String::new()), attributes["empty"]);
+        assert_eq!(None, attributes["flag"]);
+
         Ok(())
     }
 
