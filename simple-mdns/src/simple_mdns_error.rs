@@ -19,10 +19,10 @@ impl Display for SimpleMdnsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SimpleMdnsError::UdpSocketError(err) => {
-                write!(f, "There was an error related to UDP socket: {}", err)
+                write!(f, "There was an error related to UDP socket: {err}")
             }
             SimpleMdnsError::DnsParsing(err) => {
-                write!(f, "Failed to parse dns packet: {}", err)
+                write!(f, "Failed to parse dns packet: {err}")
             }
             SimpleMdnsError::ServiceDiscoveryStopped => {
                 write!(f, "Service discovery is no longer running")

@@ -102,7 +102,7 @@ impl<'a> Name<'a> {
     /// let sub = name.without(&domain).unwrap();
     /// assert_eq!(sub.to_string(), "sub")
     /// ```
-    pub fn without(&self, domain: &Name) -> Option<Name> {
+    pub fn without(&'_ self, domain: &Name) -> Option<Name<'_>> {
         if self.is_subdomain_of(domain) {
             let labels = self.labels[..self.labels.len() - domain.labels.len()].to_vec();
 
