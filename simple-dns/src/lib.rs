@@ -76,11 +76,8 @@ mod lib {
     #[cfg(feature = "std")]
     pub use std::io::Cursor;
 
-    #[cfg(feature = "compression")]
+    #[cfg(feature = "std")]
     pub use std::collections::HashMap;
-
-    #[cfg(feature = "compression")]
-    pub use std::collections::hash_map::Entry as HashEntry;
 
     pub use self::core::array::TryFromSliceError;
     pub use self::core::error::Error;

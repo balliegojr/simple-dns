@@ -57,8 +57,16 @@ assert!(!header_buffer::has_flags(&buffer[..], PacketFlag::RESPONSE).unwrap());
 EDNS is supported by Packet [opt](Packet::opt) and [opt_mut](Packet::opt_mut) functions, when working with ENDS packets, 
 you **SHOULD NOT** add **OPT Resource Records** directly to the **Additional Records** sections unless you know exactly what you are doing.  
 
+## Feature Flags
 
-# EDNS0 caveats
+- `[std]`: Enables rust std
+- `[compression]`: Includes name compression for wire format generation
+- `alloc`: Required for no_std support
+
+
+
+
+## EDNS0 caveats
 
 EDNS extends the DNS packet header by adding an OPT resource record and *moving* part of the header information to the additional records section. 
 RCODE went from 4 bits to 12 bits, where the first 4 bits are stored in the header section and the last 8 bits are stored somewhere else inside the packet.  

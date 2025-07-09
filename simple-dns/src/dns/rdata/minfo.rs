@@ -51,7 +51,7 @@ impl<'a> WireFormat<'a> for MINFO<'a> {
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::HashMap<&'a [crate::Label<'a>], usize>,
+        name_refs: &mut radix_trie::Trie<String, u16>,
     ) -> crate::Result<()> {
         self.rmailbox.write_compressed_to(out, name_refs)?;
         self.emailbox.write_compressed_to(out, name_refs)

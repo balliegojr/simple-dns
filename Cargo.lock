@@ -794,6 +794,7 @@ version = "0.10.1"
 dependencies = [
  "bitflags",
  "criterion",
+ "radix_trie",
 ]
 
 [[package]]

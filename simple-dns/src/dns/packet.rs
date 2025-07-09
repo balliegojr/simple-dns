@@ -160,6 +160,7 @@ impl<'a> Packet<'a> {
     ///
     /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
     #[cfg(feature = "compression")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "compression")))]
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
         let mut out = crate::lib::Cursor::new(Vec::with_capacity(900));
         self.write_compressed_to(&mut out)?;
@@ -201,7 +202,7 @@ impl<'a> Packet<'a> {
     ) -> crate::Result<()> {
         self.write_header(out)?;
 
-        let mut name_refs = crate::lib::HashMap::default();
+        let mut name_refs = Default::default();
         for e in &self.questions {
             e.write_compressed_to(out, &mut name_refs)?;
         }
