@@ -88,11 +88,10 @@ impl<'a> WireFormat<'a> for SOA<'a> {
         self.write_common(out)
     }
 
-    #[cfg(feature = "compression")]
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
     ) -> crate::Result<()> {
         self.mname.write_compressed_to(out, name_refs)?;
         self.rname.write_compressed_to(out, name_refs)?;

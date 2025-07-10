@@ -67,6 +67,12 @@ mod lib {
     pub use std::collections::BTreeMap;
 
     #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use alloc::collections::btree_map::Entry as BTreeEntry;
+
+    #[cfg(feature = "std")]
+    pub use std::collections::btree_map::Entry as BTreeEntry;
+
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
     pub use alloc::collections::BTreeSet;
     #[cfg(feature = "std")]
     pub use std::collections::BTreeSet;

@@ -159,8 +159,6 @@ impl<'a> Packet<'a> {
     /// with compression enabled
     ///
     /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
-    #[cfg(feature = "compression")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "compression")))]
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
         let mut out = crate::lib::Cursor::new(Vec::with_capacity(900));
         self.write_compressed_to(&mut out)?;
@@ -194,7 +192,6 @@ impl<'a> Packet<'a> {
         Ok(())
     }
 
-    #[cfg(feature = "compression")]
     /// Write the contents of this package in wire format with enabled compression into the provided writer
     pub fn write_compressed_to<T: Write + crate::seek::Seek>(
         &self,
@@ -275,5 +272,36 @@ mod tests {
         assert_eq!(2, parsed.questions.len());
         assert_eq!("_srv._udp.local", parsed.questions[0].qname.to_string());
         assert_eq!("_srv2._udp.local", parsed.questions[1].qname.to_string());
+    }
+
+    #[test]
+    fn fuzz() {
+        let data = [
+            233, 247, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1, 3, 37, 0, 10, 0, 0, 0, 0, 35, 0, 1,
+            10, 0, 5, 0, 0, 0, 0, 0, 0, 0, 252, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+            10, 238, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+            10, 10, 10, 10, 0, 14, 0, 1, 138, 48, 0, 0, 252, 223, 241, 255, 254, 117, 207, 255, 0,
+            0, 35, 0, 1, 10, 0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 1, 3, 37, 0, 10, 0, 0, 0, 0, 35, 0, 1,
+            10, 0, 5, 0, 0, 0, 0, 0, 0, 0, 252, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+            10, 238, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10,
+            10, 10, 10, 10, 0, 14, 0, 1, 138, 48, 0, 0, 252, 223, 241, 255, 254, 117, 207, 255, 0,
+            0, 35, 0, 1, 10, 0, 0, 5, 0, 0, 0, 0, 0, 0, 252, 0, 0, 14, 0, 1, 138, 49, 0, 0, 0, 32,
+            14, 0, 1, 138, 48, 0, 0, 0, 17, 0, 16, 58, 0, 199, 0, 0, 7, 1, 0, 0, 0, 0, 0, 0, 1, 0,
+            0, 2, 0, 0, 16, 5, 0, 0, 0, 0, 0, 0, 252, 0, 0, 14, 0, 1, 138, 49, 0, 0, 0, 32, 14, 0,
+            1, 138, 48, 0, 0, 0, 17, 0, 16, 58, 0, 199, 0, 0, 7, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 2,
+            0, 0, 16, 58, 0, 58, 0, 0, 1, 93, 0, 0, 0, 0, 0, 0,
+        ];
+
+        if let Ok(original) = Packet::parse(&data) {
+            dbg!(&original);
+            let compressed = original.build_bytes_vec_compressed().unwrap();
+
+            if let Ok(decompressed) = Packet::parse(&compressed) {
+                let encoded = decompressed.build_bytes_vec().unwrap();
+                dbg!(&decompressed);
+
+                assert_eq!(encoded, original.build_bytes_vec().unwrap());
+            }
+        }
     }
 }

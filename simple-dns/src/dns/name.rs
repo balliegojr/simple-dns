@@ -134,51 +134,23 @@ impl<'a> Name<'a> {
         Ok(())
     }
 
-    #[cfg(feature = "compression")]
     fn compress_append<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,
     ) -> crate::Result<()> {
-        use radix_trie::TrieCommon;
+        for (i, label) in self.iter().enumerate() {
+            match name_refs.entry(&self.labels[i..]) {
+                crate::lib::BTreeEntry::Occupied(e) => {
+                    let p = *e.get();
+                    out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
 
-        let rev_label = to_bytes(self.labels.iter().rev());
-        let mut remaining = rev_label.len();
-        let ancestor = name_refs.get_ancestor(&rev_label);
-
-        match ancestor {
-            Some(ancestor) => {
-                let p = *ancestor.value().unwrap();
-                let ancestor_len = ancestor.key().unwrap().len();
-
-                for label in self.labels.iter() {
-                    if remaining <= ancestor_len {
-                        out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
-                        return Ok(());
-                    }
-
-                    name_refs.insert(
-                        rev_label[..remaining].to_vec(),
-                        out.stream_position()? as u16,
-                    );
-
-                    out.write_all(&[label.len() as u8])?;
-                    out.write_all(&label.data)?;
-
-                    remaining = remaining.saturating_sub(label.len() + 1);
+                    return Ok(());
                 }
-            }
-            None => {
-                for label in self.labels.iter() {
-                    name_refs.insert(
-                        rev_label[..remaining].to_vec(),
-                        out.stream_position()? as u16,
-                    );
-
+                crate::lib::BTreeEntry::Vacant(e) => {
+                    e.insert(out.stream_position()? as u16);
                     out.write_all(&[label.len() as u8])?;
                     out.write_all(&label.data)?;
-
-                    remaining = remaining.saturating_sub(label.len() + 1);
                 }
             }
         }
@@ -264,11 +236,10 @@ impl<'a> WireFormat<'a> for Name<'a> {
         self.plain_append(out)
     }
 
-    #[cfg(feature = "compression")]
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -339,20 +310,6 @@ impl Hash for Name<'_> {
     }
 }
 
-fn to_bytes<'a>(mut labels: impl Iterator<Item = &'a Label<'a>>) -> Vec<u8> {
-    let mut bytes = Vec::new();
-    if let Some(label) = labels.next() {
-        bytes.extend_from_slice(&label.data);
-    }
-
-    for label in labels {
-        bytes.push(b'.');
-        bytes.extend_from_slice(&label.data);
-    }
-
-    bytes
-}
-
 /// An iterator over the labels in a domain name
 struct LabelsIter<'a> {
     bytes: &'a [u8],
@@ -399,7 +356,7 @@ impl<'a> Iterator for LabelsIter<'a> {
 ///
 /// The `Display` implementation uses [`std::string::String::from_utf8_lossy`] to display the
 /// label.
-#[derive(Eq, PartialEq, Hash, Clone)]
+#[derive(Eq, PartialEq, Hash, Clone, PartialOrd, Ord)]
 pub struct Label<'a> {
     data: Cow<'a, [u8]>,
 }
@@ -493,7 +450,6 @@ impl AsRef<[u8]> for Label<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "compression")]
     use crate::lib::Cursor;
     use crate::{lib::Vec, SimpleDnsError};
 
@@ -601,7 +557,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn append_to_vec_with_compression() {
         let mut buf = Cursor::new(crate::lib::vec![0, 0, 0]);
         buf.set_position(3);
@@ -626,7 +581,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn append_to_vec_with_compression_mult_names() {
         let mut buf = Cursor::new(Vec::new());
         let mut name_refs = Default::default();
@@ -664,7 +618,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn ensure_different_domains_are_not_compressed() {
         let mut buf = Cursor::new(Vec::new());
         let mut name_refs = Default::default();
@@ -716,7 +669,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn len_compressed() -> crate::Result<()> {
         let name_one = Name::new_unchecked("ex.com.");
         let mut name_refs = Default::default();

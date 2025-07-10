@@ -49,11 +49,10 @@ impl<'a> WireFormat<'a> for HINFO<'a> {
         self.os.write_to(out)
     }
 
-    #[cfg(feature = "compression")]
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
     ) -> crate::Result<()> {
         self.cpu.write_compressed_to(out, name_refs)?;
         self.os.write_compressed_to(out, name_refs)

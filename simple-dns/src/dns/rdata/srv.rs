@@ -96,7 +96,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn srv_should_not_be_compressed() {
         use crate::lib::Cursor;
 

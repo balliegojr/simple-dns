@@ -14,11 +14,10 @@ pub(crate) trait WireFormat<'a> {
     /// Write this part bytes to the writer
     fn write_to<T: Write>(&self, out: &mut T) -> crate::Result<()>;
 
-    #[cfg(feature = "compression")]
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        _name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        _name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
     ) -> crate::Result<()> {
         self.write_to(out)
     }
