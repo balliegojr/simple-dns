@@ -90,7 +90,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "compression")]
     fn parse_rdata_with_multiple_caa_records() {
         use crate::{rdata::RData, Packet, ResourceRecord, CLASS};
 

@@ -60,7 +60,6 @@ you **SHOULD NOT** add **OPT Resource Records** directly to the **Additional Rec
 ## Feature Flags
 
 - `[std]`: Enables rust std
-- `[compression]`: Includes name compression for wire format generation
 - `alloc`: Required for no_std support
 
 

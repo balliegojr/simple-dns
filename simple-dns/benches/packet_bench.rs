@@ -22,7 +22,6 @@ fn packet_questions() -> Vec<u8> {
     query.build_bytes_vec().unwrap()
 }
 
-#[cfg(feature = "compression")]
 fn packet_questions_compressed() -> Vec<u8> {
     let mut query = Packet::new_query(1);
 
@@ -52,7 +51,6 @@ fn packet_parse() {
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("packet_questions", |b| b.iter(packet_questions));
-    #[cfg(feature = "compression")]
     c.bench_function("packet_questions_compressed", |b| {
         b.iter(packet_questions_compressed)
     });

@@ -82,7 +82,6 @@ fn reply_google_com() -> Result<(), SimpleDnsError> {
 }
 
 #[test]
-#[cfg(feature = "compression")]
 fn compression_multiple_names() {
     let mut packet = Packet::new_query(0);
 
@@ -145,7 +144,6 @@ fn compressed_rdata_has_correct_length() {
 }
 
 #[test]
-#[cfg(feature = "compression")]
 fn build_bytes_vec_after_parsing_compressed_have_correct_length() {
     let name = "foobar";
 

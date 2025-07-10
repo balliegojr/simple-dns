@@ -46,11 +46,10 @@ impl<'a> WireFormat<'a> for ISDN<'a> {
         self.sa.write_to(out)
     }
 
-    #[cfg(feature = "compression")]
     fn write_compressed_to<T: Write + crate::seek::Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut radix_trie::Trie<Vec<u8>, u16>,
+        name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
     ) -> crate::Result<()> {
         self.address.write_compressed_to(out, name_refs)?;
         self.sa.write_compressed_to(out, name_refs)
