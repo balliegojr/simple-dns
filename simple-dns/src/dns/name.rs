@@ -676,8 +676,6 @@ mod tests {
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
         name_one.write_compressed_to(&mut bytes, &mut name_refs)?;
 
-        dbg!(&bytes.get_ref());
-
         assert_eq!(10, bytes.get_ref().len());
         Ok(())
     }

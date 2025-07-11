@@ -1,7 +1,7 @@
 use crate::CharacterString;
 use crate::{
     dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
-    lib::{format, vec, FromUtf8Error, String, Vec},
+    lib::{vec, FromUtf8Error, String, Vec},
     write::Write,
 };
 
@@ -252,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    pub fn iter_raw() -> Result<(), Box<dyn Error>> {
+    pub fn iter_raw() -> Result<(), crate::lib::Box<dyn Error>> {
         let txt = TXT::new()
             .with_string("version=0.1")?
             .with_string("flag")?

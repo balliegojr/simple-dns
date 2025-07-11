@@ -30,3 +30,19 @@ impl Write for crate::lib::Vec<u8> {
         Ok(())
     }
 }
+
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+impl Write for &mut [u8] {
+    fn write_all(&mut self, bytes: &[u8]) -> crate::Result<()> {
+        if self.len() != bytes.len() {
+            return Err(crate::SimpleDnsError::FailedToWrite);
+        }
+
+        self.copy_from_slice(bytes);
+        Ok(())
+    }
+
+    fn flush(&mut self) -> crate::Result<()> {
+        Ok(())
+    }
+}

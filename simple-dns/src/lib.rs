@@ -14,6 +14,9 @@ mod seek;
 mod simple_dns_error;
 mod write;
 
+#[cfg(all(feature = "alloc", not(feature = "std")))]
+mod cursor;
+
 pub use simple_dns_error::SimpleDnsError;
 
 pub use dns::*;
@@ -77,8 +80,8 @@ mod lib {
     #[cfg(feature = "std")]
     pub use std::collections::BTreeSet;
 
-    // #[cfg(all(feature = "alloc", not(feature = "std")))]
-    // pub use crate::cursor::Cursor;
+    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use crate::cursor::Cursor;
     #[cfg(feature = "std")]
     pub use std::io::Cursor;
 
