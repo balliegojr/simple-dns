@@ -91,5 +91,7 @@ jobs:
       with:
         toolchain: stable
         targets: thumbv6m-none-eabi
-    - name: Run tests
+    - name: Build
       run: cargo build --target thumbv6m-none-eabi --no-default-features --features alloc --package simple-dns
+    - name: Run tests
+      run: cargo test --target thumbv6m-none-eabi --no-default-features --features alloc --package simple-dns
