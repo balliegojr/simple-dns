@@ -18,15 +18,5 @@ alloc = []
 [dependencies]
 bitflags = "2.4"
 
-[dev-dependencies]
-criterion = "0.5"
-
-[lib]
-bench = false
-
-[[bench]]
-name = "packet_bench"
-harness = false
-
 [package.metadata.docs.rs]
 all-features = true

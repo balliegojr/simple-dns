@@ -1,5 +1,5 @@
 [workspace]
 resolver = "2"
 
-members = ["simple-dns", "simple-mdns", "simple-dns/fuzz", "bind9-tests"]
+members = ["simple-dns", "simple-mdns", "simple-dns/fuzz", "bind9-tests", "simple-dns/bench"]
 

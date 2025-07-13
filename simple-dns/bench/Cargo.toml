@@ -1,0 +1,19 @@
+[package]
+name = "simple-dns-bench"
+version = "0.1.0"
+edition = "2024"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[dependencies.simple-dns]
+path = ".."
+
+[lib]
+bench = false
+
+[[bench]]
+name = "packet_bench"
+harness = false
+
+
