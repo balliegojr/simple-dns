@@ -1,5 +1,5 @@
 use crate::lib::Cow;
-use crate::write::Write;
+use crate::lib::Write;
 use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
 
 use super::RR;

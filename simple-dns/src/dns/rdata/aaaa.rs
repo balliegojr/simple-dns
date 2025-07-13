@@ -1,6 +1,8 @@
-use crate::lib::Ipv6Addr;
-use crate::write::Write;
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::WireFormat,
+    lib::{Ipv6Addr, Write},
+};
 
 use super::RR;
 

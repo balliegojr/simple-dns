@@ -1,7 +1,5 @@
 use crate::lib::fmt::{Display, Formatter, Result};
-use crate::lib::Error;
-use crate::lib::FromUtf8Error;
-use crate::lib::TryFromSliceError;
+use crate::lib::{Error, FromUtf8Error, TryFromSliceError};
 
 /// Error types for SimpleDns
 #[derive(Debug, PartialEq, Eq)]
@@ -36,6 +34,13 @@ pub enum SimpleDnsError {
 impl From<TryFromSliceError> for SimpleDnsError {
     fn from(_: TryFromSliceError) -> Self {
         Self::InvalidDnsPacket
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<std::io::Error> for SimpleDnsError {
+    fn from(_value: std::io::Error) -> Self {
+        Self::FailedToWrite
     }
 }
 

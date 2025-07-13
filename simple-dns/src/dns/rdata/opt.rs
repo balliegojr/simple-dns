@@ -3,7 +3,7 @@ use crate::{
     dns::{header::Header, WireFormat},
     lib::Cow,
     lib::Vec,
-    write::Write,
+    lib::Write,
     RCODE,
 };
 

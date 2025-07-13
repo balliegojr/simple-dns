@@ -1,5 +1,10 @@
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
-use crate::{bytes_buffer::BytesBuffer, lib::Vec, rdata::OPT, write::Write, RCODE};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{Seek, Vec, Write},
+    rdata::OPT,
+    RCODE,
+};
 
 /// Represents a DNS message packet
 ///
@@ -193,10 +198,7 @@ impl<'a> Packet<'a> {
     }
 
     /// Write the contents of this package in wire format with enabled compression into the provided writer
-    pub fn write_compressed_to<T: Write + crate::seek::Seek>(
-        &self,
-        out: &mut T,
-    ) -> crate::Result<()> {
+    pub fn write_compressed_to<T: Write + Seek>(&self, out: &mut T) -> crate::Result<()> {
         self.write_header(out)?;
 
         let mut name_refs = Default::default();

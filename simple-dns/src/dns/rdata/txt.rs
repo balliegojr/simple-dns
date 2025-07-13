@@ -2,7 +2,7 @@ use crate::CharacterString;
 use crate::{
     dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
     lib::{vec, FromUtf8Error, String, Vec},
-    write::Write,
+    lib::Write,
 };
 
 use super::RR;

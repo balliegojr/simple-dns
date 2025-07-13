@@ -34,7 +34,7 @@ macro_rules! rr_wrapper {
                 self.0.write_to(out)
             }
 
-            fn write_compressed_to<T: Write + crate::seek::Seek>(
+            fn write_compressed_to<T: Write + Seek>(
                 &'a self,
                 out: &mut T,
                 name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
@@ -117,7 +117,7 @@ macro_rules! rdata_enum {
                 }
             }
 
-            fn write_compressed_to<T: Write + crate::seek::Seek>(
+            fn write_compressed_to<T: Write + Seek>(
                 &'a self,
                 out: &mut T,
                 name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,

@@ -1,8 +1,7 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{CharacterString, WireFormat},
-    lib::Cow,
-    write::Write,
+    lib::{Cow, Write},
 };
 
 use super::RR;

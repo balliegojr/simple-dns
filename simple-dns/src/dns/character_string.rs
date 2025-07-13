@@ -3,9 +3,8 @@ use crate::{
     dns::WireFormat,
     lib::{
         fmt::{Debug, Display, Formatter},
-        Cow, String, ToString, TryFrom,
+        Cow, String, ToString, TryFrom, Write,
     },
-    write::Write,
     SimpleDnsError,
 };
 

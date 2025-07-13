@@ -3,7 +3,7 @@ use crate::{
     bytes_buffer::BytesBuffer,
     dns::WireFormat,
     lib::{Cow, Ipv4Addr, Ipv6Addr},
-    write::Write,
+    lib::Write,
     Name,
 };
 

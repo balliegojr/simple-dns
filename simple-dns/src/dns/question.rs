@@ -1,5 +1,8 @@
 use super::{Name, WireFormat, QCLASS, QTYPE};
-use crate::{bytes_buffer::BytesBuffer, lib::TryFrom, write::Write};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{Seek, TryFrom, Write},
+};
 
 /// Question represents a query in the DNS Packet
 #[derive(Debug, Clone)]
@@ -43,7 +46,9 @@ impl<'a> Question<'a> {
         };
 
         out.write_all(&Into::<u16>::into(self.qtype).to_be_bytes())?;
-        out.write_all(&qclass.to_be_bytes())
+        out.write_all(&qclass.to_be_bytes())?;
+
+        Ok(())
     }
 }
 
@@ -74,7 +79,7 @@ impl<'a> WireFormat<'a> for Question<'a> {
         self.write_common(out)
     }
 
-    fn write_compressed_to<T: Write + crate::seek::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,

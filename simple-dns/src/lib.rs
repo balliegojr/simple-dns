@@ -9,13 +9,11 @@ extern crate alloc;
 extern crate std;
 
 mod bytes_buffer;
+mod cursor;
 mod dns;
 mod seek;
 mod simple_dns_error;
 mod write;
-
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-mod cursor;
 
 pub use simple_dns_error::SimpleDnsError;
 
@@ -80,7 +78,11 @@ mod lib {
     #[cfg(feature = "std")]
     pub use std::collections::BTreeSet;
 
-    #[cfg(all(feature = "alloc", not(feature = "std")))]
+    pub use crate::seek::Seek;
+    pub use crate::seek::SeekFrom;
+    pub use crate::write::Write;
+
+    #[cfg(not(feature = "std"))]
     pub use crate::cursor::Cursor;
     #[cfg(feature = "std")]
     pub use std::io::Cursor;

@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, Name};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Write, Name};
 
 use super::RR;
 
