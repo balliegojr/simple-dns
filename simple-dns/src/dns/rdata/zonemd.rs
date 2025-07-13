@@ -1,4 +1,8 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Cow, write::Write};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    dns::WireFormat,
+    lib::{Cow, Write},
+};
 
 use super::RR;
 
@@ -67,11 +71,8 @@ impl ZONEMD<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::lib::{Error, Vec};
-    use crate::{
-        rdata::{RData, ZONEMD},
-        ResourceRecord,
-    };
+    use crate::lib::Vec;
+    use crate::rdata::ZONEMD;
 
     use super::*;
 
@@ -99,7 +100,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "std")]
-    fn parse_sample() -> Result<(), Box<dyn Error>> {
+    fn parse_sample() -> Result<(), crate::lib::Box<dyn crate::lib::Error>> {
+        use crate::{rdata::RData, ResourceRecord};
+
         let sample_file = std::fs::read("samples/zonefile/ZONEMD.sample")?;
 
         let sample_rdata = match ResourceRecord::parse(&mut sample_file[..].into())?.rdata {

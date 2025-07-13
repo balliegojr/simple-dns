@@ -2,9 +2,8 @@ use crate::{
     bytes_buffer::BytesBuffer,
     lib::{
         fmt::{Debug, Display, Formatter, Result as FmtResult},
-        format, Cow, Hash, Hasher, Iter, String, ToString, TryFrom, Vec,
+        format, Cow, Hash, Hasher, Iter, Seek, String, ToString, TryFrom, Vec, Write,
     },
-    write::Write,
 };
 
 use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
@@ -134,7 +133,7 @@ impl<'a> Name<'a> {
         Ok(())
     }
 
-    fn compress_append<T: Write + crate::seek::Seek>(
+    fn compress_append<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,
@@ -236,7 +235,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
         self.plain_append(out)
     }
 
-    fn write_compressed_to<T: Write + crate::seek::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,

@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, SimpleDnsError};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Write, SimpleDnsError};
 
 use super::RR;
 

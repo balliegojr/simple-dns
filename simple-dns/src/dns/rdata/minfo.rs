@@ -1,7 +1,7 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::{Name, WireFormat},
-    write::Write,
+    lib::{Seek, Write},
 };
 
 use super::RR;
@@ -47,7 +47,7 @@ impl<'a> WireFormat<'a> for MINFO<'a> {
         self.emailbox.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + crate::seek::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,

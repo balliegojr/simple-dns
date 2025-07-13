@@ -2,7 +2,7 @@ use crate::{
     bytes_buffer::BytesBuffer,
     dns::{WireFormat, MAX_NULL_LENGTH},
     lib::Cow,
-    write::Write,
+    lib::Write,
 };
 
 use super::RR;

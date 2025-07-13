@@ -2,7 +2,7 @@ use crate::{
     bytes_buffer::BytesBuffer,
     dns::WireFormat,
     lib::{Cow, Vec},
-    write::Write,
+    lib::Write,
     Name,
 };
 

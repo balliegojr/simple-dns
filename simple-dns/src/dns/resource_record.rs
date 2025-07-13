@@ -1,7 +1,6 @@
 use crate::{
     bytes_buffer::BytesBuffer,
-    lib::{Hash, Hasher},
-    write::Write,
+    lib::{Hash, Hasher, Seek, SeekFrom, Write},
     QCLASS, QTYPE,
 };
 
@@ -150,7 +149,7 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.rdata.write_to(out)
     }
 
-    fn write_compressed_to<T: Write + crate::seek::Seek>(
+    fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
         name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
@@ -164,9 +163,9 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
         self.rdata.write_compressed_to(out, name_refs)?;
         let end = out.stream_position()?;
 
-        out.seek(crate::seek::SeekFrom::Start(len_position))?;
+        out.seek(SeekFrom::Start(len_position))?;
         out.write_all(&((end - len_position - 2) as u16).to_be_bytes())?;
-        out.seek(crate::seek::SeekFrom::End(0))?;
+        out.seek(SeekFrom::End(0))?;
         Ok(())
     }
 }
@@ -191,8 +190,10 @@ mod tests {
     use crate::{
         dns::rdata::NULL,
         lib::{ToString, Vec},
-        rdata::TXT,
     };
+
+    #[cfg(feature = "std")]
+    use crate::rdata::TXT;
 
     #[test]
     fn test_parse() {

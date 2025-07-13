@@ -1,4 +1,4 @@
-use crate::{bytes_buffer::BytesBuffer, rdata::OPT, write::Write, ResourceRecord};
+use crate::{bytes_buffer::BytesBuffer, lib::Write, rdata::OPT, ResourceRecord};
 
 use super::{PacketFlag, OPCODE, RCODE};
 

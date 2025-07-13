@@ -1,9 +1,12 @@
 #![allow(non_camel_case_types)]
 //! Contains RData implementations
 
-use crate::{bytes_buffer::BytesBuffer, write::Write, CharacterString};
+use crate::{
+    bytes_buffer::BytesBuffer,
+    lib::{Seek, Write},
+    CharacterString, Name, WireFormat,
+};
 
-use super::{Name, WireFormat};
 use core::fmt::Debug;
 
 mod macros;

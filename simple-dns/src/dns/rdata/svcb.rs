@@ -1,5 +1,5 @@
 use crate::lib::{BTreeMap, BTreeSet, Cow, Vec};
-use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, write::Write, CharacterString, Name};
+use crate::{bytes_buffer::BytesBuffer, dns::WireFormat, lib::Write, CharacterString, Name};
 
 use super::RR;
 
