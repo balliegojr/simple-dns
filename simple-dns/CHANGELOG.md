@@ -1,3 +1,9 @@
+# 0.11.0 (unreleased)
+
+### Added
+- no-std support
+- **std** and **alloc** feature
+
 # 0.10.1 (2025-04-20)
 
 ### Fix
