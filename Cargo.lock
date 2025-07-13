@@ -793,7 +793,14 @@ name = "simple-dns"
 version = "0.10.1"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "simple-dns-bench"
+version = "0.1.0"
+dependencies = [
  "criterion",
+ "simple-dns",
 ]
 
 [[package]]
