@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use crate::{
     lib::Vec,
     lib::Write,
