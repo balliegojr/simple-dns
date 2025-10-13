@@ -80,7 +80,7 @@ jobs:
     - name: Run tests
       run: |
         cd bind9-tests
-        cargo test --verbose 
+        RUSTFLAGS="-C linker-features=-lld" cargo test --verbose 
 
   test-no-std:
     name: Test no_std
