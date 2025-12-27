@@ -32,7 +32,7 @@ fn one_shot_resolver_address_query() {
 
     let mut resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     resolver.set_unicast_response(false);
-    let answer = resolver.query_service_address("_sync._tcp.local");
+    let answer = dbg!(resolver.query_service_address("_sync._tcp.local"));
 
     assert!(answer.is_ok());
     let answer = answer.unwrap();
@@ -52,7 +52,7 @@ fn one_shot_resolver_address_query() {
 #[test]
 fn one_shot_resolver_timeout() {
     let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
-    let answer = resolver.query_service_address("_sync_miss._tcp.local");
+    let answer = dbg!(resolver.query_service_address("_sync_miss._tcp.local"));
     assert!(answer.is_ok());
     let answer = answer.unwrap();
     assert!(answer.is_none());
