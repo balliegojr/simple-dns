@@ -100,8 +100,13 @@ impl TryFrom<String> for CharacterString<'_> {
 
 impl Display for CharacterString<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> crate::lib::fmt::Result {
-        let s = crate::lib::str::from_utf8(&self.data).unwrap();
-        f.write_str(s)
+        match crate::lib::str::from_utf8(&self.data) {
+            Ok(s) => f.write_str(s),
+            Err(_) => {
+                let s = crate::lib::String::from_utf8_lossy(&self.data);
+                f.write_str(&s)
+            }
+        }
     }
 }
 
@@ -146,5 +151,11 @@ mod tests {
 
         assert_eq!(b"\x0esome_long_text", &out[..]);
         assert_eq!(b"\x0esome_long_text", &out[..]);
+    }
+
+    #[test]
+    fn panic_display() {
+        let c = CharacterString::new(&[0xFF]).expect("failed to create character string");
+        assert_eq!(c.to_string(), "\u{FFFD}");
     }
 }
