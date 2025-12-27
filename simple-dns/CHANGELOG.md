@@ -1,4 +1,9 @@
-# 0.11.0 (unreleased)
+# 0.11.1 (2025-12-27)
+
+### Fix
+- Fix CharacterString display implementation to prevent panics
+
+# 0.11.0 (2025-07-23)
 
 ### Added
 - no-std support
