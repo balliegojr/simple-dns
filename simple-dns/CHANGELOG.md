@@ -1,3 +1,8 @@
+# 0.11.2 (2026-01-06)
+
+### Fix
+- Fix name compression when the offset is too large PR [#53]
+
 # 0.11.1 (2025-12-27)
 
 ### Fix
