@@ -10,6 +10,7 @@ use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
 
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
+const MAX_COMPRESSION_OFFSET: u64 = !POINTER_MASK_U16 as u64;
 
 // NOTE: there are no extend labels implemented today
 // const EXTENDED_LABEL: u8 = 0b0100_0000;
@@ -147,7 +148,10 @@ impl<'a> Name<'a> {
                     return Ok(());
                 }
                 crate::lib::BTreeEntry::Vacant(e) => {
-                    e.insert(out.stream_position()? as u16);
+                    let pos = out.stream_position()?;
+                    if pos <= MAX_COMPRESSION_OFFSET {
+                        e.insert(pos as u16);
+                    }
                     out.write_all(&[label.len() as u8])?;
                     out.write_all(&label.data)?;
                 }
@@ -754,5 +758,40 @@ mod tests {
         let label = Label::new_unchecked(input);
 
         assert_eq!(label.to_string(), "invalid�label");
+    }
+
+    #[test]
+    fn test_compress_append_near_boundary() -> crate::Result<()> {
+        let mut buf = Cursor::new(Vec::new());
+        let mut name_refs = Default::default();
+
+        let before_boundary_pos = (MAX_COMPRESSION_OFFSET - 5) as usize;
+        let padding = vec![0u8; before_boundary_pos];
+        buf.write_all(&padding)?;
+
+        let name1 = Name::new_unchecked("foo.example.com");
+        let name2 = Name::new_unchecked("bar.test.net");
+
+        // before the boundary
+        let old_pos = buf.position();
+        name1.write_compressed_to(&mut buf, &mut name_refs)?;
+        assert_eq!(buf.position() - old_pos, name1.len() as u64);
+
+        // after the boundary
+        let old_pos = buf.position();
+        name2.write_compressed_to(&mut buf, &mut name_refs)?;
+        assert_eq!(buf.position() - old_pos, name2.len() as u64);
+
+        // should be compressed
+        let old_pos = buf.position();
+        name1.write_compressed_to(&mut buf, &mut name_refs)?;
+        assert_eq!(buf.position() - old_pos, 2);
+
+        // should not be compressed
+        let old_pos = buf.position();
+        name2.write_compressed_to(&mut buf, &mut name_refs)?;
+        assert_eq!(buf.position() - old_pos, name2.len() as u64);
+
+        Ok(())
     }
 }
