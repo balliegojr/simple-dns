@@ -92,6 +92,65 @@ async fn service_discovery_can_find_services() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+async fn service_is_removed_from_discovery() -> Result<(), Box<dyn Error>> {
+    init_log();
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let mut service_discovery_a = ServiceDiscovery::new(
+        InstanceInformation::new("a".to_string()).with_socket_address("192.168.1.2:8080".parse()?),
+        "_removed._tcp.local",
+        60,
+    )?;
+
+    let mut service_discovery_b = ServiceDiscovery::new(
+        InstanceInformation::new("b".to_string()).with_socket_address("192.168.1.3:8080".parse()?),
+        "_removed._tcp.local",
+        60,
+    )?;
+
+    let service_discovery_c = ServiceDiscovery::new(
+        InstanceInformation::new("c".to_string()).with_socket_address("192.168.1.4:8080".parse()?),
+        "_removed._tcp.local",
+        60,
+    )?;
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let from_a = service_discovery_a.get_known_services().await;
+    let from_b = service_discovery_b.get_known_services().await;
+    let from_c = service_discovery_c.get_known_services().await;
+
+    assert_eq!(2, from_a.len());
+    assert_eq!(2, from_b.len());
+    assert_eq!(2, from_c.len());
+
+    service_discovery_b.remove_service_from_discovery().await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let from_a = service_discovery_a.get_known_services().await;
+    let from_b = service_discovery_b.get_known_services().await;
+    let from_c = service_discovery_c.get_known_services().await;
+
+    assert_eq!(1, from_a.len());
+    assert_eq!(2, from_b.len());
+    assert_eq!(1, from_c.len());
+
+    service_discovery_a.remove_service_from_discovery().await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    let from_a = service_discovery_a.get_known_services().await;
+    let from_b = service_discovery_b.get_known_services().await;
+    let from_c = service_discovery_c.get_known_services().await;
+
+    assert_eq!(1, from_a.len());
+    assert_eq!(1, from_b.len());
+    assert_eq!(0, from_c.len());
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn service_discovery_is_notified_on_discovery() -> Result<(), Box<dyn Error>> {
     init_log();
 

@@ -119,7 +119,10 @@ impl ServiceDiscovery {
     /// removing all the internal resource records
     pub fn remove_service_from_discovery(&mut self) {
         self.announce(true);
-        self.resource_manager.write().unwrap().clear();
+        self.resource_manager
+            .write()
+            .unwrap()
+            .remove_domain_resources(&self.instance_name);
     }
 
     /// Return the [`InstanceInformation`] of all known services
