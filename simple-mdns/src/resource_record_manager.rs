@@ -71,7 +71,7 @@ impl<'a> ResourceRecordManager<'a> {
             .get_mut(&key)
             .map(|resources| {
                 resources.remove(&resource_record.clone());
-                !resources.is_empty()
+                resources.is_empty()
             })
             .unwrap_or_default();
 
