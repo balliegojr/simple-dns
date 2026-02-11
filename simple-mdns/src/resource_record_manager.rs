@@ -1,5 +1,5 @@
 #![allow(unused)]
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use radix_trie::{Trie, TrieCommon};
@@ -7,134 +7,192 @@ use simple_dns::{Name, ResourceRecord};
 
 #[derive(Debug)]
 pub struct ResourceRecordManager<'a> {
-    resources: Trie<Vec<u8>, HashMap<ResourceRecord<'a>, ResourceRecordType>>,
+    authoritative: Trie<Vec<u8>, HashSet<ResourceRecord<'a>>>,
+    cached: Trie<Vec<u8>, HashMap<ResourceRecord<'a>, ExpirationInfo>>,
 }
 
 impl<'a> ResourceRecordManager<'a> {
     pub fn new() -> Self {
         Self {
-            resources: Trie::new(),
+            authoritative: Default::default(),
+            cached: Default::default(),
         }
     }
 
     /// Register a Resource Record
     pub fn add_authoritative_resource(&mut self, resource: ResourceRecord<'a>) {
         let key = get_key(&resource.name);
-        match self.resources.get_mut(&key) {
+        match self.authoritative.get_mut(&key) {
             Some(resources) => {
-                resources.insert(resource, ResourceRecordType::Authoritative);
+                resources.insert(resource);
             }
             None => {
-                let mut resources = HashMap::new();
-                resources.insert(resource, ResourceRecordType::Authoritative);
+                let mut resources = HashSet::new();
+                resources.insert(resource);
 
-                self.resources.insert(key, resources);
+                self.authoritative.insert(key.clone(), resources);
             }
+        }
+
+        // FIXME: the trie implementation is not able to find subtries unless the parent prefix has
+        // been manually added, this workaround is required to be able to find cached resources
+        // related to subdomains. This assumes the main domain will be added in the authoritative
+        // resources at some point
+        if self.cached.get(&key).is_none() {
+            self.cached.insert(key, Default::default());
         }
     }
 
     pub fn add_cached_resource(&mut self, resource: ResourceRecord<'a>) {
         let key = get_key(&resource.name);
 
-        let ttl = if resource.cache_flush {
-            1
-        } else {
-            resource.ttl
-        };
-
-        let exp_info = ExpirationInfo::new(ttl);
-        match self.resources.get_mut(&key) {
+        let exp_info = ExpirationInfo::new(resource.ttl);
+        match self.cached.get_mut(&key) {
+            Some(resources) if resource.cache_flush => {
+                resources.remove(&resource);
+            }
             Some(resources) => {
-                resources.insert(resource, ResourceRecordType::Cached(exp_info));
+                resources.insert(resource, exp_info);
             }
-            None => {
+            None if !resource.cache_flush => {
                 let mut resources = HashMap::new();
-                resources.insert(resource, ResourceRecordType::Cached(exp_info));
+                resources.insert(resource, exp_info);
 
-                self.resources.insert(key, resources);
+                self.cached.insert(key, resources);
             }
+            _ => {}
         }
     }
 
     pub fn remove_resource_record(&mut self, resource_record: &ResourceRecord<'a>) {
         let key = get_key(&resource_record.name);
-        self.resources
+        let remove_key = self
+            .authoritative
             .get_mut(&key)
-            .map(|resources| resources.remove(resource_record));
+            .map(|resources| {
+                resources.remove(&resource_record.clone());
+                !resources.is_empty()
+            })
+            .unwrap_or_default();
+
+        if remove_key {
+            self.authoritative.remove(&key);
+        }
+    }
+
+    pub fn remove_domain_resources(&mut self, name: &Name) -> usize {
+        let key = get_key(name);
+        self.authoritative
+            .remove(&key)
+            .map(|resources| resources.len())
+            .unwrap_or(0)
     }
 
     /// Remove all resource records
     pub fn clear(&mut self) {
-        self.resources = Trie::new();
+        self.authoritative = Default::default();
+        self.cached = Default::default();
     }
 
     pub fn get_next_refresh(&self) -> Option<Instant> {
-        self.resources
+        self.cached
             .iter()
             .flat_map(|(_, resources)| {
-                resources.values().filter_map(|resource_type| {
-                    if !resource_type.should_refresh() {
-                        return None;
-                    }
-                    match resource_type {
-                        ResourceRecordType::Authoritative => None,
-                        ResourceRecordType::Cached(exp_info) => Some(exp_info.refresh_at),
+                resources.values().filter_map(|exp_info| {
+                    if !exp_info.should_refresh() {
+                        None
+                    } else {
+                        Some(exp_info.refresh_at)
                     }
                 })
             })
             .min_by(|a, b| a.cmp(b))
     }
 
+    /// Get all the resources matching the filter criteria and returns the results grouped by
+    /// domain.
+    ///
+    /// if the filter does not include subdomains, the resulting iterator will contain a single
+    /// value (the requested domain) and all the resource records for that domain.
+    ///
+    /// otherwise, the resulting iterator will contain one item for each subdomain found.
     pub fn get_domain_resources<'b>(
         &'a self,
         name: &'b Name,
         filter: DomainResourceFilter,
     ) -> impl Iterator<Item = impl Iterator<Item = &'a ResourceRecord<'a>>> {
         let key = get_key(name);
-
-        let filter_expired_resource = |resource_pair: (
-            &'a ResourceRecord,
-            &'a ResourceRecordType,
-        )|
-         -> Option<&ResourceRecord> {
-            let (resource, resource_type) = resource_pair;
-            if filter.match_filter(resource_type) {
-                Some(resource)
-            } else {
-                None
-            }
-        };
         let mut found: Vec<Vec<&'a ResourceRecord>> = Vec::new();
 
+        fn filter_expired<'b>(
+            (resource, exp_info): (&'b ResourceRecord<'b>, &'b ExpirationInfo),
+        ) -> Option<&'b ResourceRecord<'b>> {
+            if exp_info.is_expired() {
+                None
+            } else {
+                Some(resource)
+            }
+        }
+
         if filter.subdomain {
-            if let Some(trie) = self.resources.subtrie(&key) {
-                found = trie
-                    .iter()
-                    .map(|(_domain, resources)| {
-                        resources
-                            .iter()
-                            .filter_map(filter_expired_resource)
-                            .collect()
-                    })
-                    .collect();
-            };
-        } else if let Some(resources) = self.resources.get(&key) {
-            found = vec![resources
-                .iter()
-                .filter_map(filter_expired_resource)
-                .collect()]
+            let mut domain_resources: BTreeMap<&Vec<u8>, HashSet<&ResourceRecord>> =
+                Default::default();
+            if filter.authoritative {
+                if let Some(authoritative) = self.authoritative.subtrie(&key) {
+                    for (domain, resources) in authoritative.iter() {
+                        domain_resources
+                            .entry(domain)
+                            .or_default()
+                            .extend(resources);
+                    }
+                }
+            }
+
+            if filter.cached {
+                if let Some(cached) = self.cached.subtrie(&key) {
+                    for (domain, resources) in cached.iter() {
+                        let non_expired: Vec<&ResourceRecord> =
+                            resources.iter().filter_map(filter_expired).collect();
+
+                        if !non_expired.is_empty() {
+                            domain_resources
+                                .entry(domain)
+                                .or_default()
+                                .extend(non_expired);
+                        }
+                    }
+                }
+            }
+
+            found.extend(
+                domain_resources
+                    .into_values()
+                    .filter(|resources| !resources.is_empty())
+                    .map(|inner| inner.into_iter().collect()),
+            );
+        } else {
+            let mut resources = Vec::new();
+            if filter.authoritative {
+                if let Some(authoritative) = self.authoritative.get(&key) {
+                    resources.extend(authoritative);
+                }
+            }
+
+            if filter.cached {
+                if let Some(cached) = self.cached.get(&key) {
+                    resources.extend(cached.iter().filter_map(filter_expired));
+                }
+            }
+
+            if !resources.is_empty() {
+                found.push(resources);
+            }
         }
 
         found
             .into_iter()
             .filter(|resources| !resources.is_empty())
             .map(|inner| inner.into_iter())
-    }
-}
-
-impl Default for ResourceRecordManager<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -168,15 +226,6 @@ impl DomainResourceFilter {
             cached: true,
         }
     }
-
-    fn match_filter(&self, resource_type: &ResourceRecordType) -> bool {
-        match resource_type {
-            ResourceRecordType::Authoritative => self.authoritative,
-            ResourceRecordType::Cached(exp_info) => {
-                self.cached && exp_info.expire_at > Instant::now()
-            }
-        }
-    }
 }
 
 fn get_key(name: &Name) -> Vec<u8> {
@@ -185,21 +234,6 @@ fn get_key(name: &Name) -> Vec<u8> {
         .rev()
         .flat_map(|label| label.to_string().into_bytes())
         .collect()
-}
-
-#[derive(Debug)]
-enum ResourceRecordType {
-    Authoritative,
-    Cached(ExpirationInfo),
-}
-
-impl ResourceRecordType {
-    pub fn should_refresh(&self) -> bool {
-        match self {
-            ResourceRecordType::Authoritative => false,
-            ResourceRecordType::Cached(exp_info) => exp_info.refresh_at < Instant::now(),
-        }
-    }
 }
 
 /// Provides known service expiration and refresh times
@@ -225,6 +259,14 @@ impl ExpirationInfo {
             refresh_at,
         }
     }
+
+    pub fn should_refresh(&self) -> bool {
+        self.refresh_at < Instant::now()
+    }
+
+    pub fn is_expired(&self) -> bool {
+        self.expire_at < Instant::now()
+    }
 }
 
 #[cfg(test)]
@@ -236,7 +278,7 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_add_resource() {
+    pub fn test_add_authoritative_resource() {
         let mut resources = ResourceRecordManager::new();
         resources.add_authoritative_resource(ResourceRecord::new(
             Name::new_unchecked("_srv1._tcp"),
@@ -245,7 +287,55 @@ mod tests {
             RData::TXT(TXT::new().with_string("version=1").unwrap()),
         ));
 
-        assert_eq!(1, resources.resources.len());
+        assert_eq!(1, resources.authoritative.len());
+    }
+
+    #[test]
+    pub fn test_add_cached_resource() {
+        let mut resources = ResourceRecordManager::new();
+        resources.add_cached_resource(ResourceRecord::new(
+            Name::new_unchecked("_srv1._tcp"),
+            simple_dns::CLASS::IN,
+            0,
+            RData::TXT(TXT::new().with_string("version=1").unwrap()),
+        ));
+
+        assert_eq!(1, resources.cached.len());
+    }
+
+    #[test]
+    pub fn test_add_cached_resource_dont_override_authoritative() {
+        let name = Name::new_unchecked("_srv1._tcp");
+        let mut resources = ResourceRecordManager::new();
+        resources.add_authoritative_resource(ResourceRecord::new(
+            name.clone(),
+            simple_dns::CLASS::IN,
+            0,
+            RData::TXT(TXT::new().with_string("version=1").unwrap()),
+        ));
+
+        resources.add_cached_resource(ResourceRecord::new(
+            name.clone(),
+            simple_dns::CLASS::IN,
+            0,
+            RData::TXT(TXT::new().with_string("version=2").unwrap()),
+        ));
+
+        assert_eq!(
+            ResourceRecord::new(
+                name.clone(),
+                simple_dns::CLASS::IN,
+                0,
+                RData::TXT(TXT::new().with_string("version=1").unwrap()),
+            ),
+            *resources
+                .authoritative
+                .get(&get_key(&name))
+                .unwrap()
+                .iter()
+                .next()
+                .unwrap()
+        );
     }
 
     #[test]
@@ -323,5 +413,38 @@ mod tests {
             DomainResourceFilter::authoritative(false)
         )
         .is_empty());
+    }
+
+    #[test]
+    pub fn test_remove_resources() {
+        let mut resources = ResourceRecordManager::new();
+        resources.add_authoritative_resource(ResourceRecord::new(
+            "a._srv._tcp.local".try_into().unwrap(),
+            simple_dns::CLASS::IN,
+            0,
+            RData::A(A::from(Ipv4Addr::from_str("127.0.0.1").unwrap())),
+        ));
+        resources.add_cached_resource(ResourceRecord::new(
+            "b._srv._tcp.local".try_into().unwrap(),
+            simple_dns::CLASS::IN,
+            60,
+            RData::A(A::from(Ipv4Addr::from_str("127.0.0.2").unwrap())),
+        ));
+        resources.add_authoritative_resource(ResourceRecord::new(
+            "_srv._tcp.local".try_into().unwrap(),
+            simple_dns::CLASS::IN,
+            0,
+            RData::A(A::from(Ipv4Addr::from_str("127.0.0.3").unwrap())),
+        ));
+
+        assert_eq!(
+            1,
+            resources.remove_domain_resources(&Name::new_unchecked("a._srv._tcp.local"))
+        );
+
+        assert_eq!(
+            1,
+            resources.remove_domain_resources(&Name::new_unchecked("_srv._tcp.local"))
+        );
     }
 }

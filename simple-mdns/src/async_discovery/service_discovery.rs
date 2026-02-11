@@ -40,7 +40,7 @@ pub struct ServiceDiscovery {
     resource_manager: Arc<RwLock<ResourceRecordManager<'static>>>,
     service_name: Name<'static>,
 
-    advertise_tx: Sender<bool>,
+    advertise_tx: Sender<(bool, Option<tokio::sync::oneshot::Sender<()>>)>,
 }
 impl ServiceDiscovery {
     /// Creates a new ServiceDiscovery by providing `instance_information`, `service_name`, `resource ttl`. The service will be created using IPV4 scope with UNSPECIFIED Interface
@@ -116,9 +116,9 @@ impl ServiceDiscovery {
 
         let announce = advertise_tx.clone();
         spawn(async move {
-            let _ = announce.send(false).await;
+            let _ = announce.send((false, None)).await;
             tokio::time::sleep(Duration::from_secs(1)).await;
-            let _ = announce.send(false).await;
+            let _ = announce.send((false, None)).await;
         });
 
         Ok(Self {
@@ -134,7 +134,6 @@ impl ServiceDiscovery {
         if (self.announce(true).await).is_err() {
             log::error!("Failed to advertise cache flush");
         };
-        self.resource_manager.write().await.clear();
     }
 
     /// Announce the service by sending a packet with all the resource records in the answers
@@ -144,9 +143,13 @@ impl ServiceDiscovery {
     /// if `cache_flush` is true, then the resources will have the cache flush flag set, this will
     /// cause them to be removed from any cache that receives the packet.
     pub async fn announce(&mut self, cache_flush: bool) -> Result<(), SimpleMdnsError> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
         self.advertise_tx
-            .send(cache_flush)
+            .send((cache_flush, Some(tx)))
             .await
+            .map_err(|_| SimpleMdnsError::ServiceDiscoveryStopped)?;
+
+        rx.await
             .map_err(|_| SimpleMdnsError::ServiceDiscoveryStopped)
     }
 
@@ -174,7 +177,7 @@ struct ServiceDiscoveryExecutor {
 impl ServiceDiscoveryExecutor {
     async fn execution_loop(
         self,
-        mut advertise: Receiver<bool>,
+        mut advertise: Receiver<(bool, Option<tokio::sync::oneshot::Sender<()>>)>,
         mut on_discovery: Option<tokio::sync::mpsc::Sender<InstanceInformation>>,
     ) -> Result<(), SimpleMdnsError> {
         let recv_socket =
@@ -200,9 +203,17 @@ impl ServiceDiscoveryExecutor {
                 }
                 cache_flush = advertise.recv() => {
                     match cache_flush {
-                        Some(cache_flush) => {
-                            if let Err(err) = self.advertise_service(cache_flush).await {
-                                log::error!("Failed to advertise service {err}");
+                        Some((cache_flush, notify)) => {
+                            match self.advertise_service(cache_flush).await {
+                                Err(err) => log::error!("Failed to advertise service {err}"),
+                                Ok(()) => {
+                                    if cache_flush {
+                                        self.resource_manager.write().await.remove_domain_resources(&self.instance_name);
+                                    }
+                                    if let Some(notify) = notify {
+                                        let _ = notify.send(());
+                                    }
+                                }
                             }
                         }
                         None => {
@@ -288,6 +299,7 @@ impl ServiceDiscoveryExecutor {
             DomainResourceFilter::authoritative(true),
         ) {
             if cache_flush {
+                log::info!("advertising cache flush");
                 d_resources
                     .filter(|r| r.match_qclass(CLASS::IN.into()))
                     .for_each(|r| packet.answers.push(r.to_cache_flush_record()));
@@ -319,7 +331,7 @@ impl ServiceDiscoveryExecutor {
         }
 
         if packet.answers.is_empty() {
-            log::info!("Failed to advertise service");
+            log::info!("Failed to advertise service, no answers to send");
             return Ok(());
         }
 
