@@ -299,7 +299,6 @@ impl ServiceDiscoveryExecutor {
             DomainResourceFilter::authoritative(true),
         ) {
             if cache_flush {
-                log::info!("advertising cache flush");
                 d_resources
                     .filter(|r| r.match_qclass(CLASS::IN.into()))
                     .for_each(|r| packet.answers.push(r.to_cache_flush_record()));
