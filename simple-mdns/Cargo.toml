@@ -1,6 +1,6 @@
 [package]
 name = "simple-mdns"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2021"
 description = "Rust implementation of mDNS for service discovering (DNS-SD)"
