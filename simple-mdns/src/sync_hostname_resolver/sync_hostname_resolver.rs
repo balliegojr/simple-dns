@@ -128,7 +128,6 @@ impl OneShotMdnsHostnameResolver {
                 if anwser.name != hostname {
                     continue;
                 }
-                println!("Found matching answer: {:?}", anwser);
                 match anwser.rdata {
                     RData::A(a) => {
                         result.ip_addresses.push(IpAddr::V4(Ipv4Addr::from(a.address)));
@@ -144,7 +143,6 @@ impl OneShotMdnsHostnameResolver {
                 if anwser.name != hostname {
                     continue;
                 }
-                println!("Found matching additional_records: {:?}", anwser);
                 match anwser.rdata {
                     RData::A(a) => {
                         result.ip_addresses.push(IpAddr::V4(Ipv4Addr::from(a.address)));
