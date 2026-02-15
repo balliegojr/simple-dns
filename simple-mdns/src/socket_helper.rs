@@ -3,7 +3,7 @@
 
 use std::{
     io,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV6, UdpSocket},
     time::Duration,
 };
 
@@ -31,6 +31,57 @@ pub fn sender_socket(ipv4: bool) -> io::Result<UdpSocket> {
         )))?;
 
         Ok(socket.into())
+    }
+}
+
+fn create_pktinfo_socket(addr: &SocketAddr) -> std::io::Result<socket_pktinfo::PktInfoUdpSocket> {
+  let socket: socket_pktinfo::PktInfoUdpSocket = if addr.is_ipv4() {
+    let socket = socket_pktinfo::PktInfoUdpSocket::new(Domain::IPV4)?;
+    socket
+  } else {
+    let socket = socket_pktinfo::PktInfoUdpSocket::new(Domain::IPV6)?;
+    socket
+  };
+  socket.set_reuse_address(true)?;
+
+  #[cfg(not(windows))]
+  socket.set_reuse_port(true)?;
+
+  Ok(socket)
+}
+
+pub fn join_multicast_with_pktinfo(network_scope: NetworkScope) -> io::Result<socket_pktinfo::PktInfoUdpSocket> {
+    // depending on the IP protocol we have slightly different work
+    match network_scope {
+        NetworkScope::V4 => {
+            //let socket = create_socket(Domain::IPV4)?;
+            let socket = create_pktinfo_socket(&SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0))?;
+            socket.join_multicast_v4(&MULTICAST_ADDR_IPV4, &Ipv4Addr::UNSPECIFIED)?;
+            socket.bind(&SockAddr::from(SocketAddr::from((Ipv4Addr::UNSPECIFIED, 5353))))?;
+            Ok(socket)
+
+        }
+        NetworkScope::V4WithInterface(ref interface) => {
+            //let socket = create_socket(Domain::IPV4)?;
+            let socket = create_pktinfo_socket(&SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0))?;
+            socket.join_multicast_v4(&MULTICAST_ADDR_IPV4, &interface)?;
+            socket.bind(&SockAddr::from(SocketAddr::from((Ipv4Addr::UNSPECIFIED, 5353))))?;
+            Ok(socket)
+        },
+        NetworkScope::V6 => {
+            //let socket = create_socket(Domain::IPV4)?;
+            let socket = create_pktinfo_socket(&SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), 0))?;
+            socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, 0)?;
+            socket.bind(&SockAddr::from(SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, 5353, 0, 0)))?;
+            Ok(socket)
+        }
+        NetworkScope::V6WithInterface(interface) => {
+            //let socket = create_socket(Domain::IPV4)?;
+            let socket = create_pktinfo_socket(&SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), 0))?;
+            socket.join_multicast_v6(&MULTICAST_ADDR_IPV6, interface)?;
+            socket.bind(&SockAddr::from(SocketAddrV6::new(Ipv6Addr::UNSPECIFIED, 5353, 0, 0)))?;
+            Ok(socket)
+        }
     }
 }
 

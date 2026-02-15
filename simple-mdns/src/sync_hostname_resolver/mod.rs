@@ -1,0 +1,3 @@
+mod sync_hostname_resolver;
+
+pub use sync_hostname_resolver::OneShotMdnsHostnameResolver;

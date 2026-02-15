@@ -119,5 +119,34 @@ IPV6 is now supported by using the `NetworkScope` enum.
     # }
 ```
 
+## MDNS Hostname A/AAAA Resolve
+
+IP address (A/AAAA) resolution based on Hostname.local (without discovery)
+
+```rust  
+     use simple_mdns::sync_hostname_resolver::OneShotMdnsHostnameResolver;
+
+
+     let mut resolver = OneShotMdnsHostnameResolver::new().expect("Failed to create resolver");
+     let answer = resolver.query_hostname_address("volumio.local");
+         let result = match answer {
+             Ok(result) => match result {
+                 Some(addr) => addr,
+                 None => {
+                     println!("No answer found for the hostname");
+                     std::process::exit(0);
+                 }
+             },
+             Err(err) => {
+                 println!("err {}", err);
+                 std::process::exit(0);
+             }
+         };
+         for ip in result.ip_addresses {
+             println!("IP address: {}", ip);
+             
+         }
+         println!("scope: {}", result.scope);
+```
 
 Note: It is not tested on MacOS.

@@ -25,6 +25,8 @@ pub mod async_discovery;
 
 #[cfg(feature = "sync")]
 pub mod sync_discovery;
+#[cfg(feature = "sync")]
+pub mod sync_hostname_resolver;
 
 #[allow(unused)]
 const UNICAST_RESPONSE: bool = cfg!(not(test));
