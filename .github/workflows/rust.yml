@@ -95,3 +95,37 @@ jobs:
       run: cargo build --target thumbv6m-none-eabi --no-default-features --features alloc --package simple-dns
     # - name: Run tests
     #   run: cargo test --target thumbv6m-none-eabi --no-default-features --features alloc --package simple-dns
+
+  release-simple-dns:
+    name: Release simple-dns
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [clippy, test-dev, test-release, fuzzing, test-bind-check, test-no-std]
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect version and release
+        run: bash .github/scripts/release-crate.sh simple-dns
+
+  release-simple-mdns:
+    name: Release simple-mdns
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs: [clippy, test-dev, test-release, fuzzing, test-bind-check, test-no-std]
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect version and release
+        run: bash .github/scripts/release-crate.sh simple-mdns
