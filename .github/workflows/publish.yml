@@ -57,6 +57,7 @@ jobs:
     name: Publish
     needs: [prepare, test]
     runs-on: ubuntu-latest
+    environment: crates-release
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
