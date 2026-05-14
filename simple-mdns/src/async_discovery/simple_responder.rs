@@ -1,5 +1,5 @@
-use std::sync::Arc;
-use tokio::{spawn, sync::RwLock};
+use std::{future::Future, sync::Arc};
+use tokio::{select, spawn, sync::RwLock};
 
 use simple_dns::{header_buffer, Packet, PacketFlag, ResourceRecord};
 
@@ -55,11 +55,16 @@ impl SimpleMdnsResponder {
     /// Creates a new SimpleMdnsResponder with specified ttl and IPV4 scope with UNSPECIFIED
     /// Interface
     pub fn new(rr_ttl: u32) -> Self {
-        Self::new_with_scope(rr_ttl, NetworkScope::V4)
+        Self::new_with_scope(rr_ttl, NetworkScope::V4, None::<std::future::Pending<()>>)
     }
 
-    /// Creates a new SimpleMdnsResponder with specified ttl and network scope
-    pub fn new_with_scope(rr_ttl: u32, scope: NetworkScope) -> Self {
+    /// Creates a new SimpleMdnsResponder with specified ttl, network scope and optional shutdown
+    /// signal.
+    pub fn new_with_scope<F: Future + Send + 'static>(
+        rr_ttl: u32,
+        scope: NetworkScope,
+        shutdown: Option<F>,
+    ) -> Self {
         let responder = Self {
             resources: Arc::new(RwLock::new(ResourceRecordManager::new())),
             rr_ttl,
@@ -67,7 +72,7 @@ impl SimpleMdnsResponder {
 
         let resources = responder.resources.clone();
         spawn(async move {
-            if let Err(err) = Self::responder_loop(resources, scope).await {
+            if let Err(err) = Self::responder_loop(resources, scope, shutdown).await {
                 log::error!("Dns Responder failed: {}", err);
             }
         });
@@ -92,52 +97,69 @@ impl SimpleMdnsResponder {
         resources.clear();
     }
 
-    async fn responder_loop(
+    async fn responder_loop<F: Future + Send>(
         resources: Arc<RwLock<ResourceRecordManager<'_>>>,
         scope: NetworkScope,
+        shutdown: Option<F>,
     ) -> Result<(), SimpleMdnsError> {
         let mut recv_buffer = [0u8; 9000];
         let sender_socket = sender_socket(scope.is_v4()).and_then(nonblocking)?;
 
         let recv_socket = join_multicast(scope).and_then(nonblocking)?;
 
-        loop {
+        let mut recv_and_process = async || -> Result<(), SimpleMdnsError> {
             let (count, addr) = recv_socket.recv_from(&mut recv_buffer).await?;
-
             if header_buffer::has_flags(&recv_buffer[..count], PacketFlag::RESPONSE).unwrap_or(true)
             {
-                continue;
+                return Ok(());
             }
 
             match Packet::parse(&recv_buffer[..count]) {
                 Ok(packet) => {
-                    match build_reply(packet, &*resources.read().await) {
-                        Some((reply_packet, unicast_response)) => {
-                            let reply = match reply_packet.build_bytes_vec_compressed() {
-                                Ok(reply) => reply,
-                                Err(err) => {
-                                    log::error!("Failed to build reply {err}");
-                                    continue;
-                                }
-                            };
+                    if let Some((reply_packet, unicast_response)) =
+                        build_reply(packet, &*resources.read().await)
+                    {
+                        let reply = match reply_packet.build_bytes_vec_compressed() {
+                            Ok(reply) => reply,
+                            Err(err) => {
+                                log::error!("Failed to build reply {err}");
+                                return Ok(());
+                            }
+                        };
 
-                            let reply_addr = if unicast_response {
-                                addr
-                            } else {
-                                scope.socket_address()
-                            };
+                        let reply_addr = if unicast_response {
+                            addr
+                        } else {
+                            scope.socket_address()
+                        };
 
-                            sender_socket.send_to(&reply, reply_addr).await?;
-                        }
-                        None => {
-                            continue;
-                        }
+                        sender_socket.send_to(&reply, reply_addr).await?;
                     };
                 }
                 Err(err) => {
                     log::error!("Received Invalid packet {err}");
                 }
             }
+
+            Ok(())
+        };
+
+        match shutdown {
+            Some(shutdown) => {
+                tokio::pin!(shutdown);
+
+                loop {
+                    select! {
+                        _ = &mut shutdown => {}
+                        _ = recv_and_process() => {
+
+                        }
+                    }
+                }
+            }
+            None => loop {
+                recv_and_process().await?
+            },
         }
     }
 
