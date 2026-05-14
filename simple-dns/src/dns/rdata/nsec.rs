@@ -1,8 +1,8 @@
 use crate::{
     bytes_buffer::BytesBuffer,
     dns::WireFormat,
-    lib::{Cow, Vec},
     lib::Write,
+    lib::{Cow, Vec},
     Name,
 };
 
@@ -73,7 +73,7 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
         self.next_name.write_to(out)?;
 
         let mut sorted = self.type_bit_maps.clone();
-        sorted.sort_by(|a, b| a.window_block.cmp(&b.window_block));
+        sorted.sort_by_key(|a| a.window_block);
 
         for record in sorted.iter() {
             out.write_all(&[record.window_block])?;
