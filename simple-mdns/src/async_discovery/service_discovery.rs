@@ -1,4 +1,4 @@
-use simple_dns::{rdata::RData, Name, Packet, Question, ResourceRecord, CLASS, TYPE};
+use simple_dns::{rdata::RData, Name, Packet, Question, CLASS, TYPE};
 use tokio::{
     net::UdpSocket,
     select, spawn,
@@ -12,7 +12,9 @@ use tokio::{
 use std::{collections::HashSet, net::SocketAddr, sync::Arc, time::Duration};
 
 use crate::{
-    resource_record_manager::{DomainResourceFilter, ResourceRecordManager},
+    resource_record_manager::{
+        service_discovery_resource_manager, DomainResourceFilter, ResourceRecordManager,
+    },
     socket_helper::nonblocking,
     InstanceInformation, NetworkScope, SimpleMdnsError,
 };
@@ -82,17 +84,12 @@ impl ServiceDiscovery {
         let instance_full_name = Name::new(&instance_full_name)?.into_owned();
         let service_name = Name::new(service_name)?.into_owned();
 
-        let mut resource_manager = ResourceRecordManager::new();
-        resource_manager.add_authoritative_resource(ResourceRecord::new(
-            service_name.clone(),
-            simple_dns::CLASS::IN,
+        let resource_manager = service_discovery_resource_manager(
+            &service_name,
+            &instance_full_name,
             resource_ttl,
-            RData::PTR(instance_full_name.clone().into()),
-        ));
-
-        for resource in instance_information.into_records(&instance_full_name, resource_ttl)? {
-            resource_manager.add_authoritative_resource(resource);
-        }
+            instance_information,
+        )?;
 
         let resource_manager = Arc::new(RwLock::new(resource_manager));
         let service_discovery = ServiceDiscoveryExecutor {
@@ -257,6 +254,7 @@ impl ServiceDiscoveryExecutor {
     ) -> Result<(), SimpleMdnsError> {
         let packet = Packet::parse(buf)?;
         if packet.has_flags(simple_dns::PacketFlag::RESPONSE) {
+            log::trace!("received response packet {}", packet.id());
             add_response_to_resources(
                 packet,
                 &self.service_name,
@@ -345,15 +343,10 @@ impl ServiceDiscoveryExecutor {
     async fn query_service_instances(&self) -> Result<(), SimpleMdnsError> {
         log::trace!("probing service instances");
         let mut packet = Packet::new_query(0);
+        // RFC 6763 §4 — discover service instances via PTR query on the service type name
         packet.questions.push(Question::new(
             self.service_name.clone(),
-            TYPE::SRV.into(),
-            CLASS::IN.into(),
-            false,
-        ));
-        packet.questions.push(Question::new(
-            self.service_name.clone(),
-            TYPE::TXT.into(),
+            TYPE::PTR.into(),
             CLASS::IN.into(),
             false,
         ));

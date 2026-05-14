@@ -33,3 +33,11 @@ tokio = { version = "1.32", features = [
 [dev-dependencies]
 stderrlog = "0.6"
 tokio = { version = "1.32", features = ["full"] }
+
+[[example]]
+name = "sync_discovery"
+required-features = ["sync"]
+
+[[example]]
+name = "async_discovery"
+required-features = ["async-tokio"]

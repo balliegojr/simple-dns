@@ -17,9 +17,10 @@ use crate::{
 pub fn sender_socket(ipv4: bool) -> io::Result<UdpSocket> {
     if ipv4 {
         let socket = create_socket(Domain::IPV4)?;
+        // RFC 6762 §6: mDNS messages MUST be sent from UDP source port 5353
         socket.bind(&SockAddr::from(SocketAddr::new(
             Ipv4Addr::UNSPECIFIED.into(),
-            0,
+            MULTICAST_PORT,
         )))?;
 
         Ok(socket.into())
@@ -27,7 +28,7 @@ pub fn sender_socket(ipv4: bool) -> io::Result<UdpSocket> {
         let socket = create_socket(Domain::IPV6)?;
         socket.bind(&SockAddr::from(SocketAddr::new(
             Ipv6Addr::UNSPECIFIED.into(),
-            0,
+            MULTICAST_PORT,
         )))?;
 
         Ok(socket.into())

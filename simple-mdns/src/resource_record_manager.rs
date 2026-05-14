@@ -3,7 +3,10 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use radix_trie::{Trie, TrieCommon};
+use simple_dns::rdata::RData;
 use simple_dns::{Name, ResourceRecord};
+
+use crate::{InstanceInformation, SimpleMdnsError};
 
 #[derive(Debug)]
 pub struct ResourceRecordManager<'a> {
@@ -267,6 +270,36 @@ impl ExpirationInfo {
     pub fn is_expired(&self) -> bool {
         self.expire_at < Instant::now()
     }
+}
+
+pub fn service_discovery_resource_manager<'a>(
+    service_name: &Name<'a>,
+    instance_full_name: &Name<'a>,
+    resource_ttl: u32,
+    instance_information: InstanceInformation,
+) -> Result<ResourceRecordManager<'a>, SimpleMdnsError> {
+    let mut resource_manager = ResourceRecordManager::new();
+    resource_manager.add_authoritative_resource(ResourceRecord::new(
+        service_name.clone(),
+        simple_dns::CLASS::IN,
+        resource_ttl,
+        RData::PTR(instance_full_name.clone().into()),
+    ));
+
+    // RFC 6763 §9 — register the service type under the meta-query name so that
+    // browsers like avahi-discover can enumerate all service types on the network
+    resource_manager.add_authoritative_resource(ResourceRecord::new(
+        Name::new("_services._dns-sd._udp.local")?.into_owned(),
+        simple_dns::CLASS::IN,
+        resource_ttl,
+        RData::PTR(service_name.clone().into()),
+    ));
+
+    for resource in instance_information.into_records(instance_full_name, resource_ttl)? {
+        resource_manager.add_authoritative_resource(resource);
+    }
+
+    Ok(resource_manager)
 }
 
 #[cfg(test)]

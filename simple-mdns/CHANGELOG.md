@@ -3,6 +3,7 @@
 ### Breaking Changes
 
 - Async `SimpleMdnsResponder::new_with_scope` expects an optional future for graceful shutdown.
+- Correct resolution of Dns-Sd metaquery
 
 # 0.6.3 (2026-02-13)
 
