@@ -1,3 +1,9 @@
+# 0.11.3 (2026-05-15)
+
+### Fix
+- Updated bitflags dependency to 2.11.
+- Clippy run
+
 # 0.11.2 (2026-01-06)
 
 ### Fix

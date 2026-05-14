@@ -16,7 +16,7 @@ std = []
 alloc = []
 
 [dependencies]
-bitflags = "2.4"
+bitflags = "2.11"
 
 [package.metadata.docs.rs]
 all-features = true
