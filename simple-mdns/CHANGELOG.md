@@ -1,3 +1,9 @@
+# Unreleasead
+
+### Breaking Changes
+
+- Async `SimpleMdnsResponder::new_with_scope` expects an optional future for graceful shutdown.
+
 # 0.6.3 (2026-02-13)
 
 ### Fixed

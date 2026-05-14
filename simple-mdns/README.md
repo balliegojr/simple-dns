@@ -98,6 +98,29 @@ This struct relies on [`simple-dns`](https://crates.io/crates/simple-dns) crate 
     # }
 ```
 
+### Graceful shutdown (async version)
+
+The async version of SimpleMdnsResponder accepts a signal future when initialized with `new_with_scope`.
+```rust, no_run  
+    # #[cfg(feature = "async-tokio")] {
+
+    use simple_mdns::async_discovery::SimpleMdnsResponder;
+    use simple_mdns::NetworkScope;
+
+    use simple_dns::{Name, CLASS, ResourceRecord, rdata::{RData, A, SRV}};
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel::<()>();
+
+    let mut responder =
+        SimpleMdnsResponder::new_with_scope(10, NetworkScope::V4, Some(shutdown_rx));
+
+    // This will stop the responder loop
+    shutdown_tx.send(()).expect("Failed to send shutdown signal");
+
+    # }
+```
+
 # IPV6
 
 IPV6 is now supported by using the `NetworkScope` enum.  
