@@ -60,6 +60,9 @@ impl SimpleMdnsResponder {
 
     /// Creates a new SimpleMdnsResponder with specified ttl, network scope and optional shutdown
     /// signal.
+    ///
+    /// The shutdown signal is a any future that, when resolved, will stop the responder internal
+    /// loop.
     pub fn new_with_scope<F: Future + Send + 'static>(
         rr_ttl: u32,
         scope: NetworkScope,
