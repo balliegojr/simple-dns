@@ -1,6 +1,6 @@
 [package]
 name = "simple-mdns"
-version = "0.6.3"
+version = "0.7.0"
 authors = ["Ilson Roberto Balliego Junior <ilson.balliego@gmail.com>"]
 edition = "2021"
 description = "Rust implementation of mDNS for service discovering (DNS-SD)"
@@ -19,10 +19,10 @@ async-tokio = ["dep:tokio"]
 
 [dependencies]
 simple-dns = { path = "../simple-dns", version = "0.*" }
-socket2 = { version = "0.5", features = ["all"] }
+socket2 = { version = "0.6", features = ["all"] }
 log = "^0.4"
 radix_trie = "^0.3.0"
-tokio = { version = "1.32", features = [
+tokio = { version = "1.52.3", features = [
     "net",
     "sync",
     "rt",
@@ -32,7 +32,7 @@ tokio = { version = "1.32", features = [
 
 [dev-dependencies]
 stderrlog = "0.6"
-tokio = { version = "1.32", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 
 [[example]]
 name = "sync_discovery"
