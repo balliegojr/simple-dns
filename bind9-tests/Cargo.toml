@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 
 [build-dependencies]
-bindgen = "0.70.1"
+bindgen = "0.72.1"
 
 [dependencies]
 simple-dns = { path = "../simple-dns" }
