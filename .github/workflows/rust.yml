@@ -72,15 +72,13 @@ jobs:
     - name: Compile bind9
       run: |
         cd bind9
-        autoreconf -fi 
-        ./configure --disable-doh 
-        make 
-        sudo make install
-        sudo ldconfig
+        autoreconf -fi
+        ./configure --disable-doh
+        make
     - name: Run tests
       run: |
         cd bind9-tests
-        RUSTFLAGS="-C linker-features=-lld" cargo test --verbose 
+        RUSTFLAGS="-C linker-features=-lld" cargo test --verbose
 
   test-no-std:
     name: Test no_std
