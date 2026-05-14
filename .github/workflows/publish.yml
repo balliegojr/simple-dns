@@ -1,0 +1,65 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'simple-dns/[0-9]*'
+      - 'simple-mdns/[0-9]*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. simple-dns/0.11.2)'
+        required: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      crate: ${{ steps.parse.outputs.crate }}
+      version: ${{ steps.parse.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and validate tag
+        id: parse
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          CRATE="${TAG%/*}"
+          VERSION="${TAG##*/}"
+          CARGO_VERSION=$(grep -m1 '^version' "${CRATE}/Cargo.toml" | sed 's/version = "\(.*\)"/\1/')
+          if [ "$CARGO_VERSION" != "$VERSION" ]; then
+            echo "ERROR: tag version $VERSION does not match Cargo.toml version $CARGO_VERSION for crate $CRATE"
+            exit 1
+          fi
+          echo "crate=$CRATE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Test on ${{ matrix.os }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-14]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clippy
+        run: cargo clippy --package ${{ needs.prepare.outputs.crate }} --all-features -- -D warnings
+      - name: Build
+        run: cargo build --package ${{ needs.prepare.outputs.crate }} --release --all-features --verbose
+      - name: Test
+        run: cargo test --package ${{ needs.prepare.outputs.crate }} --release --all-features --verbose
+
+  publish:
+    name: Publish
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    env:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish ${{ needs.prepare.outputs.crate }}
+        run: cargo publish --package ${{ needs.prepare.outputs.crate }}
