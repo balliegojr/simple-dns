@@ -68,7 +68,7 @@ jobs:
       with:
         submodules: true
     - name: Install build dependencies
-      run: sudo apt install -y liburcu-dev libcap-dev libssl-dev libuv1-dev
+      run: sudo apt-get update && sudo apt-get install -y liburcu-dev libcap-dev libssl-dev libuv1-dev
     - name: Compile bind9
       run: |
         cd bind9
