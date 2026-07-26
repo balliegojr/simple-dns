@@ -23,7 +23,7 @@ pub fn id(buffer: &[u8]) -> crate::Result<u16> {
 /// Returns the packet id from the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 2`
 pub fn id_unchecked(buffer: &[u8]) -> u16 {
     u16::from_be_bytes(buffer[..2].try_into().unwrap())
 }
@@ -36,7 +36,7 @@ pub fn questions(buffer: &[u8]) -> crate::Result<u16> {
 /// Returns the questions count from the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 6`
 pub fn questions_unchecked(buffer: &[u8]) -> u16 {
     u16::from_be_bytes(buffer[4..6].try_into().unwrap())
 }
@@ -45,7 +45,7 @@ pub fn questions_unchecked(buffer: &[u8]) -> u16 {
 /// Writes the questions count in the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 6`
 pub(crate) fn set_questions(buffer: &mut [u8], question_count: u16) {
     buffer[4..6].copy_from_slice(&question_count.to_be_bytes());
 }
@@ -58,7 +58,7 @@ pub fn answers(buffer: &[u8]) -> crate::Result<u16> {
 /// Returns the answers count from the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 8`
 pub fn answers_unchecked(buffer: &[u8]) -> u16 {
     u16::from_be_bytes(buffer[6..8].try_into().unwrap())
 }
@@ -67,7 +67,7 @@ pub fn answers_unchecked(buffer: &[u8]) -> u16 {
 /// Writes the answers count in the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 8`
 pub(crate) fn set_answers(buffer: &mut [u8], answers_count: u16) {
     buffer[6..8].copy_from_slice(&answers_count.to_be_bytes());
 }
@@ -80,7 +80,7 @@ pub fn name_servers(buffer: &[u8]) -> crate::Result<u16> {
 /// Returns the name servers count from the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 10`
 pub fn name_servers_unchecked(buffer: &[u8]) -> u16 {
     u16::from_be_bytes(buffer[8..10].try_into().unwrap())
 }
@@ -89,7 +89,7 @@ pub fn name_servers_unchecked(buffer: &[u8]) -> u16 {
 /// Writes the name servers count in the header buffer
 ///
 /// # Panics
-/// Panics if `buffer.len() < 12`
+/// Panics if `buffer.len() < 10`
 pub(crate) fn set_name_servers(buffer: &mut [u8], name_servers_count: u16) {
     buffer[8..10].copy_from_slice(&name_servers_count.to_be_bytes());
 }
@@ -114,28 +114,6 @@ pub fn additional_records_unchecked(buffer: &[u8]) -> u16 {
 /// Panics if `buffer.len() < 12`
 pub(crate) fn set_additional_records(buffer: &mut [u8], additional_records_count: u16) {
     buffer[10..12].copy_from_slice(&additional_records_count.to_be_bytes());
-}
-
-#[allow(dead_code)]
-/// Sets the flags in the buffer
-///
-/// # Panics
-/// Panics if `buffer.len() < 12`
-pub(crate) fn set_flags_unchecked(buffer: &mut [u8], flags: PacketFlag) {
-    let mut current_flags = u16::from_be_bytes(buffer[2..4].try_into().unwrap());
-    current_flags |= flags.bits();
-    buffer[2..4].copy_from_slice(&current_flags.to_be_bytes());
-}
-
-#[allow(dead_code)]
-/// Removes the flags from the buffer
-///
-/// # Panics
-/// Panics if `buffer.len() < 12`
-pub(crate) fn remove_flags(buffer: &mut [u8], flags: PacketFlag) {
-    let mut current_flags = u16::from_be_bytes(buffer[2..4].try_into().unwrap());
-    current_flags ^= flags.bits();
-    buffer[2..4].copy_from_slice(&current_flags.to_be_bytes());
 }
 
 /// Verify if buffer has the flags set.
