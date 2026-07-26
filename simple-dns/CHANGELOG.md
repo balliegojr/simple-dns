@@ -1,4 +1,4 @@
-# Unreleased 
+# 0.12.0 (2026-07-26) 
 
 ### Fix
 - Document panic behaviour in header_buffer and change the functions to have a safe and _unchecked version.
