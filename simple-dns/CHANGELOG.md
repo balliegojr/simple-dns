@@ -2,6 +2,8 @@
 
 ### Fix
 - Document panic behaviour in header_buffer and change the functions to have a safe and _unchecked version.
+- Fixed incorrect resource record len bytes when writing NSEC records
+- Fixed incorrect behaviour when writing compressed resource records to fixed size writers
 
 # 0.11.3 (2026-05-15)
 

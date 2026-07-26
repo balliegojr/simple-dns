@@ -85,7 +85,14 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     }
 
     fn len(&self) -> usize {
+        // To calculate the len it is necessary to get the len of all the bitmaps in the nsec record
+        // Type Bit Maps Field = ( Window Block # | Bitmap Length | Bitmap )+
         self.next_name.len()
+            + self
+                .type_bit_maps
+                .iter()
+                .map(|el| el.bitmap.len() + 2) // each type window has 2 bytes + bitmap data
+                .sum::<usize>()
     }
 }
 
@@ -130,6 +137,27 @@ mod tests {
         assert_eq!(nsec.type_bit_maps.len(), 1);
         assert_eq!(nsec.type_bit_maps[0].window_block, 0);
         assert_eq!(nsec.type_bit_maps[0].bitmap, vec![64, 1, 0, 0, 0, 1]);
+    }
+
+    #[test]
+    fn nsec_reports_correct_len() {
+        let nsec = NSEC {
+            next_name: Name::new("host.example.com.").unwrap(),
+            type_bit_maps: vec![
+                NsecTypeBitMap {
+                    window_block: 0,
+                    bitmap: vec![0x40, 0x01, 0x00, 0x00, 0x00, 0x01].into(),
+                },
+                NsecTypeBitMap {
+                    window_block: 1,
+                    bitmap: vec![0x40, 0x01, 0x00, 0x00, 0x00, 0x01].into(),
+                },
+            ],
+        };
+
+        let mut buffer = Vec::new();
+        nsec.write_to(&mut buffer).unwrap();
+        assert_eq!(buffer.len(), nsec.len());
     }
 
     #[test]
