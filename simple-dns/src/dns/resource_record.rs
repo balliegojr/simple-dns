@@ -165,7 +165,7 @@ impl<'a> WireFormat<'a> for ResourceRecord<'a> {
 
         out.seek(SeekFrom::Start(len_position))?;
         out.write_all(&((end - len_position - 2) as u16).to_be_bytes())?;
-        out.seek(SeekFrom::End(0))?;
+        out.seek(SeekFrom::Start(end))?;
         Ok(())
     }
 }
@@ -377,5 +377,33 @@ mod tests {
         }
 
         Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn write_compressed_to_should_not_seed_to_end() {
+        let mut q = crate::Packet::new_reply(2);
+        q.answers.push(ResourceRecord::new(
+            Name::new("a.example.com").unwrap(),
+            CLASS::IN,
+            60,
+            RData::A(crate::rdata::A { address: 1 }),
+        ));
+        q.answers.push(ResourceRecord::new(
+            Name::new("b.example.com").unwrap(),
+            CLASS::IN,
+            60,
+            RData::A(crate::rdata::A { address: 2 }),
+        ));
+
+        // (A) misplaced record: pre-sized Vec cursor
+        let mut c = std::io::Cursor::new(vec![0u8; 300]);
+        q.write_compressed_to(&mut c).unwrap();
+        assert_eq!(c.into_inner().len(), 300);
+
+        // (B) panic: 512-byte slice cursor
+        let mut buf = [0u8; 512];
+        let mut c = crate::cursor::Cursor::new(&mut buf[..]);
+        q.write_compressed_to(&mut c).unwrap();
     }
 }
