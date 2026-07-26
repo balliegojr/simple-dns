@@ -1,8 +1,8 @@
 use crate::CharacterString;
 use crate::{
     dns::{WireFormat, MAX_CHARACTER_STRING_LENGTH},
-    lib::{vec, FromUtf8Error, String, Vec},
     lib::Write,
+    lib::{vec, FromUtf8Error, String, Vec},
 };
 
 use super::RR;
@@ -154,7 +154,7 @@ impl TryFrom<crate::lib::HashMap<String, Option<String>>> for TXT<'_> {
         for (key, value) in value {
             match value {
                 Some(value) => {
-                    txt.add_char_string(format!("{}={}", &key, &value).try_into()?);
+                    txt.add_char_string(format!("{key}={value}").try_into()?);
                 }
                 None => txt.add_char_string(key.try_into()?),
             }
