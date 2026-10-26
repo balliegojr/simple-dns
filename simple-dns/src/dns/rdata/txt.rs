@@ -65,9 +65,48 @@ impl<'a> TXT<'a> {
         self.strings.iter().filter_map(|char_str| {
             let mut splited = char_str.data.splitn(2, |c| *c == b'=');
             let key = splited.next()?;
+            if key.is_empty() {
+                return None;
+            }
             let value = splited.next();
             Some((key, value))
         })
+    }
+
+    /// Add a key/value attribute to this TXT record per RFC 6763 Section 6.
+    ///
+    /// The `key` must be non-empty printable US-ASCII (`0x20..=0x7E`) excluding `=`.
+    /// The optional `value` may contain arbitrary binary bytes, as long as the combined
+    /// `key=value` fits within a 255-byte [`CharacterString`].
+    pub fn add_attribute(&mut self, key: &str, value: Option<&[u8]>) -> crate::Result<()> {
+        if key.is_empty()
+            || !key
+                .bytes()
+                .all(|b| (0x20..=0x7E).contains(&b) && b != b'=')
+        {
+            return Err(crate::SimpleDnsError::InvalidCharacterString);
+        }
+
+        let total_len = key.len() + value.map_or(0, |v| 1 + v.len());
+        if total_len > MAX_CHARACTER_STRING_LENGTH {
+            return Err(crate::SimpleDnsError::InvalidCharacterString);
+        }
+
+        let mut data = Vec::with_capacity(total_len);
+        data.extend_from_slice(key.as_bytes());
+        if let Some(value) = value {
+            data.push(b'=');
+            data.extend_from_slice(value);
+        }
+
+        self.add_char_string(CharacterString::new(&data)?.into_owned());
+        Ok(())
+    }
+
+    /// Add a key/value attribute to this TXT record, consuming and returning `Self`.
+    pub fn with_attribute(mut self, key: &str, value: Option<&[u8]>) -> crate::Result<Self> {
+        self.add_attribute(key, value)?;
+        Ok(self)
     }
 
     // FIXME: remove the std feature once the HashMap is sorted out
@@ -76,13 +115,13 @@ impl<'a> TXT<'a> {
     /// - key=
     /// - key
     ///
-    /// If a key is duplicated, only the first one will be considered
+    /// If a key is duplicated, only the first one will be considered (case-insensitive per RFC 6763 Section 6.4)
     #[cfg(feature = "std")]
     pub fn attributes(&self) -> crate::lib::HashMap<String, Option<String>> {
         let mut attributes = crate::lib::HashMap::new();
         let iter = self.iter_raw().filter_map(|(key, value)| {
             let key = match crate::lib::str::from_utf8(key) {
-                Ok(key) => key.to_owned(),
+                Ok(key) => key.to_ascii_lowercase(),
                 Err(_) => return None,
             };
 
@@ -336,6 +375,48 @@ mod tests {
         let attributes = txt.long_attributes()?;
 
         assert_eq!(Some(big_value.to_owned()), attributes["bar"]);
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_rfc6763_empty_keys_and_case_insensitivity() -> Result<(), Box<dyn Error>> {
+        let txt = TXT::new()
+            .with_char_string(CharacterString::new(b"").unwrap())
+            .with_char_string(CharacterString::new(b"=ignored").unwrap())
+            .with_string("Vers=1")?
+            .with_string("vers=2")?
+            .with_string("PATH=/test")?;
+
+        let raw: Vec<_> = txt.iter_raw().collect();
+        assert_eq!(3, raw.len());
+        assert_eq!(b"Vers", raw[0].0);
+        assert_eq!(Some(b"1".as_slice()), raw[0].1);
+
+        let attrs = txt.attributes();
+        assert_eq!(2, attrs.len());
+        assert_eq!(Some("1".to_owned()), attrs["vers"]);
+        assert_eq!(Some("/test".to_owned()), attrs["path"]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_attribute() -> Result<(), Box<dyn Error>> {
+        let mut txt = TXT::new();
+        txt.add_attribute("binary", Some(&[0x00, 0xFF, 0xFE]))?;
+        txt.add_attribute("flag", None)?;
+
+        let raw: Vec<_> = txt.iter_raw().collect();
+        assert_eq!(2, raw.len());
+        assert_eq!(b"binary", raw[0].0);
+        assert_eq!(Some(&[0x00, 0xFF, 0xFE][..]), raw[0].1);
+        assert_eq!(b"flag", raw[1].0);
+        assert_eq!(None, raw[1].1);
+
+        assert!(txt.clone().with_attribute("", None).is_err());
+        assert!(txt.with_attribute("bad=key", None).is_err());
 
         Ok(())
     }
