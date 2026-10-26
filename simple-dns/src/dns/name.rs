@@ -276,16 +276,29 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
     }
 }
 
+fn write_escaped_label(f: &mut Formatter<'_>, label: &Label<'_>) -> FmtResult {
+    let s = String::from_utf8_lossy(&label.data);
+    for c in s.chars() {
+        match c {
+            '.' => f.write_str("\\.")?,
+            '\\' => f.write_str("\\\\")?,
+            _ => f.write_fmt(format_args!("{c}"))?,
+        }
+    }
+    Ok(())
+}
+
 impl Display for Name<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let mut labels = self.labels.iter();
 
         if let Some(label) = labels.next() {
-            f.write_fmt(format_args!("{label}"))?;
+            write_escaped_label(f, label)?;
         }
 
         for label in labels {
-            f.write_fmt(format_args!(".{label}"))?;
+            f.write_str(".")?;
+            write_escaped_label(f, label)?;
         }
 
         Ok(())
@@ -325,23 +338,57 @@ impl<'a> LabelsIter<'a> {
     }
 }
 
+fn unescape_label<'a>(bytes: &'a [u8], has_escape: bool) -> Cow<'a, [u8]> {
+    if !has_escape {
+        return bytes.into();
+    }
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\'
+            && i + 1 < bytes.len()
+            && (bytes[i + 1] == b'.' || bytes[i + 1] == b'\\')
+        {
+            out.push(bytes[i + 1]);
+            i += 2;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    Cow::Owned(out)
+}
+
 impl<'a> Iterator for LabelsIter<'a> {
     type Item = Cow<'a, [u8]>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for i in self.current..self.bytes.len() {
+        let mut i = self.current;
+        let mut has_escape = false;
+        while i < self.bytes.len() {
+            if self.bytes[i] == b'\\'
+                && i + 1 < self.bytes.len()
+                && (self.bytes[i + 1] == b'.' || self.bytes[i + 1] == b'\\')
+            {
+                has_escape = true;
+                i += 2;
+                continue;
+            }
             if self.bytes[i] == b'.' {
                 let current = crate::lib::mem::replace(&mut self.current, i + 1);
                 if i - current == 0 {
+                    has_escape = false;
+                    i = self.current;
                     continue;
                 }
-                return Some(self.bytes[current..i].into());
+                return Some(unescape_label(&self.bytes[current..i], has_escape));
             }
+            i += 1;
         }
 
         if self.current < self.bytes.len() {
             let current = crate::lib::mem::replace(&mut self.current, self.bytes.len());
-            Some(self.bytes[current..].into())
+            Some(unescape_label(&self.bytes[current..], has_escape))
         } else {
             None
         }
@@ -444,7 +491,7 @@ impl<'a> Label<'a> {
             .data
             .iter()
             .skip(1)
-            .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_')
+            .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_' || *c == b'.')
         {
             return false;
         }
@@ -847,5 +894,27 @@ mod tests {
         let l2 = Label::new("example".as_bytes()).unwrap();
         assert_eq!(l1, l2);
         assert_eq!(core::cmp::Ordering::Equal, l1.cmp(&l2));
+    }
+
+    #[test]
+    fn escaped_dots_and_slashes() {
+        let name = Name::new_unchecked(r"My\.Device._googlecast._tcp.local");
+        assert_eq!(4, name.get_labels().len());
+        assert_eq!(b"My.Device", name.get_labels()[0].as_ref());
+        assert_eq!(r"My\.Device._googlecast._tcp.local", name.to_string());
+
+        let name2 = Name::new(r"My\.Device._googlecast._tcp.local").unwrap();
+        assert_eq!(4, name2.get_labels().len());
+        assert_eq!(b"My.Device", name2.get_labels()[0].as_ref());
+        assert_eq!(r"My\.Device._googlecast._tcp.local", name2.to_string());
+
+        let formatted = name2.to_string();
+        let roundtrip = Name::new_unchecked(&formatted);
+        assert_eq!(name2, roundtrip);
+
+        let name_slash = Name::new_unchecked(r"My\\Device._tcp.local");
+        assert_eq!(3, name_slash.get_labels().len());
+        assert_eq!(b"My\\Device", name_slash.get_labels()[0].as_ref());
+        assert_eq!(r"My\\Device._tcp.local", name_slash.to_string());
     }
 }
