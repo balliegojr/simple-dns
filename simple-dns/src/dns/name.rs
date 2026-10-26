@@ -359,9 +359,39 @@ impl<'a> Iterator for LabelsIter<'a> {
 ///
 /// The `Display` implementation uses [`std::string::String::from_utf8_lossy`] to display the
 /// label.
-#[derive(Eq, PartialEq, Hash, Clone, PartialOrd, Ord)]
+#[derive(Eq, Clone)]
 pub struct Label<'a> {
     data: Cow<'a, [u8]>,
+}
+
+impl PartialEq for Label<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data.eq_ignore_ascii_case(&other.data)
+    }
+}
+
+impl Hash for Label<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize(self.data.len());
+        for &b in self.data.iter() {
+            state.write_u8(b.to_ascii_lowercase());
+        }
+    }
+}
+
+impl PartialOrd for Label<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Label<'_> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.data
+            .iter()
+            .map(u8::to_ascii_lowercase)
+            .cmp(other.data.iter().map(u8::to_ascii_lowercase))
+    }
 }
 
 impl<'a> Label<'a> {
@@ -793,5 +823,29 @@ mod tests {
         assert_eq!(buf.position() - old_pos, name2.len() as u64);
 
         Ok(())
+    }
+
+    #[test]
+    fn case_insensitive_label_and_name() {
+        let lower = Name::new("_googlecast._tcp.local").unwrap();
+        let upper = Name::new("_googlecast._TCP.LOCAL").unwrap();
+
+        assert_eq!(lower, upper);
+        assert!(Name::new("device._googlecast._TCP.LOCAL")
+            .unwrap()
+            .is_subdomain_of(&lower));
+
+        let full = Name::new("device._googlecast._TCP.LOCAL").unwrap();
+        let sub = full.without(&lower).unwrap();
+        assert_eq!("device", sub.to_string());
+
+        let mut map = std::collections::HashMap::new();
+        map.insert(lower.clone(), 123);
+        assert_eq!(Some(&123), map.get(&upper));
+
+        let l1 = Label::new("Example".as_bytes()).unwrap();
+        let l2 = Label::new("example".as_bytes()).unwrap();
+        assert_eq!(l1, l2);
+        assert_eq!(core::cmp::Ordering::Equal, l1.cmp(&l2));
     }
 }
