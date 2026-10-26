@@ -2,11 +2,11 @@ use crate::{
     bytes_buffer::BytesBuffer,
     dns::WireFormat,
     lib::Write,
-    lib::{Cow, Vec},
+    lib::{BTreeMap, Cow, Vec},
     Name,
 };
 
-use super::RR;
+use super::{RR, TYPE};
 
 /// A NSEC record see [rfc4034](https://datatracker.ietf.org/doc/html/rfc4034#section-4)
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -96,7 +96,86 @@ impl<'a> WireFormat<'a> for NSEC<'a> {
     }
 }
 
-impl NSEC<'_> {
+impl<'a> NSEC<'a> {
+    /// Constructs a new `NSEC` record with the given `next_name` and list of [`TYPE`]s.
+    ///
+    /// Bitmaps are constructed and windowed according to [RFC 4034 Section 4.1.2](https://datatracker.ietf.org/doc/html/rfc4034#section-4.1.2).
+    pub fn from_types(next_name: Name<'a>, types: &[TYPE]) -> Self {
+        let mut windows: BTreeMap<u8, [u8; 32]> = BTreeMap::new();
+        let mut max_bytes: BTreeMap<u8, usize> = BTreeMap::new();
+
+        for &ty in types {
+            let type_code = u16::from(ty);
+            let window = (type_code / 256) as u8;
+            let offset_in_window = (type_code % 256) as usize;
+            let byte_idx = offset_in_window / 8;
+            let bit_idx = offset_in_window % 8;
+
+            let bitmap = windows.entry(window).or_insert([0u8; 32]);
+            bitmap[byte_idx] |= 0x80 >> bit_idx;
+
+            let max_byte = max_bytes.entry(window).or_insert(0);
+            if byte_idx > *max_byte {
+                *max_byte = byte_idx;
+            }
+        }
+
+        let type_bit_maps = windows
+            .into_iter()
+            .map(|(window_block, bitmap)| {
+                let len = max_bytes.get(&window_block).copied().unwrap_or(0) + 1;
+                NsecTypeBitMap {
+                    window_block,
+                    bitmap: Cow::Owned(bitmap[..len].to_vec()),
+                }
+            })
+            .collect();
+
+        Self {
+            next_name,
+            type_bit_maps,
+        }
+    }
+
+    /// Returns `true` if the type bit maps indicate the presence of `ty`.
+    pub fn contains(&self, ty: TYPE) -> bool {
+        let type_code = u16::from(ty);
+        let window = (type_code / 256) as u8;
+        let offset_in_window = (type_code % 256) as usize;
+        let byte_idx = offset_in_window / 8;
+        let bit_mask = 0x80 >> (offset_in_window % 8);
+
+        for map in &self.type_bit_maps {
+            if map.window_block == window {
+                return map
+                    .bitmap
+                    .get(byte_idx)
+                    .map_or(false, |byte| (byte & bit_mask) != 0);
+            }
+        }
+        false
+    }
+
+    /// Iterates over all [`TYPE`]s represented in this record's type bit maps.
+    pub fn types(&self) -> impl Iterator<Item = TYPE> + '_ {
+        self.type_bit_maps.iter().flat_map(|map| {
+            let window_base = (map.window_block as u16) * 256;
+            map.bitmap
+                .iter()
+                .enumerate()
+                .flat_map(move |(byte_idx, &byte)| {
+                    (0..8).filter_map(move |bit_idx| {
+                        if (byte & (0x80 >> bit_idx)) != 0 {
+                            let type_code = window_base + (byte_idx as u16) * 8 + (bit_idx as u16);
+                            Some(TYPE::from(type_code))
+                        } else {
+                            None
+                        }
+                    })
+                })
+        })
+    }
+
     /// Transforms the inner data into its owned type
     pub fn into_owned<'b>(self) -> NSEC<'b> {
         let type_bit_maps = self
@@ -183,5 +262,31 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_nsec_from_types_and_helpers() {
+        let name = Name::new("host.example.com.").unwrap();
+        let types = [TYPE::A, TYPE::MX, TYPE::NSEC, TYPE::Unknown(300)];
+        let nsec = NSEC::from_types(name.clone(), &types);
+
+        assert_eq!(nsec.next_name, name);
+        assert_eq!(nsec.type_bit_maps.len(), 2);
+        assert_eq!(nsec.type_bit_maps[0].window_block, 0);
+        assert_eq!(nsec.type_bit_maps[0].bitmap, vec![64, 1, 0, 0, 0, 1]);
+        assert_eq!(nsec.type_bit_maps[1].window_block, 1);
+
+        assert!(nsec.contains(TYPE::A));
+        assert!(nsec.contains(TYPE::MX));
+        assert!(nsec.contains(TYPE::NSEC));
+        assert!(nsec.contains(TYPE::Unknown(300)));
+        assert!(!nsec.contains(TYPE::AAAA));
+        assert!(!nsec.contains(TYPE::TXT));
+
+        let recovered: Vec<_> = nsec.types().collect();
+        assert_eq!(recovered, types);
+
+        assert_eq!(u16::from(crate::CLASS::IN), 1);
+        assert_eq!(u16::from(crate::CLASS::CS), 2);
     }
 }

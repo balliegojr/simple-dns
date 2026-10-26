@@ -47,6 +47,12 @@ impl From<Ipv4Addr> for A {
     }
 }
 
+impl From<A> for Ipv4Addr {
+    fn from(a: A) -> Self {
+        a.address.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::lib::Vec;
@@ -84,5 +90,12 @@ mod tests {
 
         assert_eq!(sample_a_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        let ip = Ipv4Addr::new(127, 0, 0, 1);
+        let a = A::from(ip);
+        assert_eq!(ip, Ipv4Addr::from(a));
     }
 }

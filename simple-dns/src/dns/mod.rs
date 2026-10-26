@@ -153,6 +153,12 @@ impl TryFrom<u16> for CLASS {
     }
 }
 
+impl From<CLASS> for u16 {
+    fn from(val: CLASS) -> Self {
+        val as u16
+    }
+}
+
 /// Possible QCLASS values for a Question in a DNS packet  
 /// Each value is described according to its own RFC
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

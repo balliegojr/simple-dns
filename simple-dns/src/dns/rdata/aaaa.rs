@@ -45,6 +45,12 @@ impl From<Ipv6Addr> for AAAA {
     }
 }
 
+impl From<AAAA> for Ipv6Addr {
+    fn from(aaaa: AAAA) -> Self {
+        aaaa.address.into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::lib::FromStr;
@@ -85,5 +91,12 @@ mod tests {
 
         assert_eq!(sample_rdata.address, sample_ip);
         Ok(())
+    }
+
+    #[test]
+    fn test_from_conversions() {
+        let ip = Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1);
+        let aaaa = AAAA::from(ip);
+        assert_eq!(ip, Ipv6Addr::from(aaaa));
     }
 }
