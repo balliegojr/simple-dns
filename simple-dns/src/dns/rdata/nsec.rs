@@ -150,7 +150,7 @@ impl<'a> NSEC<'a> {
                 return map
                     .bitmap
                     .get(byte_idx)
-                    .map_or(false, |byte| (byte & bit_mask) != 0);
+                    .is_some_and(|byte| (byte & bit_mask) != 0);
             }
         }
         false
