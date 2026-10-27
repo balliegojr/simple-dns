@@ -2,6 +2,19 @@
 
 ### Fix
 - Fixed label comparison to conform with RFC 1035 (case insensitive)
+- Escaped dots (`\.`) in names are handled as part of the label when parsing and displaying a
+  `Name`, and `\` is escaped as `\\` when displaying [#71]
+
+### Added
+- `Label::is_valid_hostname`, `Label::is_valid_service_label` and `Label::is_valid_instance_label`
+- `Name::is_valid_hostname`, `Name::is_valid_service_name`, `Name::is_valid_instance_name` and
+  `Name::is_valid_sub_type_name`, checking names against the RFC 1123, RFC 6335 and RFC 6763 rules
+- `Name::new` and `Label::new` accept `\DDD` and `\X` escapes (RFC 1035 section 5.1,
+  RFC 4343 section 2.1)
+
+### Changed
+- **Breaking:** the single `is_valid` check was replaced by the role-specific `is_valid_*` methods.
+  `Label::new` and `Name::new` check lengths and escapes, but no longer reject labels by content.
 
 # 0.12.0 (2026-07-26) 
 
