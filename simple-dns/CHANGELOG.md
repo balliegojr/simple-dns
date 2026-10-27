@@ -1,3 +1,8 @@
+# Unreleased
+
+### Fix
+- Fixed label comparison to conform with RFC 1035 (case insensitive)
+
 # 0.12.0 (2026-07-26) 
 
 ### Fix
