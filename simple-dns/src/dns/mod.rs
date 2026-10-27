@@ -4,7 +4,10 @@ mod character_string;
 pub use character_string::CharacterString;
 
 mod name;
-pub use name::{Label, Name};
+pub use name::Name;
+
+mod label;
+pub use label::Label;
 
 mod packet;
 pub use packet::Packet;
@@ -30,6 +33,7 @@ use crate::lib::TryFrom;
 use bitflags::bitflags;
 
 const MAX_LABEL_LENGTH: usize = 63;
+const MAX_SERVICE_NAME_LENGTH: usize = 16;
 const MAX_NAME_LENGTH: usize = 255;
 const MAX_CHARACTER_STRING_LENGTH: usize = 255;
 const MAX_NULL_LENGTH: usize = 65535;

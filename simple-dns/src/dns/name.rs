@@ -2,11 +2,14 @@ use crate::{
     bytes_buffer::BytesBuffer,
     lib::{
         fmt::{Debug, Display, Formatter, Result as FmtResult},
-        format, Cow, Hash, Hasher, Iter, Seek, String, ToString, TryFrom, Vec, Write,
+        format, Hash, Hasher, Iter, Seek, TryFrom, Vec, Write,
     },
 };
 
-use super::{WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH};
+use super::{
+    label::{Label, LabelsIter},
+    WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH,
+};
 
 const POINTER_MASK: u8 = 0b1100_0000;
 const POINTER_MASK_U16: u16 = 0b1100_0000_0000_0000;
@@ -20,8 +23,44 @@ const MAX_COMPRESSION_OFFSET: u64 = !POINTER_MASK_U16 as u64;
 /// Each section of a name is called label  
 /// ex: `google.com` consists of two labels `google` and `com`
 ///
-/// A valid name contains only alphanumeric characters, hyphen (-), underscore (_) or dots (.) and must not exceed 255 characters.
-/// Each label must not exceed 63 characters.
+/// A name is at most 255 octets long in the wire format, and each label at most 63 octets.
+/// [`Name::new`] checks these limits, but not the content of the labels. Use the `is_valid_*`
+/// methods to check a name against the rules of a given role:
+/// - [`Name::is_valid_hostname`]
+/// - [`Name::is_valid_service_name`]
+/// - [`Name::is_valid_instance_name`]
+/// - [`Name::is_valid_sub_type_name`]
+///
+/// # Text format
+///
+/// [`Name::new`] reads the presentation format of RFC 1035 section 5.1 and RFC 4343
+/// section 2.1:
+/// - an unescaped `.` separates labels
+/// - `\.` is a dot inside a label and `\\` is a backslash
+/// - `\DDD`, three decimal digits, is the octet with that value, and `\X` for any other
+///   non-digit X is the character X
+/// - a trailing dot marks the name as absolute and does not add a label. A name made only of
+///   dots is the root and has no labels
+/// - empty labels, as in `a..b`, are skipped
+///
+/// [`Name::new_unchecked`] splits the text at unescaped dots in the same way, but it does not
+/// interpret the escapes: the bytes of each label are kept as written, so `a\.b` becomes the
+/// four byte label `a\.b`. To build a name from raw label content, use
+/// [`Name::new_with_labels`].
+///
+/// [`Display`](core::fmt::Display) writes the same format, escaping `.` and `\` inside labels
+/// (RFC 6763 section 4.3), so a name parsed back with [`Name::new`] is equal to the original.
+///
+/// The escapes exist only in text. In the wire format, labels are length-prefixed and hold
+/// any octet.
+///
+/// ```
+/// # use simple_dns::Name;
+/// let name = Name::new(r"My\.Device._googlecast._tcp.local").unwrap();
+/// assert_eq!(4, name.get_labels().len());
+/// assert_eq!(b"My.Device", name.get_labels()[0].as_ref());
+/// assert_eq!(r"My\.Device._googlecast._tcp.local", name.to_string());
+/// ```
 ///
 /// Microsoft implementation allows unicode characters in the name content.
 /// To create a name with unicode characters, use [`Name::new_unchecked`] or
@@ -32,7 +71,12 @@ pub struct Name<'a> {
 }
 
 impl<'a> Name<'a> {
-    /// Creates a new Name. Returns [`Result::<Name>::Ok`] if given `name` contents are valid.
+    /// Creates a new Name from text in the format described in the [type docs](Name#text-format).
+    ///
+    /// Returns an error if an escape sequence is malformed, if a label is longer than 63 octets
+    /// after unescaping, or if the encoded name is longer than 255 octets.
+    /// The content of the labels is not checked against a naming rule, use the `is_valid_*`
+    /// methods for that.
     pub fn new(name: &'a str) -> crate::Result<Self> {
         let labels = LabelsIter::new(name.as_bytes())
             .map(Label::new)
@@ -47,7 +91,11 @@ impl<'a> Name<'a> {
         }
     }
 
-    /// Create a new Name without checking for size limits or contents
+    /// Create a new Name without checking for size limits or contents.
+    ///
+    /// The text is split at unescaped dots, but escape sequences are not interpreted: the bytes
+    /// of each label are kept as written (see the [type docs](Name#text-format)). Use
+    /// [`Name::new`] to unescape, or [`Name::new_with_labels`] to set the label content directly.
     pub fn new_unchecked(name: &'a str) -> Self {
         let labels = LabelsIter::new(name.as_bytes())
             .map(Label::new_unchecked)
@@ -162,9 +210,111 @@ impl<'a> Name<'a> {
         Ok(())
     }
 
-    /// Returns `true` if the name is valid.
-    pub fn is_valid(&self) -> bool {
-        self.labels.iter().all(|label| label.is_valid())
+    /// Returns `true` if the name has at least one label and every label is a valid host name
+    /// label, see [`Label::is_valid_hostname`].
+    ///
+    /// ```
+    /// # use simple_dns::Name;
+    /// assert!(Name::new_unchecked("my-host.example.com").is_valid_hostname());
+    /// assert!(!Name::new_unchecked("_srv.example.com").is_valid_hostname());
+    /// assert!(!Name::new_unchecked(".").is_valid_hostname());
+    /// ```
+    pub fn is_valid_hostname(&self) -> bool {
+        !self.labels.is_empty() && self.labels.iter().all(|label| label.is_valid_hostname())
+    }
+
+    /// Returns `true` if the name is a DNS-SD subtype name:
+    /// `<Subtype>._sub.<sn>._tcp|_udp.<domain>` (RFC 6763 section 7.1).
+    ///
+    /// The subtype can be any label (see [`Label::is_valid_instance_label`]) and does not need to
+    /// start with an underscore. The rest of the name must be a valid service name, see
+    /// [`Name::is_valid_service_name`].
+    ///
+    /// ```
+    /// # use simple_dns::Name;
+    /// assert!(Name::new_unchecked("_printer._sub._http._tcp.local").is_valid_sub_type_name());
+    /// assert!(Name::new_unchecked("The Music Store._sub._http._tcp.local").is_valid_sub_type_name());
+    /// assert!(!Name::new_unchecked("_printer._http._tcp.local").is_valid_sub_type_name());
+    /// ```
+    pub fn is_valid_sub_type_name(&self) -> bool {
+        // <sub>._sub.<sn>._tcp.<servicedomain>.<parentdomain>.
+        if self.labels.is_empty() {
+            return false;
+        }
+
+        let mut labels = self.labels.iter();
+        let (Some(subtype), Some(marker)) = (labels.next(), labels.next()) else {
+            return false;
+        };
+
+        let sub = Label::new_unchecked(&b"_sub"[..]);
+        subtype.is_valid_instance_label() && *marker == sub && Self::validate_service_name(labels)
+    }
+
+    /// Returns `true` if the name is a DNS-SD service instance name:
+    /// `<Instance>.<sn>._tcp|_udp.<domain>` (RFC 6763 section 4.3).
+    ///
+    /// The instance can be any label (see [`Label::is_valid_instance_label`]), including one that
+    /// contains dots. The rest of the name must be a valid service name, see
+    /// [`Name::is_valid_service_name`].
+    ///
+    /// ```
+    /// # use simple_dns::Name;
+    /// assert!(Name::new_unchecked("My Printer._ipp._tcp.local").is_valid_instance_name());
+    /// // the escaped dot keeps `My. Printer` as a single label
+    /// assert!(Name::new(r"My\. Printer._ipp._tcp.local").unwrap().is_valid_instance_name());
+    /// assert!(!Name::new_unchecked("My Printer._ipp._ftp.local").is_valid_instance_name());
+    /// ```
+    pub fn is_valid_instance_name(&self) -> bool {
+        // <Instance>.<sn>._tcp.<servicedomain>.<parentdomain>.
+
+        if self.labels.is_empty() {
+            return false;
+        }
+
+        let mut labels = self.labels.iter();
+        let Some(instance_name) = labels.next() else {
+            return false;
+        };
+
+        instance_name.is_valid_instance_label() && Self::validate_service_name(labels)
+    }
+
+    /// Returns `true` if the name is a DNS-SD service name: `<sn>._tcp|_udp.<domain>`
+    /// (RFC 6763 sections 4.1.2 and 7).
+    ///
+    /// - the first label must pass [`Label::is_valid_service_label`]
+    /// - the second label must be `_tcp` or `_udp`, ignoring case
+    /// - the remaining domain labels must pass [`Label::is_valid_hostname`]
+    ///
+    /// This is a syntax check. It does not check that the service is registered.
+    ///
+    /// ```
+    /// # use simple_dns::Name;
+    /// assert!(Name::new_unchecked("_http._tcp.local").is_valid_service_name());
+    /// assert!(!Name::new_unchecked("http._tcp.local").is_valid_service_name());
+    /// assert!(!Name::new_unchecked("_http._ftp.local").is_valid_service_name());
+    /// ```
+    pub fn is_valid_service_name(&self) -> bool {
+        if self.labels.is_empty() {
+            return false;
+        }
+
+        // <sn>._tcp . <servicedomain> . <parentdomain>.
+        Self::validate_service_name(self.labels.iter())
+    }
+
+    fn validate_service_name(mut labels: Iter<'_, Label<'_>>) -> bool {
+        let (Some(sn), Some(protocol)) = (labels.next(), labels.next()) else {
+            return false;
+        };
+
+        let tcp = Label::new_unchecked(&b"_tcp"[..]);
+        let udp = Label::new_unchecked(&b"_udp"[..]);
+
+        sn.is_valid_service_label()
+            && (*protocol == tcp || *protocol == udp)
+            && labels.all(|l| l.is_valid_hostname())
     }
 
     /// Returns the bytes of each of the labels that compose this Name
@@ -276,29 +426,16 @@ impl<'a, const N: usize> From<[Label<'a>; N]> for Name<'a> {
     }
 }
 
-fn write_escaped_label(f: &mut Formatter<'_>, label: &Label<'_>) -> FmtResult {
-    let s = String::from_utf8_lossy(&label.data);
-    for c in s.chars() {
-        match c {
-            '.' => f.write_str("\\.")?,
-            '\\' => f.write_str("\\\\")?,
-            _ => f.write_fmt(format_args!("{c}"))?,
-        }
-    }
-    Ok(())
-}
-
 impl Display for Name<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         let mut labels = self.labels.iter();
 
         if let Some(label) = labels.next() {
-            write_escaped_label(f, label)?;
+            f.write_fmt(format_args!("{label}"))?;
         }
 
         for label in labels {
-            f.write_str(".")?;
-            write_escaped_label(f, label)?;
+            f.write_fmt(format_args!(".{label}"))?;
         }
 
         Ok(())
@@ -326,207 +463,6 @@ impl Hash for Name<'_> {
     }
 }
 
-/// An iterator over the labels in a domain name
-struct LabelsIter<'a> {
-    bytes: &'a [u8],
-    current: usize,
-}
-
-impl<'a> LabelsIter<'a> {
-    fn new(bytes: &'a [u8]) -> Self {
-        Self { bytes, current: 0 }
-    }
-}
-
-fn unescape_label<'a>(bytes: &'a [u8], has_escape: bool) -> Cow<'a, [u8]> {
-    if !has_escape {
-        return bytes.into();
-    }
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'\\'
-            && i + 1 < bytes.len()
-            && (bytes[i + 1] == b'.' || bytes[i + 1] == b'\\')
-        {
-            out.push(bytes[i + 1]);
-            i += 2;
-        } else {
-            out.push(bytes[i]);
-            i += 1;
-        }
-    }
-    Cow::Owned(out)
-}
-
-impl<'a> Iterator for LabelsIter<'a> {
-    type Item = Cow<'a, [u8]>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut i = self.current;
-        let mut has_escape = false;
-        while i < self.bytes.len() {
-            if self.bytes[i] == b'\\'
-                && i + 1 < self.bytes.len()
-                && (self.bytes[i + 1] == b'.' || self.bytes[i + 1] == b'\\')
-            {
-                has_escape = true;
-                i += 2;
-                continue;
-            }
-            if self.bytes[i] == b'.' {
-                let current = crate::lib::mem::replace(&mut self.current, i + 1);
-                if i - current == 0 {
-                    has_escape = false;
-                    i = self.current;
-                    continue;
-                }
-                return Some(unescape_label(&self.bytes[current..i], has_escape));
-            }
-            i += 1;
-        }
-
-        if self.current < self.bytes.len() {
-            let current = crate::lib::mem::replace(&mut self.current, self.bytes.len());
-            Some(unescape_label(&self.bytes[current..], has_escape))
-        } else {
-            None
-        }
-    }
-}
-
-/// Represents a label in a domain name
-///
-/// A valid label is consists of A-Z, a-z, 0-9, and hyphen (-), and must be at most 63 characters
-/// in length.
-/// This library also considers valid any label starting with underscore (_), to be able to parse mDNS domain names.
-///
-/// Microsoft implementation allows unicode characters in the label content.
-/// To create a label with unicode characters, use [`Label::new_unchecked`]
-///
-/// The `Display` implementation uses [`std::string::String::from_utf8_lossy`] to display the
-/// label.
-#[derive(Eq, Clone)]
-pub struct Label<'a> {
-    data: Cow<'a, [u8]>,
-}
-
-impl PartialEq for Label<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.data.eq_ignore_ascii_case(&other.data)
-    }
-}
-
-impl Hash for Label<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write_usize(self.data.len());
-        for &b in self.data.iter() {
-            state.write_u8(b.to_ascii_lowercase());
-        }
-    }
-}
-
-impl PartialOrd for Label<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Label<'_> {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.data
-            .iter()
-            .map(u8::to_ascii_lowercase)
-            .cmp(other.data.iter().map(u8::to_ascii_lowercase))
-    }
-}
-
-impl<'a> Label<'a> {
-    /// Create a new [`Label`] if given data is valid and within the limits
-    pub fn new<T: Into<Cow<'a, [u8]>>>(data: T) -> crate::Result<Self> {
-        let label = Self::new_unchecked(data);
-        if !label.is_valid() {
-            return Err(crate::SimpleDnsError::InvalidServiceLabel);
-        }
-
-        Ok(label)
-    }
-
-    /// Create a new Label without checking for size limits or valid content.
-    /// This function can be used to create labels with unicode characters
-    pub fn new_unchecked<T: Into<Cow<'a, [u8]>>>(data: T) -> Self {
-        Self { data: data.into() }
-    }
-
-    /// Returns the length of the label
-    pub fn len(&self) -> usize {
-        self.data.len()
-    }
-
-    /// Returns true if the label is empty
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-
-    /// Transforms the inner data into its owned type
-    pub fn into_owned<'b>(self) -> Label<'b> {
-        Label {
-            data: self.data.into_owned().into(),
-        }
-    }
-
-    /// Returns `true` if the label is valid.
-    pub fn is_valid(&self) -> bool {
-        if self.data.is_empty() || self.data.len() > MAX_LABEL_LENGTH {
-            return false;
-        }
-
-        if let Some(first) = self.data.first() {
-            if !first.is_ascii_alphanumeric() && *first != b'_' {
-                return false;
-            }
-        }
-
-        if !self
-            .data
-            .iter()
-            .skip(1)
-            .all(|c| c.is_ascii_alphanumeric() || *c == b'-' || *c == b'_' || *c == b'.')
-        {
-            return false;
-        }
-
-        if let Some(last) = self.data.last() {
-            if !last.is_ascii_alphanumeric() {
-                return false;
-            }
-        }
-
-        true
-    }
-}
-
-impl Display for Label<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        let s = String::from_utf8_lossy(&self.data);
-        f.write_str(&s)
-    }
-}
-
-impl Debug for Label<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-        f.debug_struct("Label")
-            .field("data", &self.to_string())
-            .finish()
-    }
-}
-
-impl AsRef<[u8]> for Label<'_> {
-    fn as_ref(&self) -> &[u8] {
-        self.data.as_ref()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -543,13 +479,6 @@ mod tests {
         assert!(Name::new("1sync_miss._tcp.local").is_ok());
 
         assert_eq!(Name::new_unchecked("\u{1F600}.local.").labels.len(), 2);
-    }
-
-    #[test]
-    fn label_validate() {
-        assert!(Name::new("\u{1F600}.local.").is_err());
-        assert!(Name::new("@.local.").is_err());
-        assert!(Name::new("\\.local.").is_err());
     }
 
     #[test]
@@ -830,14 +759,6 @@ mod tests {
     }
 
     #[test]
-    fn display_invalid_label() {
-        let input = b"invalid\xF0\x90\x80label";
-        let label = Label::new_unchecked(input);
-
-        assert_eq!(label.to_string(), "invalid�label");
-    }
-
-    #[test]
     fn test_compress_append_near_boundary() -> crate::Result<()> {
         let mut buf = Cursor::new(Vec::new());
         let mut name_refs = Default::default();
@@ -898,23 +819,361 @@ mod tests {
 
     #[test]
     fn escaped_dots_and_slashes() {
-        let name = Name::new_unchecked(r"My\.Device._googlecast._tcp.local");
+        let name = Name::new(r"My\.Device._googlecast._tcp.local").expect("failed to build name");
         assert_eq!(4, name.get_labels().len());
         assert_eq!(b"My.Device", name.get_labels()[0].as_ref());
         assert_eq!(r"My\.Device._googlecast._tcp.local", name.to_string());
 
-        let name2 = Name::new(r"My\.Device._googlecast._tcp.local").unwrap();
+        let name2 = Name::new(r"My\.Device._googlecast._tcp.local").expect("failed to build name");
         assert_eq!(4, name2.get_labels().len());
         assert_eq!(b"My.Device", name2.get_labels()[0].as_ref());
         assert_eq!(r"My\.Device._googlecast._tcp.local", name2.to_string());
 
         let formatted = name2.to_string();
-        let roundtrip = Name::new_unchecked(&formatted);
+        let roundtrip = Name::new(&formatted).expect("failed to build name");
         assert_eq!(name2, roundtrip);
 
-        let name_slash = Name::new_unchecked(r"My\\Device._tcp.local");
+        let name_slash = Name::new(r"My\\Device._tcp.local").expect("failed to build name");
         assert_eq!(3, name_slash.get_labels().len());
         assert_eq!(b"My\\Device", name_slash.get_labels()[0].as_ref());
         assert_eq!(r"My\\Device._tcp.local", name_slash.to_string());
+    }
+
+    #[test]
+    fn escaped_dot_is_a_single_label_on_the_wire() {
+        let name = Name::new(r"a\.b.local").expect("failed to build name");
+        let mut bytes = Vec::new();
+        name.write_to(&mut bytes).unwrap();
+
+        // the dot is plain data on the wire, no escaping
+        assert_eq!(b"\x03a.b\x05local\x00", &bytes[..]);
+
+        let parsed = Name::parse(&mut BytesBuffer::new(&bytes)).unwrap();
+        assert_eq!(name, parsed);
+        assert_eq!(r"a\.b.local", parsed.to_string());
+    }
+
+    #[test]
+    fn backslash_is_escaped_in_display() {
+        let name = Name::new_with_labels(&[
+            Label::new_unchecked(b"a\\b".as_slice()),
+            Label::new_unchecked(b"local".as_slice()),
+        ]);
+        assert_eq!(r"a\\b.local", name.to_string());
+    }
+
+    #[test]
+    fn escaped_backslash_followed_by_separator_dot() {
+        // `\\` is a literal backslash, so the following `.` is a separator
+        let name = Name::new(r"a\\.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a\\", name.get_labels()[0].as_ref());
+        assert_eq!(b"local", name.get_labels()[1].as_ref());
+    }
+
+    #[test]
+    fn escaped_dot_after_escaped_backslash() {
+        // `\\\.` is a literal backslash followed by a literal dot
+        let name = Name::new(r"a\\\.b.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a\\.b", name.get_labels()[0].as_ref());
+    }
+
+    #[test]
+    fn dns_sd_instance_name_roundtrip() {
+        // RFC 6763 section 4.3: dots inside the instance label are escaped
+        let labels = [
+            Label::new_unchecked(b"My Printer. Floor 2".as_slice()),
+            Label::new_unchecked(b"_ipp".as_slice()),
+            Label::new_unchecked(b"_tcp".as_slice()),
+            Label::new_unchecked(b"local".as_slice()),
+        ];
+        let name = Name::new_with_labels(&labels);
+        let text = name.to_string();
+        assert_eq!(r"My Printer\. Floor 2._ipp._tcp.local", text);
+
+        let parsed = Name::new(&text).unwrap();
+        assert_eq!(name, parsed);
+        assert_eq!(4, parsed.get_labels().len());
+    }
+
+    #[test]
+    fn display_parse_roundtrip_with_special_bytes() {
+        let name = Name::new_with_labels(&[
+            Label::new_unchecked(b"a.b\\c.d".as_slice()),
+            Label::new_unchecked(b"local".as_slice()),
+        ]);
+        let text = name.to_string();
+        assert_eq!(r"a\.b\\c\.d.local", text);
+        assert_eq!(name, Name::new(&text).unwrap());
+    }
+
+    #[test]
+    fn decimal_escape_is_parsed_as_byte() {
+        // RFC 1035 section 5.1: \DDD is the octet with that decimal value
+        let name = Name::new(r"My\032Printer.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"My Printer", name.get_labels()[0].as_ref());
+
+        let name = Name::new(r"a\046b.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a.b", name.get_labels()[0].as_ref());
+    }
+
+    #[test]
+    fn escaped_non_special_char_is_the_char() {
+        // RFC 1035 section 5.1: \X quotes X
+        let name =
+            Name::new(r"Stuart\'s\ Test\ Server._http._tcp.local").expect("failed to build name");
+        assert_eq!(4, name.get_labels().len());
+        assert_eq!(b"Stuart's Test Server", name.get_labels()[0].as_ref());
+    }
+
+    #[test]
+    fn label_length_limit_counts_unescaped_octets() {
+        // 63 octets once unescaped, even though the text form is longer
+        let at_limit = format!("{}.local", r"a\.".repeat(31) + "a");
+        let name = Name::new(&at_limit).unwrap();
+        assert_eq!(63, name.get_labels()[0].len());
+
+        // 64 octets once unescaped
+        let over_limit = format!("{}.local", r"a\.".repeat(31) + "aa");
+        assert!(Name::new(&over_limit).is_err());
+    }
+
+    #[test]
+    fn malformed_decimal_escapes_are_rejected() {
+        // RFC 4343 section 2.1: one or two digits are undefined
+        assert!(Name::new(r"a\1.local").is_err());
+        assert!(Name::new(r"a\12.local").is_err());
+        // value does not fit in an octet
+        assert!(Name::new(r"a\256b.local").is_err());
+    }
+
+    #[test]
+    fn trailing_lone_backslash_is_rejected() {
+        assert!(Name::new(r"local\").is_err());
+        assert!(Name::new(r"a.local\").is_err());
+    }
+
+    #[test]
+    fn decimal_escape_for_dot_is_data_not_separator() {
+        // \046 is the octet 0x2E, but must not split the label
+        let name = Name::new(r"a\046b.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a.b", name.get_labels()[0].as_ref());
+        assert_eq!(r"a\.b.local", name.to_string());
+    }
+
+    #[test]
+    fn decimal_escape_followed_by_digit() {
+        // four digits: first three are the escape, the fourth is a literal digit
+        let name = Name::new(r"a\0321b.local").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a 1b", name.get_labels()[0].as_ref());
+    }
+
+    #[test]
+    fn decimal_escape_boundaries() {
+        let name = Name::new(r"a\000\255z.local").expect("failed to build name");
+        assert_eq!(b"a\x00\xffz", name.get_labels()[0].as_ref());
+
+        let mut bytes = Vec::new();
+        name.write_to(&mut bytes).unwrap();
+        assert_eq!(b"\x04a\x00\xffz\x05local\x00", &bytes[..]);
+    }
+
+    #[test]
+    fn rfc4343_examples() {
+        let name =
+            Name::new(r"Donald\032E\.\032Eastlake\0323rd.example.").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"Donald E. Eastlake 3rd", name.get_labels()[0].as_ref());
+
+        let name = Name::new(r"a\000\\\255z.example.").expect("failed to build name");
+        assert_eq!(2, name.get_labels().len());
+        assert_eq!(b"a\x00\\\xffz", name.get_labels()[0].as_ref());
+    }
+
+    #[test]
+    fn escaped_dot_before_trailing_dot_is_not_a_separator() {
+        // the trailing unescaped dot only marks the name as absolute
+        let name = Name::new(r"a\.").expect("failed to build name");
+        assert_eq!(1, name.get_labels().len());
+        assert_eq!(b"a.", name.get_labels()[0].as_ref());
+
+        let absolute = Name::new(r"a\..").expect("failed to build name");
+        assert_eq!(name, absolute);
+    }
+
+    #[test]
+    fn root_name_with_escapes_elsewhere() {
+        assert_eq!(0, Name::new_unchecked(".").get_labels().len());
+        assert_eq!(1, Name::new_unchecked(r"\.").get_labels().len());
+    }
+
+    #[test]
+    fn total_name_length_counts_unescaped_octets() {
+        let label63 = r"a\.".repeat(31) + "a";
+        let label60 = r"a\.".repeat(29) + "aa";
+
+        // 3 * 64 + 61 + 1 = 254 octets
+        let fits = format!("{label63}.{label63}.{label63}.{label60}");
+        let name = Name::new(&fits).unwrap();
+        assert_eq!(254, name.len());
+
+        // 4 * 64 + 1 = 257 octets
+        let too_long = format!("{label63}.{label63}.{label63}.{label63}");
+        assert!(Name::new(&too_long).is_err());
+    }
+
+    #[test]
+    fn hostname_valid() {
+        assert!(Name::new_unchecked("example.com").is_valid_hostname());
+        assert!(Name::new_unchecked("example.com.").is_valid_hostname());
+        assert!(Name::new_unchecked("my-host.sub.example.com").is_valid_hostname());
+        assert!(Name::new_unchecked("1host.local").is_valid_hostname());
+        assert!(Name::new_unchecked("localhost").is_valid_hostname());
+    }
+
+    #[test]
+    fn hostname_invalid() {
+        assert!(!Name::new_unchecked("").is_valid_hostname());
+        assert!(!Name::new_unchecked(".").is_valid_hostname());
+        assert!(!Name::new_unchecked("-a.com").is_valid_hostname());
+        assert!(!Name::new_unchecked("a-.com").is_valid_hostname());
+        assert!(!Name::new_unchecked("_srv.local").is_valid_hostname());
+        assert!(!Name::new_unchecked("a b.com").is_valid_hostname());
+        assert!(!Name::new_unchecked("\u{1F600}.local").is_valid_hostname());
+        // an escaped dot is data in the label, not a valid hostname character
+        assert!(!Name::new_unchecked(r"a\.b.com").is_valid_hostname());
+        // 64 octet label
+        assert!(!Name::new_unchecked(&format!("{}.com", "a".repeat(64))).is_valid_hostname());
+    }
+
+    #[test]
+    fn service_name_valid() {
+        // RFC 6763 section 4.1.2: <sn>._tcp|_udp.<domain>
+        assert!(Name::new_unchecked("_http._tcp.local").is_valid_service_name());
+        assert!(Name::new_unchecked("_http._udp.local").is_valid_service_name());
+        assert!(Name::new_unchecked("_http._tcp.local.").is_valid_service_name());
+        assert!(Name::new_unchecked("_ipp-tls._tcp.example.com").is_valid_service_name());
+        assert!(Name::new_unchecked("_9p._tcp.local").is_valid_service_name());
+    }
+
+    #[test]
+    fn service_name_transport_is_case_insensitive() {
+        // RFC 1035 section 2.3.3 / RFC 4343: comparison is case-insensitive
+        assert!(Name::new_unchecked("_HTTP._TCP.local").is_valid_service_name());
+        assert!(Name::new_unchecked("_http._Udp.local").is_valid_service_name());
+    }
+
+    #[test]
+    fn service_name_invalid() {
+        assert!(!Name::new_unchecked("").is_valid_service_name());
+        // missing underscore on the service label
+        assert!(!Name::new_unchecked("http._tcp.local").is_valid_service_name());
+        // transport label must be _tcp or _udp
+        assert!(!Name::new_unchecked("_http._ftp.local").is_valid_service_name());
+        assert!(!Name::new_unchecked("_http.tcp.local").is_valid_service_name());
+        assert!(!Name::new_unchecked("_http.local").is_valid_service_name());
+        // the <Service> portion is a pair of labels
+        assert!(!Name::new_unchecked("_http").is_valid_service_name());
+        // service name syntax (RFC 6335)
+        assert!(!Name::new_unchecked("_123._tcp.local").is_valid_service_name());
+        assert!(!Name::new_unchecked("_a--b._tcp.local").is_valid_service_name());
+        assert!(!Name::new_unchecked("_-a._tcp.local").is_valid_service_name());
+        assert!(!Name::new_unchecked("_abcdefghijklmnop._tcp.local").is_valid_service_name());
+        // invalid domain label
+        assert!(!Name::new_unchecked("_http._tcp.-bad.local").is_valid_service_name());
+    }
+
+    #[test]
+    fn instance_name_valid() {
+        // RFC 6763 section 4.3: <Instance>.<sn>._tcp|_udp.<domain>
+        assert!(Name::new_unchecked("printer._ipp._tcp.local").is_valid_instance_name());
+        assert!(Name::new_unchecked("My Printer._ipp._tcp.local").is_valid_instance_name());
+        assert!(Name::new_unchecked("My Printer._ipp._tcp.local.").is_valid_instance_name());
+        assert!(
+            Name::new_unchecked("Stuart's Test Server._http._tcp.local").is_valid_instance_name()
+        );
+        assert!(Name::new_unchecked("\u{1F5A8} Printer._ipp._udp.local").is_valid_instance_name());
+        // dot inside the instance label
+        assert!(Name::new_unchecked(r"My\. Printer._ipp._tcp.local").is_valid_instance_name());
+        assert!(Name::new_with_labels(&[
+            Label::new_unchecked(b"My. Printer".as_slice()),
+            Label::new_unchecked(b"_ipp".as_slice()),
+            Label::new_unchecked(b"_tcp".as_slice()),
+            Label::new_unchecked(b"local".as_slice()),
+        ])
+        .is_valid_instance_name());
+    }
+
+    #[test]
+    fn instance_name_escaped_dot_keeps_label_count() {
+        let name = Name::new_unchecked(r"a\.b._ipp._tcp.local");
+        assert_eq!(4, name.get_labels().len());
+        assert!(name.is_valid_instance_name());
+
+        // unescaped, the same text is five labels and the service pair is misplaced
+        let name = Name::new_unchecked("a.b._ipp._tcp.local");
+        assert_eq!(5, name.get_labels().len());
+        assert!(!name.is_valid_instance_name());
+    }
+
+    #[test]
+    fn instance_name_invalid() {
+        assert!(!Name::new_unchecked("").is_valid_instance_name());
+        // missing instance label: `_ipp` is taken as the instance, so the pair is wrong
+        assert!(!Name::new_unchecked("_ipp._tcp.local").is_valid_instance_name());
+        assert!(!Name::new_unchecked("My Printer._ipp._ftp.local").is_valid_instance_name());
+        assert!(!Name::new_unchecked("My Printer.ipp._tcp.local").is_valid_instance_name());
+        assert!(!Name::new_unchecked("My Printer._123._tcp.local").is_valid_instance_name());
+        // the <Service> pair is required
+        assert!(!Name::new_unchecked("My Printer").is_valid_instance_name());
+        assert!(!Name::new_unchecked("My Printer._ipp").is_valid_instance_name());
+        // instance label longer than 63 octets
+        let long = format!("{}._ipp._tcp.local", "a".repeat(64));
+        assert!(!Name::new_unchecked(&long).is_valid_instance_name());
+    }
+
+    #[test]
+    fn sub_type_name_valid() {
+        // RFC 6763 section 7.1: <Subtype>._sub.<Service>.<Domain>
+        assert!(Name::new_unchecked("_printer._sub._http._tcp.local").is_valid_sub_type_name());
+        assert!(Name::new_unchecked("_printer._sub._http._udp.local.").is_valid_sub_type_name());
+    }
+
+    #[test]
+    fn sub_type_name_allows_arbitrary_label() {
+        // subtype strings are not required to begin with an underscore and
+        // may be constructed using arbitrary 8-bit data values
+        assert!(Name::new_unchecked("printer._sub._http._tcp.local").is_valid_sub_type_name());
+        assert!(
+            Name::new_unchecked("The Music Store._sub._http._tcp.local").is_valid_sub_type_name()
+        );
+        assert!(Name::new_with_labels(&[
+            Label::new_unchecked(b"a.b\xff".as_slice()),
+            Label::new_unchecked(b"_sub".as_slice()),
+            Label::new_unchecked(b"_http".as_slice()),
+            Label::new_unchecked(b"_tcp".as_slice()),
+            Label::new_unchecked(b"local".as_slice()),
+        ])
+        .is_valid_sub_type_name());
+    }
+
+    #[test]
+    fn sub_type_name_invalid() {
+        assert!(!Name::new_unchecked("").is_valid_sub_type_name());
+        // `_sub` marker is required
+        assert!(!Name::new_unchecked("_printer._http._tcp.local").is_valid_sub_type_name());
+        assert!(!Name::new_unchecked("_printer._subx._http._tcp.local").is_valid_sub_type_name());
+        // the service must still be valid
+        assert!(!Name::new_unchecked("_printer._sub.http._tcp.local").is_valid_sub_type_name());
+        assert!(!Name::new_unchecked("_printer._sub._http._ftp.local").is_valid_sub_type_name());
+        assert!(!Name::new_unchecked("_printer._sub._123._tcp.local").is_valid_sub_type_name());
+        // missing service pair
+        assert!(!Name::new_unchecked("_printer._sub").is_valid_sub_type_name());
+        assert!(!Name::new_unchecked("_printer").is_valid_sub_type_name());
     }
 }
