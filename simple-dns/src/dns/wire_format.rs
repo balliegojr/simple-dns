@@ -20,7 +20,7 @@ pub(crate) trait WireFormat<'a> {
     fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
-        _name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
+        _name_refs: &mut crate::lib::BTreeMap<crate::dns::label::ExactLabels<'a, '_>, u16>,
     ) -> crate::Result<()> {
         self.write_to(out)
     }

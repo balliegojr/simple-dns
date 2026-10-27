@@ -55,7 +55,7 @@ impl<'a> WireFormat<'a> for MX<'a> {
     fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::BTreeMap<&[crate::Label<'a>], u16>,
+        name_refs: &mut crate::lib::BTreeMap<crate::dns::label::ExactLabels<'a, '_>, u16>,
     ) -> crate::Result<()> {
         out.write_all(&self.preference.to_be_bytes())?;
         self.exchange.write_compressed_to(out, name_refs)

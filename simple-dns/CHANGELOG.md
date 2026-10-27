@@ -1,20 +1,31 @@
 # Unreleased
 
 ### Fix
-- Fixed label comparison to conform with RFC 1035 (case insensitive)
+- `Label` and `Name` comparison, ordering and hashing are ASCII case-insensitive, conforming with
+  RFC 1035 and RFC 6762. Name compression still only matches byte-identical names, so the casing
+  of names is preserved by compressed packets [#72]
 - Escaped dots (`\.`) in names are handled as part of the label when parsing and displaying a
   `Name`, and `\` is escaped as `\\` when displaying [#71]
+- `TXT::iter_raw` no longer yields attributes with an empty key (an empty string or one starting
+  with `=`), and `TXT::attributes` matches duplicated keys case-insensitively, keeping the first
+  one (RFC 6763 section 6) [#73]
 
 ### Added
 - `Label::is_valid_hostname`, `Label::is_valid_service_label` and `Label::is_valid_instance_label`
 - `Name::is_valid_hostname`, `Name::is_valid_service_name`, `Name::is_valid_instance_name` and
   `Name::is_valid_sub_type_name`, checking names against the RFC 1123, RFC 6335 and RFC 6763 rules
 - `Name::new` and `Label::new` accept `\DDD` and `\X` escapes (RFC 1035 section 5.1,
-  RFC 4343 section 2.1)
+  RFC 4343 section 2.1) [#71]
+- `TXT::add_attribute` and `TXT::with_attribute`, to add key/value attributes with binary values
+  (RFC 6763 section 6) [#73]
+- `From<CLASS> for u16`, `From<A> for Ipv4Addr` and `From<AAAA> for Ipv6Addr` [#74]
+- `NSEC::from_types`, `NSEC::contains` and `NSEC::types`, to build and inspect the type bitmaps
+  [#74]
 
 ### Changed
 - **Breaking:** the single `is_valid` check was replaced by the role-specific `is_valid_*` methods.
   `Label::new` and `Name::new` check lengths and escapes, but no longer reject labels by content.
+- `TXT::attributes` keys are now lowercased [#73]
 
 # 0.12.0 (2026-07-26) 
 
