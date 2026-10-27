@@ -303,6 +303,42 @@ impl AsRef<[u8]> for Label<'_> {
     }
 }
 
+/// Key for the name compression map.
+///
+/// Unlike [`Label`], which compares ASCII case-insensitively, this compares the raw bytes, so
+/// names that differ only in case are never compressed into one and keep their original casing.
+#[derive(Clone, Copy)]
+pub(crate) struct ExactLabels<'a, 'b>(&'b [Label<'a>]);
+
+impl<'a, 'b> ExactLabels<'a, 'b> {
+    pub(crate) fn new(labels: &'b [Label<'a>]) -> Self {
+        Self(labels)
+    }
+}
+
+impl PartialEq for ExactLabels<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for ExactLabels<'_, '_> {}
+
+impl PartialOrd for ExactLabels<'_, '_> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for ExactLabels<'_, '_> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.0
+            .iter()
+            .map(|l| &l.data[..])
+            .cmp(other.0.iter().map(|l| &l.data[..]))
+    }
+}
+
 /// An iterator over the labels in a domain name
 pub(crate) struct LabelsIter<'a> {
     bytes: &'a [u8],

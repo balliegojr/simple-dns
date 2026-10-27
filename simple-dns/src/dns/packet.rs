@@ -163,6 +163,10 @@ impl<'a> Packet<'a> {
     /// Creates a new [Vec`<u8>`](`Vec<T>`) and write the contents of this package in wire format
     /// with compression enabled
     ///
+    /// Names are only compressed against byte-identical names. Names that are equal under DNS
+    /// case-insensitive comparison but differ in casing (`Foo.local` and `foo.local`) are written
+    /// in full, so the casing of every name is preserved when the packet is parsed again.
+    ///
     /// This call will allocate a `Vec<u8>` of 900 bytes, which is enough for a jumbo UDP packet
     pub fn build_bytes_vec_compressed(&self) -> crate::Result<Vec<u8>> {
         let mut out = crate::lib::Cursor::new(Vec::with_capacity(900));
@@ -198,6 +202,10 @@ impl<'a> Packet<'a> {
     }
 
     /// Write the contents of this package in wire format with enabled compression into the provided writer
+    ///
+    /// Names are only compressed against byte-identical names. Names that are equal under DNS
+    /// case-insensitive comparison but differ in casing (`Foo.local` and `foo.local`) are written
+    /// in full, so the casing of every name is preserved when the packet is parsed again.
     pub fn write_compressed_to<T: Write + Seek>(&self, out: &mut T) -> crate::Result<()> {
         self.write_header(out)?;
 

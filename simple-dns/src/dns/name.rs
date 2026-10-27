@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-    label::{Label, LabelsIter},
+    label::{ExactLabels, Label, LabelsIter},
     WireFormat, MAX_LABEL_LENGTH, MAX_NAME_LENGTH,
 };
 
@@ -185,10 +185,10 @@ impl<'a> Name<'a> {
     fn compress_append<T: Write + Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,
+        name_refs: &mut crate::lib::BTreeMap<crate::dns::label::ExactLabels<'a, '_>, u16>,
     ) -> crate::Result<()> {
         for (i, label) in self.iter().enumerate() {
-            match name_refs.entry(&self.labels[i..]) {
+            match name_refs.entry(ExactLabels::new(&self.labels[i..])) {
                 crate::lib::BTreeEntry::Occupied(e) => {
                     let p = *e.get();
                     out.write_all(&(p | POINTER_MASK_U16).to_be_bytes())?;
@@ -392,7 +392,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
     fn write_compressed_to<T: Write + Seek>(
         &'a self,
         out: &mut T,
-        name_refs: &mut crate::lib::BTreeMap<&[Label<'a>], u16>,
+        name_refs: &mut crate::lib::BTreeMap<crate::dns::label::ExactLabels<'a, '_>, u16>,
     ) -> crate::Result<()> {
         self.compress_append(out, name_refs)
     }
@@ -624,6 +624,37 @@ mod tests {
         assert_eq!("FOO.F.ISI.ARPA", third.to_string());
         let fourth = Name::parse(&mut data).unwrap();
         assert_eq!("BAR.F.ISI.ARPA", fourth.to_string());
+    }
+
+    #[test]
+    fn names_differing_only_in_case_are_not_compressed_together() {
+        let mut buf = Cursor::new(Vec::new());
+        let mut name_refs = Default::default();
+
+        let lower = Name::new_unchecked("foo.local");
+        let upper = Name::new_unchecked("FOO.LOCAL");
+        assert_eq!(lower, upper);
+
+        lower
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add foo.local");
+        upper
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add FOO.LOCAL");
+        // an exact repeat is still compressed
+        upper
+            .write_compressed_to(&mut buf, &mut name_refs)
+            .expect("failed to add FOO.LOCAL again");
+
+        let expected = b"\x03foo\x05local\x00\x03FOO\x05LOCAL\x00\xc0\x0b";
+        assert_eq!(expected[..], buf.get_ref()[..]);
+
+        // casing survives a parse of the compressed bytes
+        let mut data = BytesBuffer::new(buf.get_ref());
+        let first = Name::parse(&mut data).unwrap();
+        let second = Name::parse(&mut data).unwrap();
+        assert_eq!(b"FOO", second.get_labels()[0].as_ref());
+        assert_eq!(b"foo", first.get_labels()[0].as_ref());
     }
 
     #[test]
