@@ -1,4 +1,4 @@
-# Unreleased
+# 0.13.0
 
 ### Fix
 - `Label` and `Name` comparison, ordering and hashing are ASCII case-insensitive, conforming with
