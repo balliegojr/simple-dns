@@ -250,6 +250,59 @@ mod tests {
     use super::*;
 
     #[test]
+    fn plain_bounded_packet_writer_returns_errors_when_full() {
+        bounded_packet_writer_returns_errors_when_full(false);
+    }
+
+    #[test]
+    fn compressed_bounded_packet_writer_returns_errors_when_full() {
+        bounded_packet_writer_returns_errors_when_full(true);
+    }
+
+    fn bounded_packet_writer_returns_errors_when_full(compressed: bool) {
+        use crate::lib::{vec, Cursor};
+
+        let mut packet = Packet::new_query(17);
+        for name in ["_srv._udp.local", "_other._udp.local"] {
+            packet.questions.push(Question::new(
+                name.try_into().unwrap(),
+                TYPE::TXT.into(),
+                CLASS::IN.into(),
+                false,
+            ));
+        }
+
+        let expected = if compressed {
+            packet.build_bytes_vec_compressed().unwrap()
+        } else {
+            packet.build_bytes_vec().unwrap()
+        };
+        for capacity in [0, 12, expected.len() - 1, expected.len()] {
+            let mut output = vec![0xa5; capacity];
+            let result = if compressed {
+                packet.write_compressed_to(&mut Cursor::new(&mut output[..]))
+            } else {
+                packet.write_to(&mut output.as_mut_slice())
+            };
+            if capacity < expected.len() {
+                assert!(matches!(result, Err(SimpleDnsError::FailedToWrite)));
+                assert_eq!(output, expected[..capacity]);
+            } else {
+                result.unwrap();
+                assert_eq!(output, expected);
+                let parsed = Packet::parse(&output).unwrap();
+                assert_eq!(parsed.questions.len(), packet.questions.len());
+                for (actual, expected) in parsed.questions.iter().zip(&packet.questions) {
+                    assert_eq!(actual.qname, expected.qname);
+                    assert_eq!(actual.qtype, expected.qtype);
+                    assert_eq!(actual.qclass, expected.qclass);
+                    assert_eq!(actual.unicast_response, expected.unicast_response);
+                }
+            }
+        }
+    }
+
+    #[test]
     fn parse_without_data_should_not_panic() {
         assert!(matches!(
             Packet::parse(&[]),
