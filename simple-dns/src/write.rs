@@ -6,7 +6,7 @@ pub trait Write {
     fn write_all(&mut self, mut buf: &[u8]) -> crate::Result<()> {
         while !buf.is_empty() {
             match self.write(buf) {
-                Ok(0) => panic!("write() returned Ok(0)"),
+                Ok(0) => return Err(crate::SimpleDnsError::FailedToWrite),
                 Ok(n) => buf = &buf[n..],
                 Err(e) => return Err(e),
             }
