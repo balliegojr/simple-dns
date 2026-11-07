@@ -46,7 +46,7 @@ Since mDNS is a well known protocol, you can register your service in any mDNS r
 
 Query example:
 ```rust  
-    # #[cfg(feature = "sync")] {
+    # #[cfg(all(feature = "sync", not(target_os = "macos")))] {
     use simple_mdns::sync_discovery::OneShotMdnsResolver;
     let resolver = OneShotMdnsResolver::new().expect("Failed to create resolver");
     // querying for IP Address
