@@ -1,4 +1,5 @@
 #![cfg(feature = "async-tokio")]
+#![cfg(not(target_os = "macos"))]
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::str::FromStr;
