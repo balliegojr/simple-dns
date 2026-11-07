@@ -15,6 +15,7 @@ use std::{
 ///
 /// One Shot queries returns only the first valid response to arrive
 /// ```
+///     # #[cfg(not(target_os = "macos"))] {
 ///     use simple_mdns::sync_discovery::OneShotMdnsResolver;
 ///     use std::time::Duration;
 ///     
@@ -29,6 +30,7 @@ use std::{
 ///     let answer = resolver.query_service_address_and_port("_myservice._tcp.local").expect("Failed to query service address and port");
 ///     println!("{:?}", answer);
 ///     // SocketAddr, "127.0.0.1:8080", with a ipv4 or ipv6
+///     # }
 /// ```
 #[derive(Debug)]
 pub struct OneShotMdnsResolver {
