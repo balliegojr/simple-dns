@@ -1,4 +1,5 @@
 #![cfg(feature = "sync")]
+#![cfg(not(target_os = "macos"))]
 
 use simple_mdns::{sync_discovery::ServiceDiscovery, InstanceInformation};
 use std::{collections::HashMap, error::Error, net::SocketAddr, time::Duration};
