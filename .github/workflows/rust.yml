@@ -23,7 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-15]
+        os: [ubuntu-latest, windows-latest, macOS-26]
       
     steps:
     - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-15]
+        os: [ubuntu-latest, windows-latest, macOS-26]
 
     steps:
     - uses: actions/checkout@v4
