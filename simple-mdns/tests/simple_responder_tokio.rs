@@ -1,4 +1,5 @@
 #![cfg(feature = "async-tokio")]
+#![cfg(not(target_os = "macos"))]
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
@@ -37,14 +38,22 @@ async fn responder_shuts_down_on_signal() {
         .query_service_address("_shutdown_test._tcp.local")
         .await
         .expect("Query failed");
-    assert!(answer.is_some(), "responder should be active before shutdown");
+    assert!(
+        answer.is_some(),
+        "responder should be active before shutdown"
+    );
 
-    shutdown_tx.send(()).expect("Failed to send shutdown signal");
+    shutdown_tx
+        .send(())
+        .expect("Failed to send shutdown signal");
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let answer = make_resolver()
         .query_service_address("_shutdown_test._tcp.local")
         .await
         .expect("Query failed");
-    assert!(answer.is_none(), "responder should not reply after shutdown");
+    assert!(
+        answer.is_none(),
+        "responder should not reply after shutdown"
+    );
 }

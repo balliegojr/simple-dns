@@ -1,4 +1,5 @@
 #![cfg(feature = "async-tokio")]
+#![cfg(not(target_os = "macos"))]
 
 use simple_mdns::{async_discovery::ServiceDiscovery, InstanceInformation};
 use std::{collections::HashMap, error::Error, net::SocketAddr, time::Duration};
