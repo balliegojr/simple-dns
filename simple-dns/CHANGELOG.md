@@ -1,3 +1,11 @@
+# 0.13.1
+
+### Fix
+- Writing a packet to a fixed size output that fills up now returns `SimpleDnsError::FailedToWrite`
+  instead of panicking when the writer returns `Ok(0)`
+- `Packet::parse` no longer preallocates memory based on the section counts of the header, limiting
+  the initial capacity so malformed packets with large counts can't trigger excessive allocations
+
 # 0.13.0
 
 ### Fix
