@@ -141,7 +141,11 @@ impl<'a> Packet<'a> {
         data: &mut BytesBuffer<'a>,
         items_count: u16,
     ) -> crate::Result<Vec<T>> {
-        let mut section_items = Vec::with_capacity(items_count as usize);
+        // Prevents unnecessary memory allocation for poorly formated or empty packets trying to
+        // trigger OOM with count = u16::MAX
+        const ITEMS_INITIAL_CAPACITY: usize = 30;
+        let mut section_items =
+            Vec::with_capacity(ITEMS_INITIAL_CAPACITY.min(items_count as usize));
 
         for _ in 0..items_count {
             section_items.push(T::parse(data)?);
