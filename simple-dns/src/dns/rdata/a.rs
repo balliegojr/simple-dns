@@ -20,7 +20,7 @@ impl RR for A {
 impl<'a> WireFormat<'a> for A {
     const MINIMUM_LEN: usize = 4;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

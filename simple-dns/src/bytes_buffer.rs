@@ -1,3 +1,5 @@
+use core::cell::Cell;
+
 /// This buffer is used to read bytes from a slice in a safe way. It keeps track of the current
 /// position and ensures that the buffer does not read past the end of the slice.
 ///
@@ -5,15 +7,51 @@
 /// size of the value read.
 ///
 /// `peek_*` functions return the value at the specified offset without advancing the buffer position.
+///
+/// The buffer can carry a step limit, shared by every buffer derived from it, which limits how
+/// many labels and compression pointers the names of a packet can decode. See
+/// [`BytesBuffer::take_step`].
 #[derive(Debug, Clone)]
-pub struct BytesBuffer<'a> {
+pub struct BytesBuffer<'a, 'b> {
     data: &'a [u8],
     offset: usize,
+    steps_left: Option<&'b Cell<usize>>,
 }
 
-impl<'a> BytesBuffer<'a> {
+impl<'a, 'b> BytesBuffer<'a, 'b> {
     pub fn new(data: &'a [u8]) -> Self {
-        Self { data, offset: 0 }
+        Self {
+            data,
+            offset: 0,
+            steps_left: None,
+        }
+    }
+
+    /// Returns a new buffer that allows names to decode at most `steps_left` labels and pointers
+    /// in total, across this buffer and every buffer derived from it.
+    pub fn with_step_limit(data: &'a [u8], steps_left: &'b Cell<usize>) -> Self {
+        Self {
+            data,
+            offset: 0,
+            steps_left: Some(steps_left),
+        }
+    }
+
+    /// Takes one step, for a label or a pointer, failing once no steps are left.
+    ///
+    /// Compression pointers let many names reuse the labels of one long name, or follow a long
+    /// chain of pointers, so a small packet can decode to far more than it holds. The limit bounds
+    /// that amplification.
+    pub fn take_step(&self) -> crate::Result<()> {
+        if let Some(steps_left) = self.steps_left {
+            let remaining = steps_left.get();
+            if remaining == 0 {
+                return Err(crate::SimpleDnsError::InvalidDnsPacket);
+            }
+            steps_left.set(remaining - 1);
+        }
+
+        Ok(())
     }
 
     /// Returns `true` if there are more bytes remaining to read.
@@ -40,6 +78,7 @@ impl<'a> BytesBuffer<'a> {
         Ok(Self {
             data: self.data,
             offset: position,
+            steps_left: self.steps_left,
         })
     }
 
@@ -54,6 +93,7 @@ impl<'a> BytesBuffer<'a> {
         let buffer = Self {
             data: &self.data[..self.offset + offset],
             offset: self.offset,
+            steps_left: self.steps_left,
         };
         self.offset += offset;
 
@@ -148,8 +188,8 @@ impl<'a> BytesBuffer<'a> {
     }
 }
 
-impl<'a> From<&'a [u8]> for BytesBuffer<'a> {
-    fn from(value: &'a [u8]) -> BytesBuffer<'a> {
+impl<'a> From<&'a [u8]> for BytesBuffer<'a, '_> {
+    fn from(value: &'a [u8]) -> Self {
         Self::new(value)
     }
 }
@@ -321,5 +361,28 @@ mod tests {
     pub fn test_get_u8_returns_error_when_no_bytes_remaining() {
         let mut buffer = BytesBuffer::new(&[]);
         assert!(buffer.get_u8().is_err());
+    }
+
+    #[test]
+    pub fn test_take_step_without_limit_never_fails() {
+        let buffer = BytesBuffer::new(&[]);
+        for _ in 0..1000 {
+            assert!(buffer.take_step().is_ok());
+        }
+    }
+
+    #[test]
+    pub fn test_take_step_limit_is_shared_by_derived_buffers() {
+        let steps_left = Cell::new(3);
+        let mut buffer = BytesBuffer::with_step_limit(&[1, 2, 3, 4], &steps_left);
+        buffer.advance(3).unwrap();
+
+        buffer.take_step().unwrap();
+        buffer.new_at(0).unwrap().take_step().unwrap();
+        let mut sub_buffer = buffer.clone();
+        sub_buffer.new_limited_to(1).unwrap().take_step().unwrap();
+
+        assert_eq!(0, steps_left.get());
+        assert!(buffer.take_step().is_err());
     }
 }

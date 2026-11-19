@@ -1,3 +1,5 @@
+use core::cell::Cell;
+
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
 use crate::{
     bytes_buffer::BytesBuffer,
@@ -111,8 +113,30 @@ impl<'a> Packet<'a> {
     }
 
     /// Parses a packet from a slice of bytes
+    ///
+    /// Fails with [`SimpleDnsError::InvalidDnsPacket`](crate::SimpleDnsError::InvalidDnsPacket)
+    /// when the names of the packet decode to more than 4 labels and pointers per byte of the
+    /// packet.
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
-        let mut data = BytesBuffer::new(data);
+        // Compression pointers let a name reuse the labels of a name written earlier in the
+        // packet, so a 2 bytes pointer can decode to up to 127 labels. A hostile packet repeating
+        // such pointers decodes to more than 20 labels per byte, about 1.4 million labels for a
+        // 64 KiB packet, costing far more CPU and memory than its size suggests. A chain of
+        // pointers to pointers costs a step per hop without decoding any label, so pointers count
+        // as steps too.
+        //
+        // A label written in full takes at least 2 bytes, so only compression makes the names of
+        // a packet decode to more labels than the packet has bytes. Legitimate packets get there
+        // only by repeating long names, and stay below 4 labels per byte: 4000 A records
+        // with a compressed 4 labels owner decode to 0.25 labels per byte, the PTR records of an
+        // ip6.arpa zone (34 labels names) to 1.7, and ip6.arpa CNAME records targeting other
+        // ip6.arpa names to 3.1. A limit proportional to the packet size keeps the cost of
+        // parsing proportional to the size too, without a fixed limit that would be too strict
+        // for large packets or too lax for small ones.
+        const MAX_STEPS_PER_BYTE: usize = 4;
+
+        let steps_left = Cell::new(data.len().saturating_mul(MAX_STEPS_PER_BYTE));
+        let mut data = BytesBuffer::with_step_limit(data, &steps_left);
         let mut header = Header::parse(&mut data)?;
 
         let questions = Self::parse_section(&mut data, header.questions)?;
@@ -138,7 +162,7 @@ impl<'a> Packet<'a> {
     }
 
     fn parse_section<T: WireFormat<'a>>(
-        data: &mut BytesBuffer<'a>,
+        data: &mut BytesBuffer<'a, '_>,
         items_count: u16,
     ) -> crate::Result<Vec<T>> {
         // Prevents unnecessary memory allocation for poorly formated or empty packets trying to

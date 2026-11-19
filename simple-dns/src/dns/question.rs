@@ -56,7 +56,7 @@ impl<'a> WireFormat<'a> for Question<'a> {
     const MINIMUM_LEN: usize = 4;
 
     // Disable redundant length check.
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self> {
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self> {
         let qname = Name::parse(data)?;
 
         let qtype = data.get_u16()?;

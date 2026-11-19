@@ -37,7 +37,7 @@ impl CAA<'_> {
 impl<'a> WireFormat<'a> for CAA<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {
