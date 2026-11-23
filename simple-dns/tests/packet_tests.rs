@@ -300,3 +300,32 @@ fn parse_ip6_arpa_cnames_close_to_the_name_decode_limit() {
         Packet::parse(&bytes).unwrap().answers.len()
     );
 }
+
+#[test]
+fn parse_with_name_step_limit_applies_the_given_limit() {
+    // The question name has 4 labels, and each answer owner is one pointer to it, so the packet
+    // decodes 4 + 3 * (1 + 4) = 19 labels and pointers
+    let name = Name::new("host.service.example.com").unwrap();
+    let mut packet = Packet::new_reply(0);
+    packet.questions.push(simple_dns::Question::new(
+        name.clone(),
+        QTYPE::TYPE(TYPE::A),
+        QCLASS::CLASS(CLASS::IN),
+        false,
+    ));
+    for i in 0..3u32 {
+        packet.answers.push(ResourceRecord::new(
+            name.clone(),
+            CLASS::IN,
+            30,
+            RData::A(A { address: i }),
+        ));
+    }
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+
+    assert!(Packet::parse_with_name_step_limit(&bytes, 19).is_ok());
+    assert!(matches!(
+        Packet::parse_with_name_step_limit(&bytes, 18),
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
+    ));
+}

@@ -137,7 +137,18 @@ impl<'a> Packet<'a> {
         // ones.
         const MAX_STEPS_PER_BYTE: usize = 4;
 
-        let steps_left = Cell::new(data.len().saturating_mul(MAX_STEPS_PER_BYTE));
+        Self::parse_with_name_step_limit(data, data.len().saturating_mul(MAX_STEPS_PER_BYTE))
+    }
+
+    /// Parses a packet from a slice of bytes, decoding at most `max_steps` labels and compression
+    /// pointers across all names of the packet
+    ///
+    /// Use this to apply a tighter limit than [`Packet::parse`] when the expected packets are
+    /// small. Fails with
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`](crate::SimpleDnsError::NameDecodeLimitExceeded)
+    /// when the names decode to more than `max_steps` labels and pointers.
+    pub fn parse_with_name_step_limit(data: &'a [u8], max_steps: usize) -> crate::Result<Self> {
+        let steps_left = Cell::new(max_steps);
         let mut data = BytesBuffer::with_step_limit(data, &steps_left);
         let mut header = Header::parse(&mut data)?;
 

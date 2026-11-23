@@ -7,6 +7,8 @@
 
 ### Added
 - `SimpleDnsError::NameDecodeLimitExceeded`
+- `Packet::parse_with_name_step_limit`, to parse with a tighter limit on decoded labels and
+  pointers than `Packet::parse` applies
 
 # 0.13.1
 
