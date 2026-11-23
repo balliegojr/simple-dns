@@ -57,7 +57,14 @@ impl<'a> Label<'a> {
     /// assert!(Label::new(r"bad\1".as_bytes()).is_err());
     /// ```
     pub fn new<T: Into<Cow<'a, [u8]>>>(data: T) -> crate::Result<Self> {
+        /// The longest text of a valid label, with every octet written as `\DDD`.
+        const MAX_LABEL_TEXT_LENGTH: usize = 4 * MAX_LABEL_LENGTH;
+
         let data = data.into();
+        // Ahead of unescaping, which allocates for the whole text.
+        if data.len() > MAX_LABEL_TEXT_LENGTH {
+            return Err(crate::SimpleDnsError::InvalidServiceLabel);
+        }
         let label = if let Some((i, _)) = data.iter().enumerate().find(|(_, c)| **c == b'\\') {
             unescape_label(data, i)?
         } else {
@@ -408,6 +415,15 @@ mod tests {
         let label = Label::new_unchecked(input);
 
         assert_eq!(label.to_string(), "invalid�label");
+    }
+
+    /// 63 octets written as `\DDD` is the longest text a valid label takes.
+    #[test]
+    fn new_accepts_the_longest_escaped_text() {
+        let text = r"\097".repeat(63);
+        assert_eq!(63, Label::new(text.as_bytes()).unwrap().len());
+        assert!(Label::new((text + "a").as_bytes()).is_err());
+        assert!(Label::new(r"\097".repeat(250_000).as_bytes()).is_err());
     }
 
     #[test]

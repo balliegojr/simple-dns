@@ -1,3 +1,10 @@
+# Unreleased
+
+### Fix
+- `Name::new` stops once the name exceeds 255 octets, and `Label::new` rejects a text longer than
+  any valid label can take before it unescapes it. Before, both allocated for the whole input
+  first, so a long text cost memory in proportion to its size
+
 # 0.13.1
 
 ### Fix
