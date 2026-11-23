@@ -114,39 +114,26 @@ impl<'a> Packet<'a> {
 
     /// Parses a packet from a slice of bytes
     ///
-    /// Fails with
-    /// [`SimpleDnsError::NameDecodeLimitExceeded`](crate::SimpleDnsError::NameDecodeLimitExceeded)
-    /// when the names of the packet decode to more than 4 labels and pointers per byte of the
-    /// packet.
+    /// Fails with [`SimpleDnsError::NameDecodeLimitExceeded`] when the names decode to more than 4
+    /// labels and pointers per byte of the packet.
+    ///
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`]: crate::SimpleDnsError::NameDecodeLimitExceeded
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
-        // Compression pointers let a name reuse the labels of a name written earlier in the
-        // packet, so a 2 bytes pointer can decode to up to 127 labels. A hostile packet repeating
-        // such pointers decodes to more than 20 labels per byte, about 1.4 million labels for a
-        // 64 KiB packet, costing far more CPU and memory than its size suggests. A chain of
-        // pointers to pointers costs a step per hop without decoding any label, so pointers count
-        // as steps too.
-        //
-        // A label written in full takes at least 2 bytes, so only compression makes the names of
-        // a packet decode to more labels than the packet has bytes. Realistic packets stay below 4
-        // steps per byte: 4000 A records with a compressed 4 labels owner take 0.31 steps per
-        // byte, the PTR records of an ip6.arpa zone (34 labels names) 1.7, and ip6.arpa CNAME
-        // records targeting other ip6.arpa names 3.1. Legal packets can still exceed the limit:
-        // a large set of records whose owner name has more than 63 labels is rejected. A limit
-        // proportional to the packet size keeps the cost of parsing proportional to the size too,
-        // without a fixed limit that would be too strict for large packets or too lax for small
-        // ones.
+        // A 2 bytes pointer can decode to 127 labels, and a pointer can point to a pointer, so a
+        // hostile 64 KiB packet decodes to over a million labels. Realistic packets stay below 4
+        // steps per byte. The densest measured, ip6.arpa CNAMEs that target each other, take 3.1.
+        // A large record set whose owner has more than 63 labels is legal, but exceeds the limit.
         const MAX_STEPS_PER_BYTE: usize = 4;
 
         Self::parse_with_name_step_limit(data, data.len().saturating_mul(MAX_STEPS_PER_BYTE))
     }
 
-    /// Parses a packet from a slice of bytes, decoding at most `max_steps` labels and compression
-    /// pointers across all names of the packet
+    /// Parses a packet, decoding at most `max_steps` labels and pointers across all names
     ///
-    /// Use this to apply a tighter limit than [`Packet::parse`] when the expected packets are
-    /// small. Fails with
-    /// [`SimpleDnsError::NameDecodeLimitExceeded`](crate::SimpleDnsError::NameDecodeLimitExceeded)
-    /// when the names decode to more than `max_steps` labels and pointers.
+    /// Use this for a tighter limit than [`Packet::parse`] applies when the expected packets are
+    /// small. Fails with [`SimpleDnsError::NameDecodeLimitExceeded`] when the names need more.
+    ///
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`]: crate::SimpleDnsError::NameDecodeLimitExceeded
     pub fn parse_with_name_step_limit(data: &'a [u8], max_steps: usize) -> crate::Result<Self> {
         let steps_left = Cell::new(max_steps);
         let mut data = BytesBuffer::with_step_limit(data, &steps_left);

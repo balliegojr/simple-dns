@@ -29,8 +29,7 @@ pub enum SimpleDnsError {
     FailedToWrite,
     /// Invalid utf8 string
     InvalidUtf8String(FromUtf8Error),
-    /// The names of the packet decode to more labels and compression pointers than the parser
-    /// allows for the size of the packet
+    /// The names of a packet decode to more labels and pointers than the parser allows
     NameDecodeLimitExceeded,
 }
 

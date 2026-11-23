@@ -8,9 +8,8 @@ use core::cell::Cell;
 ///
 /// `peek_*` functions return the value at the specified offset without advancing the buffer position.
 ///
-/// The buffer can carry a step limit, shared by every buffer derived from it, which limits how
-/// many labels and compression pointers the names of a packet can decode. See
-/// [`BytesBuffer::take_step`].
+/// An optional step limit, shared with every derived buffer, bounds the labels and pointers that
+/// names decode. See [`BytesBuffer::take_step`].
 #[derive(Debug, Clone)]
 pub struct BytesBuffer<'a, 'b> {
     data: &'a [u8],
@@ -27,8 +26,9 @@ impl<'a, 'b> BytesBuffer<'a, 'b> {
         }
     }
 
-    /// Returns a new buffer that allows names to decode at most `steps_left` labels and pointers
-    /// in total, across this buffer and every buffer derived from it.
+    /// Returns a new buffer whose names decode at most `steps_left` labels and pointers
+    ///
+    /// The limit is shared with every buffer derived from this one.
     pub fn with_step_limit(data: &'a [u8], steps_left: &'b Cell<usize>) -> Self {
         Self {
             data,
@@ -37,11 +37,7 @@ impl<'a, 'b> BytesBuffer<'a, 'b> {
         }
     }
 
-    /// Takes one step, for a label or a pointer, failing once no steps are left.
-    ///
-    /// Compression pointers let many names reuse the labels of one long name, or follow a long
-    /// chain of pointers, so a small packet can decode to far more than it holds. The limit bounds
-    /// that amplification.
+    /// Takes one step, for a label or a pointer, failing once no steps are left
     pub fn take_step(&self) -> crate::Result<()> {
         if let Some(steps_left) = self.steps_left {
             let remaining = steps_left.get();

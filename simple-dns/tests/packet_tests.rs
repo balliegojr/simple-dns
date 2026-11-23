@@ -182,9 +182,8 @@ fn build_bytes_vec_after_parsing_compressed_have_correct_length() {
 
 #[test]
 fn parse_rejects_packets_following_too_many_pointers() {
-    // The first record's rdata holds a chain of pointers to pointers ending at a one label name,
-    // and every later owner name points at the top of the chain, so each name follows 4000
-    // pointers to decode a single label
+    // The first rdata holds a chain of 4000 pointers to a one label name, and every later owner
+    // points at the top of the chain
     let mut bytes = vec![0u8; 12];
     bytes[2] = 0x80;
     bytes.extend_from_slice(&[0, 0, 99, 0, 1, 0, 0, 0, 60, 0, 0]);
@@ -215,8 +214,7 @@ fn parse_rejects_packets_following_too_many_pointers() {
 
 #[test]
 fn parse_rejects_packets_decoding_too_many_labels() {
-    // Every name below is a 2 bytes pointer to the same 120 labels name, so each 16 bytes MINFO
-    // record decodes to 360 labels
+    // Each name is a pointer to one 120 labels name, so a 16 bytes MINFO record decodes 360 labels
     let long_name = "a.".repeat(120);
     let name = Name::new(&long_name).unwrap();
 
@@ -271,8 +269,7 @@ fn parse_large_compressed_packet() {
 
 #[test]
 fn parse_ip6_arpa_cnames_close_to_the_name_decode_limit() {
-    // Each owner and target is a 34 labels ip6.arpa name sharing most labels with the previous
-    // record, so the packet decodes to about 3.1 labels and pointers per byte, close to the limit
+    // Consecutive 34 labels names share most labels, so the packet takes about 3.1 steps per byte
     fn reverse_name(address: u32) -> String {
         let mut nibbles: Vec<String> = format!("{address:032x}")
             .chars()
@@ -303,8 +300,7 @@ fn parse_ip6_arpa_cnames_close_to_the_name_decode_limit() {
 
 #[test]
 fn parse_with_name_step_limit_applies_the_given_limit() {
-    // The question name has 4 labels, and each answer owner is one pointer to it, so the packet
-    // decodes 4 + 3 * (1 + 4) = 19 labels and pointers
+    // 4 labels for the question, then 1 pointer and 4 labels for each of the 3 owners
     let name = Name::new("host.service.example.com").unwrap();
     let mut packet = Packet::new_reply(0);
     packet.questions.push(simple_dns::Question::new(
