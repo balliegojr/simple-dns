@@ -1,3 +1,11 @@
+# Unreleased
+
+### Fix
+- `Label` and `Name` display control characters and bytes that are not UTF-8 as `\DDD` escapes,
+  instead of writing them raw or replacing them with U+FFFD. The text parses back to the same name
+  with `Name::new`, and a name from the network can no longer put control characters, such as a
+  newline, into logs
+
 # 0.13.1
 
 ### Fix
