@@ -40,6 +40,26 @@ impl<'a> CharacterString<'a> {
             data: self.data.into_owned().into(),
         }
     }
+
+    /// Returns the content of the string, without its length octet.
+    ///
+    /// The bytes need not be UTF-8. `Display` replaces invalid UTF-8 with U+FFFD, and
+    /// `TryFrom<CharacterString> for String` fails on it.
+    ///
+    /// ```
+    /// # use simple_dns::CharacterString;
+    /// let string = CharacterString::new(b"h2\xff").unwrap();
+    /// assert_eq!(b"h2\xff", string.as_bytes());
+    /// ```
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl AsRef<[u8]> for CharacterString<'_> {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
 }
 
 impl<'a> TryFrom<CharacterString<'a>> for String {

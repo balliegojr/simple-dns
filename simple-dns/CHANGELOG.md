@@ -1,3 +1,9 @@
+# Unreleased
+
+### Added
+- `CharacterString::as_bytes` and `AsRef<[u8]> for CharacterString`, which give the content
+  without a copy and without the UTF-8 conversion of `Display`
+
 # 0.13.1
 
 ### Fix
