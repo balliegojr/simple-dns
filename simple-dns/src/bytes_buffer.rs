@@ -46,7 +46,7 @@ impl<'a, 'b> BytesBuffer<'a, 'b> {
         if let Some(steps_left) = self.steps_left {
             let remaining = steps_left.get();
             if remaining == 0 {
-                return Err(crate::SimpleDnsError::InvalidDnsPacket);
+                return Err(crate::SimpleDnsError::NameDecodeLimitExceeded);
             }
             steps_left.set(remaining - 1);
         }

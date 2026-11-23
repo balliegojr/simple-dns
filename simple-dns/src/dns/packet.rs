@@ -114,7 +114,8 @@ impl<'a> Packet<'a> {
 
     /// Parses a packet from a slice of bytes
     ///
-    /// Fails with [`SimpleDnsError::InvalidDnsPacket`](crate::SimpleDnsError::InvalidDnsPacket)
+    /// Fails with
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`](crate::SimpleDnsError::NameDecodeLimitExceeded)
     /// when the names of the packet decode to more than 4 labels and pointers per byte of the
     /// packet.
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
@@ -126,13 +127,14 @@ impl<'a> Packet<'a> {
         // as steps too.
         //
         // A label written in full takes at least 2 bytes, so only compression makes the names of
-        // a packet decode to more labels than the packet has bytes. Legitimate packets get there
-        // only by repeating long names, and stay below 4 labels per byte: 4000 A records
-        // with a compressed 4 labels owner decode to 0.25 labels per byte, the PTR records of an
-        // ip6.arpa zone (34 labels names) to 1.7, and ip6.arpa CNAME records targeting other
-        // ip6.arpa names to 3.1. A limit proportional to the packet size keeps the cost of
-        // parsing proportional to the size too, without a fixed limit that would be too strict
-        // for large packets or too lax for small ones.
+        // a packet decode to more labels than the packet has bytes. Realistic packets stay below 4
+        // steps per byte: 4000 A records with a compressed 4 labels owner take 0.31 steps per
+        // byte, the PTR records of an ip6.arpa zone (34 labels names) 1.7, and ip6.arpa CNAME
+        // records targeting other ip6.arpa names 3.1. Legal packets can still exceed the limit:
+        // a large set of records whose owner name has more than 63 labels is rejected. A limit
+        // proportional to the packet size keeps the cost of parsing proportional to the size too,
+        // without a fixed limit that would be too strict for large packets or too lax for small
+        // ones.
         const MAX_STEPS_PER_BYTE: usize = 4;
 
         let steps_left = Cell::new(data.len().saturating_mul(MAX_STEPS_PER_BYTE));

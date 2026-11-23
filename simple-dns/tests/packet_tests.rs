@@ -209,7 +209,7 @@ fn parse_rejects_packets_following_too_many_pointers() {
 
     assert!(matches!(
         Packet::parse(&bytes),
-        Err(SimpleDnsError::InvalidDnsPacket)
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
     ));
 }
 
@@ -243,7 +243,7 @@ fn parse_rejects_packets_decoding_too_many_labels() {
     assert!(bytes.len() <= u16::MAX as usize);
     assert!(matches!(
         Packet::parse(&bytes),
-        Err(SimpleDnsError::InvalidDnsPacket)
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
     ));
 }
 
@@ -267,4 +267,36 @@ fn parse_large_compressed_packet() {
     let parsed = Packet::parse(&bytes).unwrap();
     assert_eq!(4000, parsed.answers.len());
     assert!(parsed.answers.iter().all(|rr| rr.name == name));
+}
+
+#[test]
+fn parse_ip6_arpa_cnames_close_to_the_name_decode_limit() {
+    // Each owner and target is a 34 labels ip6.arpa name sharing most labels with the previous
+    // record, so the packet decodes to about 3.1 labels and pointers per byte, close to the limit
+    fn reverse_name(address: u32) -> String {
+        let mut nibbles: Vec<String> = format!("{address:032x}")
+            .chars()
+            .map(|c| c.to_string())
+            .collect();
+        nibbles.reverse();
+        format!("{}.ip6.arpa", nibbles.join("."))
+    }
+
+    let names: Vec<String> = (0..2700).map(reverse_name).collect();
+    let mut packet = Packet::new_reply(0);
+    for pair in names.windows(2) {
+        packet.answers.push(ResourceRecord::new(
+            Name::new_unchecked(&pair[0]),
+            CLASS::IN,
+            30,
+            RData::CNAME(Name::new_unchecked(&pair[1]).into()),
+        ));
+    }
+
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+    assert!(bytes.len() <= u16::MAX as usize);
+    assert_eq!(
+        packet.answers.len(),
+        Packet::parse(&bytes).unwrap().answers.len()
+    );
 }
