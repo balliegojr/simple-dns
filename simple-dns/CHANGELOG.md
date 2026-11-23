@@ -1,3 +1,10 @@
+# Unreleased
+
+### Fix
+- `Packet::parse` returns `SimpleDnsError::InvalidDnsPacket` when the names of a packet decode to
+  more than 4 labels and compression pointers per byte of the packet. Pointers to long names, or
+  long chains of pointers, made a 64 KiB packet decode to over a million labels [#87]
+
 # 0.13.1
 
 ### Fix
