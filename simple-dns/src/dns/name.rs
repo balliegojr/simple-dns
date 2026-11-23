@@ -78,17 +78,20 @@ impl<'a> Name<'a> {
     /// The content of the labels is not checked against a naming rule, use the `is_valid_*`
     /// methods for that.
     pub fn new(name: &'a str) -> crate::Result<Self> {
-        let labels = LabelsIter::new(name.as_bytes())
-            .map(Label::new)
-            .collect::<Result<Vec<Label>, _>>()?;
-
-        let name = Self { labels };
-
-        if name.len() > MAX_NAME_LENGTH {
-            Err(crate::SimpleDnsError::InvalidServiceName)
-        } else {
-            Ok(name)
+        let mut labels = Vec::new();
+        // The wire length so far, starting with the root label.
+        let mut len = Self::MINIMUM_LEN;
+        // Stops at the limit, so an oversized text allocates no more than a valid one.
+        for label in LabelsIter::new(name.as_bytes()) {
+            let label = Label::new(label)?;
+            len += label.len() + 1;
+            if len > MAX_NAME_LENGTH {
+                return Err(crate::SimpleDnsError::InvalidServiceName);
+            }
+            labels.push(label);
         }
+
+        Ok(Self { labels })
     }
 
     /// Create a new Name without checking for size limits or contents.
@@ -1056,6 +1059,17 @@ mod tests {
         // 4 * 64 + 1 = 257 octets
         let too_long = format!("{label63}.{label63}.{label63}.{label63}");
         assert!(Name::new(&too_long).is_err());
+    }
+
+    /// The malformed escape lies past the length limit, so it is never read.
+    #[test]
+    fn new_stops_at_the_name_length_limit() {
+        let text = "a.".repeat(200) + r"bad\1";
+        assert_eq!(
+            Err(SimpleDnsError::InvalidServiceName),
+            Name::new(&text).map(|_| ())
+        );
+        assert!(Name::new(&"a.".repeat(1_000_000)).is_err());
     }
 
     #[test]
