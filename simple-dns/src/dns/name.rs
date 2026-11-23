@@ -326,14 +326,14 @@ impl<'a> Name<'a> {
 impl<'a> WireFormat<'a> for Name<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {
         // Parse labels will extract labels until it finds a 0 len label
         // or a pointer  to another label
         fn parse_labels<'a>(
-            data: &mut BytesBuffer<'a>,
+            data: &mut BytesBuffer<'a, '_>,
             name_len: &mut usize,
             labels: &mut Vec<Label<'a>>,
         ) -> crate::Result<Option<usize>> {
@@ -341,6 +341,7 @@ impl<'a> WireFormat<'a> for Name<'a> {
                 match data.get_u8()? {
                     0 => break Ok(None),
                     len if len & POINTER_MASK == POINTER_MASK => {
+                        data.take_step()?;
                         let mut pointer = len as u16;
                         pointer <<= 8;
                         pointer += data.get_u8()? as u16;
@@ -359,6 +360,8 @@ impl<'a> WireFormat<'a> for Name<'a> {
                         if len as usize > MAX_LABEL_LENGTH {
                             return Err(crate::SimpleDnsError::InvalidServiceLabel);
                         }
+
+                        data.take_step()?;
 
                         // Parsing allow invalid characters in the label.
                         // However, the length of the label must be validated (above)

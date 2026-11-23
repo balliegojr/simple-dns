@@ -47,7 +47,7 @@ impl<'a> NULL<'a> {
 
 impl<'a> WireFormat<'a> for NULL<'a> {
     const MINIMUM_LEN: usize = 0;
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

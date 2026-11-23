@@ -29,6 +29,8 @@ pub enum SimpleDnsError {
     FailedToWrite,
     /// Invalid utf8 string
     InvalidUtf8String(FromUtf8Error),
+    /// The names of a packet decode to more labels and pointers than the parser allows
+    NameDecodeLimitExceeded,
 }
 
 impl From<TryFromSliceError> for SimpleDnsError {
@@ -80,6 +82,12 @@ impl Display for SimpleDnsError {
             }
             SimpleDnsError::InvalidUtf8String(e) => {
                 write!(f, "Invalid utf8 string: {e}")
+            }
+            SimpleDnsError::NameDecodeLimitExceeded => {
+                write!(
+                    f,
+                    "Names of the packet decode to too many labels and pointers"
+                )
             }
         }
     }

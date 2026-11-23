@@ -1,3 +1,5 @@
+use core::cell::Cell;
+
 use super::{Header, PacketFlag, Question, ResourceRecord, WireFormat, OPCODE};
 use crate::{
     bytes_buffer::BytesBuffer,
@@ -111,8 +113,30 @@ impl<'a> Packet<'a> {
     }
 
     /// Parses a packet from a slice of bytes
+    ///
+    /// Fails with [`SimpleDnsError::NameDecodeLimitExceeded`] when the names decode to more than 4
+    /// labels and pointers per byte of the packet.
+    ///
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`]: crate::SimpleDnsError::NameDecodeLimitExceeded
     pub fn parse(data: &'a [u8]) -> crate::Result<Self> {
-        let mut data = BytesBuffer::new(data);
+        // A 2 bytes pointer can decode to 127 labels, and a pointer can point to a pointer, so a
+        // hostile 64 KiB packet decodes to over a million labels. Realistic packets stay below 4
+        // steps per byte. The densest measured, ip6.arpa CNAMEs that target each other, take 3.1.
+        // A large record set whose owner has more than 63 labels is legal, but exceeds the limit.
+        const MAX_STEPS_PER_BYTE: usize = 4;
+
+        Self::parse_with_name_step_limit(data, data.len().saturating_mul(MAX_STEPS_PER_BYTE))
+    }
+
+    /// Parses a packet, decoding at most `max_steps` labels and pointers across all names
+    ///
+    /// Use this for a tighter limit than [`Packet::parse`] applies when the expected packets are
+    /// small. Fails with [`SimpleDnsError::NameDecodeLimitExceeded`] when the names need more.
+    ///
+    /// [`SimpleDnsError::NameDecodeLimitExceeded`]: crate::SimpleDnsError::NameDecodeLimitExceeded
+    pub fn parse_with_name_step_limit(data: &'a [u8], max_steps: usize) -> crate::Result<Self> {
+        let steps_left = Cell::new(max_steps);
+        let mut data = BytesBuffer::with_step_limit(data, &steps_left);
         let mut header = Header::parse(&mut data)?;
 
         let questions = Self::parse_section(&mut data, header.questions)?;
@@ -138,7 +162,7 @@ impl<'a> Packet<'a> {
     }
 
     fn parse_section<T: WireFormat<'a>>(
-        data: &mut BytesBuffer<'a>,
+        data: &mut BytesBuffer<'a, '_>,
         items_count: u16,
     ) -> crate::Result<Vec<T>> {
         // Prevents unnecessary memory allocation for poorly formated or empty packets trying to

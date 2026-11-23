@@ -129,7 +129,7 @@ impl<'a> SVCB<'a> {
 impl<'a> WireFormat<'a> for SVCB<'a> {
     const MINIMUM_LEN: usize = 2;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {
@@ -248,7 +248,7 @@ impl SVCParam<'_> {
 impl<'a> WireFormat<'a> for SVCParam<'a> {
     const MINIMUM_LEN: usize = 4;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

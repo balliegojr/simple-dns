@@ -20,7 +20,7 @@ impl RR for DHCID<'_> {
 impl<'a> WireFormat<'a> for DHCID<'a> {
     const MINIMUM_LEN: usize = 3;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

@@ -10,7 +10,7 @@ pub(crate) trait WireFormat<'a> {
     /// Parse the contents of the data buffer starting at the given `position`
     /// It is necessary to pass the full buffer to this function, to be able to correctly implement name compression
     /// The implementor must `position` to ensure that is at the end of the data just parsed
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized;
 

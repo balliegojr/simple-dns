@@ -23,7 +23,7 @@ macro_rules! rr_wrapper {
 
         impl<'a> WireFormat<'a> for $t<'a> {
             const MINIMUM_LEN: usize = 0;
-            fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+            fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
             where
                 Self: Sized,
             {
@@ -80,7 +80,7 @@ macro_rules! rdata_enum {
         impl<'a> WireFormat<'a> for RData<'a> {
             const MINIMUM_LEN: usize = 10;
 
-            fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+            fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
             where
                 Self: Sized,
             {
@@ -172,7 +172,7 @@ macro_rules! rdata_enum {
             }
         }
 
-        fn parse_rdata<'a>(data: &mut BytesBuffer<'a>, rdatatype: TYPE) -> crate::Result<RData<'a>> {
+        fn parse_rdata<'a>(data: &mut BytesBuffer<'a, '_>, rdatatype: TYPE) -> crate::Result<RData<'a>> {
             let rdata = match rdatatype {
                 $(
                     TYPE::$i => RData::$i($i::parse(data)?),

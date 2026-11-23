@@ -231,7 +231,7 @@ impl<'a> TryFrom<TXT<'a>> for String {
 impl<'a> WireFormat<'a> for TXT<'a> {
     const MINIMUM_LEN: usize = 1;
 
-    fn parse(data: &mut crate::bytes_buffer::BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut crate::bytes_buffer::BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

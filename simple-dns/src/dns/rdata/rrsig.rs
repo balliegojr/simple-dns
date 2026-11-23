@@ -37,7 +37,7 @@ impl RR for RRSIG<'_> {
 impl<'a> WireFormat<'a> for RRSIG<'a> {
     const MINIMUM_LEN: usize = 18;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

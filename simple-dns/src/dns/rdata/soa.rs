@@ -58,7 +58,7 @@ impl SOA<'_> {
 impl<'a> WireFormat<'a> for SOA<'a> {
     const MINIMUM_LEN: usize = 20;
 
-    fn parse(data: &mut BytesBuffer<'a>) -> crate::Result<Self>
+    fn parse(data: &mut BytesBuffer<'a, '_>) -> crate::Result<Self>
     where
         Self: Sized,
     {

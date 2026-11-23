@@ -179,3 +179,149 @@ fn build_bytes_vec_after_parsing_compressed_have_correct_length() {
         original.build_bytes_vec().unwrap()
     );
 }
+
+#[test]
+fn parse_rejects_packets_following_too_many_pointers() {
+    // The first rdata holds a chain of 4000 pointers to a one label name, and every later owner
+    // points at the top of the chain
+    let mut bytes = vec![0u8; 12];
+    bytes[2] = 0x80;
+    bytes.extend_from_slice(&[0, 0, 99, 0, 1, 0, 0, 0, 60, 0, 0]);
+    let rdata_start = bytes.len();
+    bytes.extend_from_slice(&[1, b'a', 0]);
+    let mut top = rdata_start;
+    for _ in 0..4000 {
+        let cell = bytes.len();
+        bytes.extend_from_slice(&(0xC000 | top as u16).to_be_bytes());
+        top = cell;
+    }
+    let rdata_len = (bytes.len() - rdata_start) as u16;
+    bytes[rdata_start - 2..rdata_start].copy_from_slice(&rdata_len.to_be_bytes());
+
+    let mut records = 1u16;
+    while bytes.len() + 16 <= u16::MAX as usize {
+        bytes.extend_from_slice(&(0xC000 | top as u16).to_be_bytes());
+        bytes.extend_from_slice(&[0, 1, 0, 1, 0, 0, 0, 60, 0, 4, 192, 0, 2, 1]);
+        records += 1;
+    }
+    bytes[6..8].copy_from_slice(&records.to_be_bytes());
+
+    assert!(matches!(
+        Packet::parse(&bytes),
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
+    ));
+}
+
+#[test]
+fn parse_rejects_packets_decoding_too_many_labels() {
+    // Each name is a pointer to one 120 labels name, so a 16 bytes MINFO record decodes 360 labels
+    let long_name = "a.".repeat(120);
+    let name = Name::new(&long_name).unwrap();
+
+    let mut packet = Packet::new_reply(0);
+    packet.questions.push(simple_dns::Question::new(
+        name.clone(),
+        QTYPE::TYPE(TYPE::MINFO),
+        QCLASS::CLASS(CLASS::IN),
+        false,
+    ));
+    for _ in 0..4000 {
+        packet.answers.push(ResourceRecord::new(
+            name.clone(),
+            CLASS::IN,
+            30,
+            RData::MINFO(simple_dns::rdata::MINFO {
+                rmailbox: name.clone(),
+                emailbox: name.clone(),
+            }),
+        ));
+    }
+
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+    assert!(bytes.len() <= u16::MAX as usize);
+    assert!(matches!(
+        Packet::parse(&bytes),
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
+    ));
+}
+
+#[test]
+fn parse_large_compressed_packet() {
+    let name = Name::new("host.service.example.com").unwrap();
+
+    let mut packet = Packet::new_reply(0);
+    for i in 0..4000u32 {
+        packet.answers.push(ResourceRecord::new(
+            name.clone(),
+            CLASS::IN,
+            30,
+            RData::A(A { address: i }),
+        ));
+    }
+
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+    assert!(bytes.len() <= u16::MAX as usize);
+
+    let parsed = Packet::parse(&bytes).unwrap();
+    assert_eq!(4000, parsed.answers.len());
+    assert!(parsed.answers.iter().all(|rr| rr.name == name));
+}
+
+#[test]
+fn parse_ip6_arpa_cnames_close_to_the_name_decode_limit() {
+    // Consecutive 34 labels names share most labels, so the packet takes about 3.1 steps per byte
+    fn reverse_name(address: u32) -> String {
+        let mut nibbles: Vec<String> = format!("{address:032x}")
+            .chars()
+            .map(|c| c.to_string())
+            .collect();
+        nibbles.reverse();
+        format!("{}.ip6.arpa", nibbles.join("."))
+    }
+
+    let names: Vec<String> = (0..2700).map(reverse_name).collect();
+    let mut packet = Packet::new_reply(0);
+    for pair in names.windows(2) {
+        packet.answers.push(ResourceRecord::new(
+            Name::new_unchecked(&pair[0]),
+            CLASS::IN,
+            30,
+            RData::CNAME(Name::new_unchecked(&pair[1]).into()),
+        ));
+    }
+
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+    assert!(bytes.len() <= u16::MAX as usize);
+    assert_eq!(
+        packet.answers.len(),
+        Packet::parse(&bytes).unwrap().answers.len()
+    );
+}
+
+#[test]
+fn parse_with_name_step_limit_applies_the_given_limit() {
+    // 4 labels for the question, then 1 pointer and 4 labels for each of the 3 owners
+    let name = Name::new("host.service.example.com").unwrap();
+    let mut packet = Packet::new_reply(0);
+    packet.questions.push(simple_dns::Question::new(
+        name.clone(),
+        QTYPE::TYPE(TYPE::A),
+        QCLASS::CLASS(CLASS::IN),
+        false,
+    ));
+    for i in 0..3u32 {
+        packet.answers.push(ResourceRecord::new(
+            name.clone(),
+            CLASS::IN,
+            30,
+            RData::A(A { address: i }),
+        ));
+    }
+    let bytes = packet.build_bytes_vec_compressed().unwrap();
+
+    assert!(Packet::parse_with_name_step_limit(&bytes, 19).is_ok());
+    assert!(matches!(
+        Packet::parse_with_name_step_limit(&bytes, 18),
+        Err(SimpleDnsError::NameDecodeLimitExceeded)
+    ));
+}
