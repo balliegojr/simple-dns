@@ -48,8 +48,9 @@ const MAX_COMPRESSION_OFFSET: u64 = !POINTER_MASK_U16 as u64;
 /// four byte label `a\.b`. To build a name from raw label content, use
 /// [`Name::new_with_labels`].
 ///
-/// [`Display`](core::fmt::Display) writes the same format, escaping `.` and `\` inside labels
-/// (RFC 6763 section 4.3), so a name parsed back with [`Name::new`] is equal to the original.
+/// [`Display`] writes the same format. It escapes `.` and `\` inside labels (RFC 6763 section
+/// 4.3), and writes control characters and bytes that are not UTF-8 as `\DDD`, so a name parsed
+/// back with [`Name::new`] is equal to the original.
 ///
 /// The escapes exist only in text. In the wire format, labels are length-prefixed and hold
 /// any octet.
@@ -65,6 +66,8 @@ const MAX_COMPRESSION_OFFSET: u64 = !POINTER_MASK_U16 as u64;
 /// Microsoft implementation allows unicode characters in the name content.
 /// To create a name with unicode characters, use [`Name::new_unchecked`] or
 /// [`Name::new_with_labels`]
+///
+/// [`Display`]: core::fmt::Display
 #[derive(Eq, Clone)]
 pub struct Name<'a> {
     labels: Vec<Label<'a>>,

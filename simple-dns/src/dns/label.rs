@@ -4,7 +4,7 @@ use crate::{
     dns::MAX_SERVICE_NAME_LENGTH,
     lib::{
         fmt::{Debug, Display, Formatter, Result as FmtResult},
-        Cow, Hash, String, ToString, Vec,
+        Cow, Hash, ToString, Vec,
     },
 };
 
@@ -27,9 +27,12 @@ use super::MAX_LABEL_LENGTH;
 /// host name (unicode, dots, spaces), use [`Label::new`] or [`Label::new_unchecked`] and
 /// [`Name::new_with_labels`](crate::Name::new_with_labels).
 ///
-/// The `Display` implementation uses [`std::string::String::from_utf8_lossy`] to display the
-/// label, and escapes `.` as `\.` and `\` as `\\`, so that labels joined in a [`Name`](crate::Name)
-/// can be told apart from the dots that separate them (RFC 6763 section 4.3).
+/// The `Display` implementation escapes `.` as `\.` and `\` as `\\`, so that labels joined in a
+/// [`Name`] can be told apart from the dots that separate them (RFC 6763 section 4.3). It writes
+/// control characters and bytes that are not UTF-8 as `\DDD`, so the text never carries them raw,
+/// and [`Label::new`] reads it back to the same label.
+///
+/// [`Name`]: crate::Name
 #[derive(Eq, Clone)]
 pub struct Label<'a> {
     pub(crate) data: Cow<'a, [u8]>,
@@ -269,19 +272,24 @@ impl Display for Label<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         use core::fmt::Write;
 
-        let s = String::from_utf8_lossy(&self.data);
-        for c in s.chars() {
-            match c {
-                '.' => {
-                    f.write_char('\\')?;
-                    f.write_char(c)?;
+        for chunk in self.data.utf8_chunks() {
+            for c in chunk.valid().chars() {
+                match c {
+                    '.' | '\\' => {
+                        f.write_char('\\')?;
+                        f.write_char(c)?;
+                    }
+                    c if c.is_control() => {
+                        let mut bytes = [0; 4];
+                        for byte in c.encode_utf8(&mut bytes).bytes() {
+                            write!(f, "\\{byte:03}")?;
+                        }
+                    }
+                    c => f.write_char(c)?,
                 }
-                '\\' => {
-                    f.write_str(r"\\")?;
-                }
-                _ => {
-                    f.write_char(c)?;
-                }
+            }
+            for byte in chunk.invalid() {
+                write!(f, "\\{byte:03}")?;
             }
         }
 
@@ -403,11 +411,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn display_invalid_label() {
-        let input = b"invalid\xF0\x90\x80label";
-        let label = Label::new_unchecked(input);
+    fn display_escapes_bytes_that_are_not_utf8() {
+        let label = Label::new_unchecked(b"invalid\xF0\x90\x80label");
+        assert_eq!(r"invalid\240\144\128label", label.to_string());
+    }
 
-        assert_eq!(label.to_string(), "invalid�label");
+    #[test]
+    fn display_escapes_control_characters() {
+        let label = Label::new_unchecked("a\nb\x7fc\u{85}d".as_bytes());
+        assert_eq!(r"a\010b\127c\194\133d", label.to_string());
+    }
+
+    #[test]
+    fn display_keeps_printable_unicode() {
+        let label = Label::new_unchecked("caf\u{e9} bar".as_bytes());
+        assert_eq!("caf\u{e9} bar", label.to_string());
+    }
+
+    /// Every octet survives `Display` followed by `Label::new`.
+    #[test]
+    fn display_round_trips_every_byte() {
+        for byte in 0..=u8::MAX {
+            let data = [b'a', byte, b'1'];
+            let text = Label::new_unchecked(&data[..]).to_string();
+            let parsed = Label::new(text.as_bytes()).expect("display output parses");
+            assert_eq!(&data[..], parsed.as_ref(), "byte {byte} as {text:?}");
+        }
     }
 
     #[test]
